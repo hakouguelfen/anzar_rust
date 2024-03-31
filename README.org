@@ -1,0 +1,3 @@
+# https://auth0.com/blog/refresh-tokens-what-are-they-and-when-to-use-them/
+# https://www.loginradius.com/blog/identity/refresh-tokens-jwt-interaction/
+# https://www.shuttle.rs/blog/2024/02/21/using-jwt-auth-rust
