@@ -25,9 +25,13 @@ impl FromRequest for AuthToken {
 
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
         let auth_header: Option<&header::HeaderValue> = req.headers().get(header::AUTHORIZATION);
-        let auth_token: String = auth_header.unwrap().to_str().unwrap_or("").to_string();
+        let auth_token = auth_header;
+        if let None = auth_token {
+            return ready(Err(ErrorUnauthorized("Unauthorized")));
+        }
+        let token: String = auth_token.unwrap().to_str().unwrap_or("").to_string();
 
-        let token: Vec<&str> = auth_token.split_ascii_whitespace().collect();
+        let token: Vec<&str> = token.split_ascii_whitespace().collect();
         let mut refresh_token: Option<String> = None;
         if req.path() == "/auth/refreshToken" {
             refresh_token = Some(token[1].to_string());

@@ -56,7 +56,7 @@ pub async fn update_refresh_token(
     refresh_token: String,
 ) -> Option<User> {
     let filter = doc! {"_id": id};
-    let update = doc! { "$set": doc! {"refresh_token": refresh_token} };
+    let update = doc! { "$set": doc! {"refreshToken": refresh_token} };
     let user_detail = db
         .collection::<User>("user")
         .find_one_and_update(filter, update, None)

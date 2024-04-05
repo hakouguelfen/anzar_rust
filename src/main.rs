@@ -16,7 +16,7 @@ async fn main() -> std::io::Result<()> {
 
     let mongorepo = MongoRepo::init().await;
     let db = web::Data::new(mongorepo);
-    println!("Server running in http://localhost:8080");
+    println!("Server running in http://localhost:3000");
 
     HttpServer::new(move || {
         let jwt: String = match env::var("JWT_SECRET") {
@@ -36,7 +36,7 @@ async fn main() -> std::io::Result<()> {
             .service(auth::auth_scope())
             .service(user::user_scope())
     })
-    .bind(("127.0.0.1", 8080))?
+    .bind(("0.0.0.0", 3000))?
     .run()
     .await
 }
