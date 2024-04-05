@@ -249,6 +249,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "anzar"
+version = "0.1.0"
+dependencies = [
+ "actix-web",
+ "bcrypt",
+ "chrono",
+ "dotenv",
+ "jsonwebtoken",
+ "mongodb",
+ "once_cell",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "async-trait"
 version = "0.1.77"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -431,21 +446,6 @@ checksum = "8cd6604a82acf3039f1144f54b8eb34e91ffba622051189e71b781822d5ee1f5"
 dependencies = [
  "jobserver",
  "libc",
-]
-
-[[package]]
-name = "ccp"
-version = "0.1.0"
-dependencies = [
- "actix-web",
- "bcrypt",
- "chrono",
- "dotenv",
- "jsonwebtoken",
- "mongodb",
- "once_cell",
- "serde",
- "serde_json",
 ]
 
 [[package]]
