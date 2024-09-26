@@ -17,7 +17,7 @@ impl DataBaseRepo {
         let db: Database = client.database(DATABASE_NAME);
         user::create_unique_email_index(&db)
             .await
-            .expect("Coudln't create user emali index");
+            .expect("Coudln't create user email index");
 
         db
     }

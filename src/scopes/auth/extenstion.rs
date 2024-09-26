@@ -1,16 +1,16 @@
 use actix_web::{http::header, HttpResponse};
 
 use super::tokens::Tokens;
-use super::user::User;
+use super::user::UserResponse;
 
 const X_REFRESH_TOKEN: &str = "X-Refresh-Token";
 
 pub trait AuthResponseTrait {
-    fn load_tokens(tokens: Tokens, user: User) -> Self;
+    fn load_tokens(tokens: Tokens, user: UserResponse) -> Self;
 }
 
 impl AuthResponseTrait for HttpResponse {
-    fn load_tokens(tokens: Tokens, user: User) -> Self {
+    fn load_tokens(tokens: Tokens, user_response: UserResponse) -> Self {
         HttpResponse::Ok()
             .append_header((header::ACCESS_CONTROL_EXPOSE_HEADERS, X_REFRESH_TOKEN))
             .append_header((
@@ -19,6 +19,6 @@ impl AuthResponseTrait for HttpResponse {
             ))
             .append_header((header::AUTHORIZATION, tokens.access_token))
             .append_header((X_REFRESH_TOKEN, tokens.refresh_token))
-            .json(user)
+            .json(user_response)
     }
 }

@@ -17,13 +17,11 @@ use super::{extenstion::AuthResponseTrait, repository};
 use uuid::Uuid;
 
 async fn login(req: Json<LoginRequest>, repo: Data<RepositoryManager>) -> Result<HttpResponse> {
-    // FIXME: refreshToken is not returned the first time you login
-    // remove password from response body
     let user: User = repository::check_credentials(&repo, req.into_inner()).await?;
 
     repository::issue_and_save_tokens(&repo, &user)
         .await
-        .map(|tokens| Ok(HttpResponse::load_tokens(tokens, user)))?
+        .map(|tokens| Ok(HttpResponse::load_tokens(tokens, user.as_response())))?
 }
 
 async fn register(req: Json<User>, repo: Data<RepositoryManager>) -> Result<HttpResponse> {
@@ -31,7 +29,7 @@ async fn register(req: Json<User>, repo: Data<RepositoryManager>) -> Result<Http
 
     repository::issue_and_save_tokens(&repo, &user)
         .await
-        .map(|tokens| Ok(HttpResponse::load_tokens(tokens, user)))?
+        .map(|tokens| Ok(HttpResponse::load_tokens(tokens, user.as_response())))?
 }
 
 async fn refresh_token(

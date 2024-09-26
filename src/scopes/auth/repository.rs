@@ -71,11 +71,6 @@ pub async fn validate_token(repo: &Data<RepositoryManager>, payload: AuthPayload
 
     let mut token_data: Option<RefreshToken> = None;
     for token in tokens {
-        // DEPRECATED
-        // if bcrypt::verify(&payload.refresh_token, &token.hash).unwrap_or(false) {
-        //     token_data = Some(token);
-        //     break;
-        // }
         if verify_token(&payload.refresh_token, &token.hash) {
             token_data = Some(token);
             break;
@@ -85,7 +80,7 @@ pub async fn validate_token(repo: &Data<RepositoryManager>, payload: AuthPayload
     let refresh_token = token_data.ok_or(Error::InvalidToken)?;
 
     if !refresh_token.valid {
-        // NOTE: send an email indicating a possible breach
+        // TODO: send an email indicating a possible breach
         let _ = repo.token_repo.revoke(user_id).await;
         return Err(Error::InvalidToken);
     }
@@ -114,10 +109,6 @@ pub async fn issue_and_save_tokens(repo: &Data<RepositoryManager>, user: &User) 
         .sub(user_id.to_string())
         .role(user.role.clone())
         .build()?;
-
-    // DEPRECATED
-    // let hashed_refresh_token: String =
-    //     hash(&tokens.refresh_token, DEFAULT_COST).map_err(|_| Error::HashingFailure)?;
 
     let hashed_refresh_token = hash_token(&tokens.refresh_token);
 

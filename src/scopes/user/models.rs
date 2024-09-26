@@ -14,7 +14,6 @@ impl Default for Role {
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct User {
-    #[serde(serialize_with = "serialize_object_id")]
     #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
     pub id: Option<ObjectId>,
 
@@ -27,14 +26,15 @@ pub struct User {
     pub is_premium: bool,
 }
 
-fn serialize_object_id<S>(id: &Option<ObjectId>, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    match id {
-        Some(id) => serializer.serialize_str(&id.to_string()),
-        None => serializer.serialize_none(),
-    }
+#[derive(Serialize)]
+pub struct UserResponse {
+    #[serde(rename = "_id")]
+    pub id: String,
+    pub username: String,
+    pub email: String,
+    pub role: Role,
+    #[serde(rename = "isPremium")]
+    pub is_premium: bool,
 }
 
 impl User {
@@ -56,5 +56,16 @@ impl User {
     pub fn with_password(mut self, password: String) -> Self {
         self.password = password;
         self
+    }
+
+    pub fn as_response(self) -> UserResponse {
+        UserResponse {
+            // FIXME: dont use unwrap
+            id: self.id.unwrap().to_string(),
+            email: self.email,
+            username: self.username,
+            role: self.role,
+            is_premium: self.is_premium,
+        }
     }
 }

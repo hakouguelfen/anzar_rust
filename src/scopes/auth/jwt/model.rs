@@ -49,6 +49,7 @@ impl RefreshToken {
     }
 }
 
+// FIXME: remove serializer
 fn serialize_object_id<S>(id: &Option<ObjectId>, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
