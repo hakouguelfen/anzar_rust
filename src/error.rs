@@ -15,23 +15,8 @@ pub enum Error {
     #[display("Something has occured while proccessing this request")]
     BadRequest,
 
-    #[display("User Creation Error")]
-    UserCreationFailure,
-
-    #[display("And error has occured while hashing")]
-    HashingFailure,
-
-    #[display("Invalid token")]
-    InvalidToken,
-
-    #[display("Wrong credentials")]
-    WrongCredentials,
-
-    #[display("Token creation error")]
-    TokenCreation,
-
-    #[display("Missing credentials")]
-    MissingCredentials,
+    #[display("Data Not Found")]
+    NotFound,
 }
 
 impl ResponseError for Error {
@@ -43,16 +28,9 @@ impl ResponseError for Error {
 
     fn status_code(&self) -> StatusCode {
         match self {
-            Error::TokenCreation => StatusCode::INTERNAL_SERVER_ERROR,
-            Error::HashingFailure => StatusCode::INTERNAL_SERVER_ERROR,
             Error::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
-
-            Error::UserCreationFailure => StatusCode::UNAUTHORIZED,
-            Error::InvalidToken => StatusCode::UNAUTHORIZED,
-            Error::WrongCredentials => StatusCode::UNAUTHORIZED,
-
             Error::BadRequest => StatusCode::BAD_REQUEST,
-            Error::MissingCredentials => StatusCode::BAD_REQUEST,
+            Error::NotFound => StatusCode::NOT_FOUND,
         }
     }
 }

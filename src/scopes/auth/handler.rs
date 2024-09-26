@@ -1,125 +1,109 @@
-use actix_web::{web, HttpResponse};
-use bcrypt::{hash, verify, DEFAULT_COST};
-use mongodb::{bson::oid::ObjectId, Database};
+use actix_web::{
+    web::{self, Data, Json, Query},
+    HttpResponse, Scope,
+};
+use mongodb::bson::oid::ObjectId;
 
+use crate::core::repository::repository_manager::RepositoryManager;
+
+use super::user::User;
+use super::Claims;
 use super::{
-    jwt::{self, Tokens},
-    LoginRequest,
+    email::manager::Email,
+    models::{EmailRequest, LoginRequest, TokenQuery},
 };
-use crate::{
-    extractors::AuthToken,
-    scopes::user::{handler, models::User},
-};
+use super::{error::Result, models::AuthPayload};
+use super::{extenstion::AuthResponseTrait, repository};
+use uuid::Uuid;
 
-pub async fn login(
-    db: web::Data<Database>,
-    req: LoginRequest,
-    secret: String,
-) -> Result<(User, Tokens), HttpResponse> {
-    let user_detail = handler::find_by_email(&db, req.email.to_string()).await;
+async fn login(req: Json<LoginRequest>, repo: Data<RepositoryManager>) -> Result<HttpResponse> {
+    // FIXME: refreshToken is not returned the first time you login
+    // remove password from response body
+    let user: User = repository::check_credentials(&repo, req.into_inner()).await?;
 
-    if let None = user_detail {
-        return Err(HttpResponse::Unauthorized().body("user not found"));
-    }
-    let user = user_detail.unwrap();
-    let user_id: ObjectId = user.id.expect("ObjectId convertion error");
-
-    let is_valid: bool = verify(&req.password, &user.password).unwrap_or(false);
-    if !is_valid {
-        return Err(HttpResponse::Unauthorized().body("password wrong"));
-    }
-    Ok(sync_token(&db, user_id, secret).await?)
+    repository::issue_and_save_tokens(&repo, &user)
+        .await
+        .map(|tokens| Ok(HttpResponse::load_tokens(tokens, user)))?
 }
 
-pub async fn register(
-    db: web::Data<Database>,
-    req: User,
-    secret: String,
-) -> Result<(User, Tokens), HttpResponse> {
-    let hashed = hash(&req.password, DEFAULT_COST);
-    if let Err(_) = hashed {
-        return Err(HttpResponse::InternalServerError().body("password hashing error"));
-    }
+async fn register(req: Json<User>, repo: Data<RepositoryManager>) -> Result<HttpResponse> {
+    let user: User = repository::create_user(&repo, req.into_inner()).await?;
 
-    let user_detail = handler::create_user(&db, req, hashed.unwrap()).await;
-    if let Err(_) = user_detail {
-        return Err(HttpResponse::Unauthorized().body("User creation error"));
-    }
-
-    let user = user_detail.unwrap();
-    let user_id: ObjectId = user
-        .inserted_id
-        .as_object_id()
-        .expect("filed to make an objectId");
-
-    Ok(sync_token(&db, user_id, secret).await?)
+    repository::issue_and_save_tokens(&repo, &user)
+        .await
+        .map(|tokens| Ok(HttpResponse::load_tokens(tokens, user)))?
 }
 
-pub async fn refresh_user_token(
-    auth_token: AuthToken,
-    db: web::Data<Database>,
-    secret: String,
-) -> Result<Tokens, HttpResponse> {
-    // get user
-    let user_id = ObjectId::parse_str(auth_token.user_id);
-    if let Err(_) = user_id {
-        return Err(HttpResponse::Unauthorized().body("Error parsing objectId"));
-    }
-    let user_object_id = user_id.unwrap();
+async fn refresh_token(
+    payload: AuthPayload,
+    repo: Data<RepositoryManager>,
+) -> Result<HttpResponse> {
+    // NOTE: maybe save valid tokens to user doc
+    let user: User = repository::validate_token(&repo, payload).await?;
 
-    let user_detail = handler::find_by_id(&db, user_object_id).await;
-    if let None = user_detail {
-        return Err(HttpResponse::Unauthorized().body("User not found"));
-    }
-    let user: User = user_detail.unwrap();
-
-    // get token
-    let rf_token_option = auth_token.refresh_token;
-    if let None = rf_token_option {
-        return Err(HttpResponse::InternalServerError().body("retrieve token failure"));
-    }
-    let refresh_token: String = rf_token_option.unwrap();
-
-    // compare hash(refreshToken) with user.refreshToken
-    let is_valid: bool = verify(
-        &refresh_token,
-        &user.refresh_token.unwrap_or(String::from("")),
-    )
-    .unwrap_or(false);
-    if !is_valid {
-        return Err(HttpResponse::Unauthorized().body("comapre token failure"));
-    }
-
-    let response = sync_token(&db, user_object_id, secret).await;
-    if let Err(_) = response {
-        return Err(HttpResponse::Unauthorized().body("comapre token failure"));
-    }
-
-    Ok(response.unwrap().1)
+    repository::issue_and_save_tokens(&repo, &user)
+        .await
+        .map(|tokens| Ok(HttpResponse::Ok().json(tokens)))?
 }
 
-pub async fn sync_token(
-    db: &web::Data<Database>,
-    user_id: ObjectId,
-    secret: String,
-) -> Result<(User, Tokens), HttpResponse> {
-    let tokens_response = jwt::encode_tokens(user_id.to_string(), secret);
-    if let Err(_) = tokens_response {
-        return Err(HttpResponse::Unauthorized().body("Token creation error"));
-    }
+async fn logout(claims: Claims, repo: Data<RepositoryManager>) -> Result<HttpResponse> {
+    let user_id: ObjectId = ObjectId::parse_str(claims.sub).unwrap_or_default();
+    repository::logout(repo, user_id)
+        .await
+        .map(|user| Ok(HttpResponse::Ok().json(user)))?
+}
 
-    let tokens = tokens_response.unwrap();
+async fn forgot_password(
+    req: Json<EmailRequest>,
+    repo: Data<RepositoryManager>,
+) -> Result<HttpResponse> {
+    // get email from payload
+    let email: String = req.into_inner().email;
 
-    let hashed = hash(&tokens.refresh_token, DEFAULT_COST);
-    if let Err(_) = hashed {
-        return Err(HttpResponse::InternalServerError().body("token hashing error"));
-    }
+    // chkeck if email exist in DB
+    let user: User = repository::find_by_email(&repo, email).await?;
 
-    let user_detail = handler::update_refresh_token(&db, user_id, hashed.unwrap()).await;
+    // generate a time limited token
+    let _token = Uuid::new_v4();
 
-    if let None = user_detail {
-        return Err(HttpResponse::InternalServerError().body("update token failed"));
-    }
+    // Save the token into a database
+    //
+    // compose an email with token: exp-> api/reset-password?token=xxxxxxx
+    Email::new()
+        .with_sender("hakouklvn79@gmail.com")
+        .with_reciever(user.email)
+        .send()?;
+    //
+    // send confirmation email to check the inbox
+    Ok(HttpResponse::Ok().json("email has been sent"))
+}
 
-    Ok((user_detail.unwrap(), tokens))
+async fn reset_password(
+    _repo: Data<RepositoryManager>,
+    query: Query<TokenQuery>,
+) -> Result<HttpResponse> {
+    let _token: &str = &query.token;
+    // Checks the database for a matching token
+
+    // Verifies the token isn't expired or already used
+
+    // If valid, allows the password reset for the associated user
+
+    // Marks the token as used in the database
+
+    todo!("")
+    // repository::search(&db, &query.token)
+    //     .await
+    //     .map(|books| HttpResponse::Ok().json(books))
+    //     .map_err(|_| Error::NotFound)
+}
+
+pub fn auth_scope() -> Scope {
+    web::scope("/auth")
+        .route("/login", web::post().to(login))
+        .route("/register", web::post().to(register))
+        .route("/refreshToken", web::post().to(refresh_token))
+        .route("/logout", web::post().to(logout))
+        .route("/forgot-password", web::post().to(forgot_password))
+        .route("/reset-password", web::post().to(reset_password))
 }

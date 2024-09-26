@@ -1,38 +1,44 @@
-mod extractors;
-mod repository;
+mod core;
+mod error;
 mod scopes;
-use repository::mongodb_repo::MongoRepo;
+
+use actix_cors::Cors;
+use actix_web::{http, web};
+
+use actix_web::{App, HttpServer};
 
 use dotenv::dotenv;
-use std::env;
 
-use scopes::{auth, user};
-
-use actix_web::{error, web, App, HttpResponse, HttpServer};
+use core::repository::{repository_manager::RepositoryManager, DataBaseRepo};
+use scopes::*;
+use std::sync::Arc;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     dotenv().ok();
 
-    let mongorepo = MongoRepo::init().await;
-    let db = web::Data::new(mongorepo);
+    let db_repo = DataBaseRepo::default().await;
+    // let db = web::Data::new(db_repo);
+    let database = Arc::new(db_repo);
+
+    let repo_manager = web::Data::new(RepositoryManager::new(database.clone()));
+
     println!("Server running in http://localhost:3000");
-
     HttpServer::new(move || {
-        let jwt: String = match env::var("JWT_SECRET") {
-            Ok(token) => token.to_string(),
-            Err(_) => format!("Error loading env variable"),
-        };
-
-        let _json_config = web::JsonConfig::default()
-            .limit(4096)
-            .error_handler(|err, _req| {
-                error::InternalError::from_response(err, HttpResponse::Conflict().finish()).into()
-            });
+        let cors = Cors::default()
+            .allow_any_origin()
+            .allowed_methods(vec!["GET", "POST", "PUT", "DELETE"])
+            .allowed_headers(vec![
+                http::header::AUTHORIZATION,
+                http::header::ACCEPT,
+                http::header::CONTENT_TYPE,
+            ])
+            .supports_credentials()
+            .max_age(3600);
 
         App::new()
-            .app_data(web::Data::new(jwt))
-            .app_data(db.clone())
+            .wrap(cors)
+            .app_data(repo_manager.clone())
             .service(auth::auth_scope())
             .service(user::user_scope())
     })

@@ -1,67 +1,35 @@
-use actix_web::{web::Data, Error};
-use mongodb::{
-    bson::{doc, oid::ObjectId},
-    results::InsertOneResult,
-    Database,
+use actix_web::{
+    web::{self, Data},
+    HttpResponse, Scope,
 };
+use mongodb::bson::oid::ObjectId;
 
-use super::models::User;
+use crate::core::repository::repository_manager::RepositoryManager;
+use crate::error::{Error, Result};
+use crate::scopes::auth::Claims;
 
-pub async fn create_user(
-    db: &Data<Database>,
-    new_user: User,
-    hashed: String,
-) -> Result<InsertOneResult, Error> {
-    let new_doc = User {
-        id: None,
-        email: new_user.email.to_owned(),
-        password: hashed,
-        refresh_token: None,
-    };
-    let user = db
-        .collection("user")
-        .insert_one(new_doc, None)
-        .await
-        .ok()
-        .expect("Error creating user");
+use super::repository::UserRepo;
 
-    Ok(user)
+async fn find_user(claims: Claims, repo: Data<RepositoryManager>) -> Result<HttpResponse> {
+    let user_id: ObjectId = ObjectId::parse_str(claims.sub).unwrap_or_default();
+
+    match repo.user_repo.find_by_id(user_id).await {
+        Some(user) => Ok(HttpResponse::Ok().json(user)),
+        None => Err(Error::NotFound),
+    }
 }
 
-pub async fn find_by_email(db: &Data<Database>, email: String) -> Option<User> {
-    let filter = doc! {"email": email};
-    let user_detail = db
-        .collection::<User>("user")
-        .find_one(filter, None)
-        .await
-        .ok()?;
+async fn activate_account(claims: Claims, repo: Data<RepositoryManager>) -> Result<HttpResponse> {
+    let user_id: ObjectId = ObjectId::parse_str(claims.sub).unwrap_or_default();
 
-    user_detail
+    match repo.user_repo.activate_account(user_id).await {
+        Some(user) => Ok(HttpResponse::Ok().json(user)),
+        None => Err(Error::BadRequest),
+    }
 }
 
-pub async fn find_by_id(db: &Data<Database>, id: ObjectId) -> Option<User> {
-    let filter = doc! {"_id": id};
-    let user_detail = db
-        .collection::<User>("user")
-        .find_one(filter, None)
-        .await
-        .ok()?;
-
-    user_detail
-}
-
-pub async fn update_refresh_token(
-    db: &Data<Database>,
-    id: ObjectId,
-    refresh_token: String,
-) -> Option<User> {
-    let filter = doc! {"_id": id};
-    let update = doc! { "$set": doc! {"refreshToken": refresh_token} };
-    let user_detail = db
-        .collection::<User>("user")
-        .find_one_and_update(filter, update, None)
-        .await
-        .ok()?;
-
-    user_detail
+pub fn user_scope() -> Scope {
+    web::scope("/user")
+        .route("/activate-account", web::put().to(activate_account))
+        .route("", web::get().to(find_user))
 }

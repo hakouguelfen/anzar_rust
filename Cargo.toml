@@ -5,12 +5,26 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
+actix-cors = "0.7.0"
+actix-multipart = "0.6.1"
 actix-web = "4.5.1"
-bcrypt = "0.15.1"
+mongodb = "3.1.0"
 chrono = "0.4.37"
+derive_more = { version = "1.0", features = ["display"] }
 dotenv = "0.15.0"
 jsonwebtoken = "9.3.0"
-mongodb = "2.8.2"
-once_cell = "1.19.0"
 serde = "1.0.197"
 serde_json = "1.0.115"
+
+futures = "0.3.30"
+lettre = "0.11.8"
+uuid = "1.10.0"
+
+rstest = "0.22.0"
+mockall = "0.13.0"
+async-trait = "0.1.82"
+
+# Cryptography
+sha3 = "0.10.8"
+hex = "0.4.3"
+bcrypt = "0.15.1"
