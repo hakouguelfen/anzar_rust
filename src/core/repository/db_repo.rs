@@ -15,9 +15,9 @@ impl DataBaseRepo {
             .expect("Coudln't connect to DB");
 
         let db: Database = client.database(DATABASE_NAME);
-        user::create_unique_email_index(&db)
-            .await
-            .expect("Coudln't create user email index");
+        // user::create_unique_email_index(&db)
+        //     .await
+        //     .expect("Coudln't create user email index docker hasb een changed::::!!!");
 
         db
     }
