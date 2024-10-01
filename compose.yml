@@ -13,6 +13,7 @@ services:
       - JWT_ACCESS_TOKEN_SECRET=${JWT_ACCESS_TOKEN_SECRET}
       - JWT_REFRESH_TOKEN_SECRET=${JWT_REFRESH_TOKEN_SECRET}
       - DATABASE_URI=${DATABASE_URI}
+      - RUST_LOG=debug
 
   db:
     image: mongo:latest

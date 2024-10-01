@@ -8,8 +8,6 @@ use actix_web::{http, web};
 use actix_web::{App, HttpServer};
 
 use dotenv::dotenv;
-use env_logger::Env;
-use log::info;
 
 use core::repository::{repository_manager::RepositoryManager, DataBaseRepo};
 use scopes::*;
@@ -17,7 +15,7 @@ use std::sync::Arc;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    env_logger::Builder::from_env(Env::default().default_filter_or("debug")).init();
+    env_logger::init();
 
     dotenv().ok();
     const PORT: u16 = 3000;
@@ -27,7 +25,7 @@ async fn main() -> std::io::Result<()> {
 
     let repo_manager = web::Data::new(RepositoryManager::new(database.clone()));
 
-    info!("Server running at port {PORT}");
+    log::info!("Server running at port {PORT}");
     HttpServer::new(move || {
         let cors = Cors::default()
             .allow_any_origin()

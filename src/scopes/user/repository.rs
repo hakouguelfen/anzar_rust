@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use log::info;
 use mockall::automock;
 use mongodb::{
     bson::{doc, oid::ObjectId},
@@ -44,11 +43,19 @@ impl UserRepo for DatabaseUserRepo {
         user
     }
     async fn create_user(&self, user: &User) -> Result<InsertOneResult, Error> {
-        info!("user creation in proccess");
-        let response = self.collection.insert_one(user).await?;
-        info!("user created successfully, user_id: [{}]", user.id.unwrap());
+        log::debug!("User Creation in Proccess ...");
 
-        Ok(response)
+        self.collection
+            .insert_one(user)
+            .await
+            .map(|response| {
+                log::debug!("User Creation Successeded");
+                response
+            })
+            .map_err(|err| {
+                log::debug!("User Creation Failed");
+                err
+            })
     }
     async fn find_by_id(&self, id: ObjectId) -> Option<User> {
         let filter = doc! {"_id": id};

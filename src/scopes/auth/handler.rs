@@ -2,7 +2,6 @@ use actix_web::{
     web::{self, Data, Json, Query},
     HttpResponse, Scope,
 };
-use log::info;
 use mongodb::bson::oid::ObjectId;
 
 use crate::core::repository::repository_manager::RepositoryManager;
@@ -26,7 +25,6 @@ async fn login(req: Json<LoginRequest>, repo: Data<RepositoryManager>) -> Result
 }
 
 async fn register(req: Json<User>, repo: Data<RepositoryManager>) -> Result<HttpResponse> {
-    info!("Registering");
     let user: User = repository::create_user(&repo, req.into_inner()).await?;
 
     repository::issue_and_save_tokens(&repo, &user)
