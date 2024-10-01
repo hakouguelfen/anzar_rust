@@ -4,16 +4,14 @@ services:
     ports:
       - 3000:3000
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     volumes:
       - .:/app
     environment:
       - JWT_ACCESS_TOKEN_SECRET=${JWT_ACCESS_TOKEN_SECRET}
       - JWT_REFRESH_TOKEN_SECRET=${JWT_REFRESH_TOKEN_SECRET}
       - DATABASE_URI=${DATABASE_URI}
-    # networks:
-    #   anzar_net:
-    #     ipv4_address: 192.168.1.21
 
   db:
     image: mongo:latest
@@ -21,16 +19,11 @@ services:
       - 27017:27017
     volumes:
       - mongodata:/data/db
-    # networks:
-    #   anzar_net:
-    #     ipv4_address: 192.168.1.20
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   mongodata:
-
-# networks:
-#   anzar_net:
-#     ipam:
-#       driver: default
-#       config: 
-#         - subnet: 192.168.1.0/24 

@@ -55,6 +55,7 @@ FROM debian:bullseye-slim AS final
 RUN apt-get update && apt-get install -y \
     libssl1.1 \
     ca-certificates \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a non-privileged user that the app will run under.

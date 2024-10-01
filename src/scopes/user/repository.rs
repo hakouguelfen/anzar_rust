@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use log::info;
 use mockall::automock;
 use mongodb::{
     bson::{doc, oid::ObjectId},
@@ -43,7 +44,9 @@ impl UserRepo for DatabaseUserRepo {
         user
     }
     async fn create_user(&self, user: &User) -> Result<InsertOneResult, Error> {
+        info!("user creation in proccess");
         let response = self.collection.insert_one(user).await?;
+        info!("user created successfully, user_id: [{}]", user.id.unwrap());
 
         Ok(response)
     }
@@ -77,13 +80,24 @@ impl UserRepo for DatabaseUserRepo {
 }
 
 pub async fn create_unique_email_index(db: &Database) -> Result<(), mongodb::error::Error> {
-    let options = IndexOptions::builder().unique(true).build();
-    let model = IndexModel::builder()
-        .keys(doc! { "email": 1 })
-        .options(options)
-        .build();
+    match db.list_collection_names().await {
+        Ok(collections) => {
+            dbg!(&collections);
 
-    db.collection::<User>("user").create_index(model).await?;
+            if collections.contains(&"user".to_string()) {
+                let options = IndexOptions::builder().unique(true).build();
+                let model = IndexModel::builder()
+                    .keys(doc! { "email": 1 })
+                    .options(options)
+                    .build();
+
+                db.collection::<User>("user").create_index(model).await?;
+            }
+        }
+        Err(err) => {
+            dbg!(err);
+        }
+    };
 
     Ok(())
 }
