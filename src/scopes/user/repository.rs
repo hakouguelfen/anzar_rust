@@ -87,24 +87,13 @@ impl UserRepo for DatabaseUserRepo {
 }
 
 pub async fn create_unique_email_index(db: &Database) -> Result<(), mongodb::error::Error> {
-    match db.list_collection_names().await {
-        Ok(collections) => {
-            dbg!(&collections);
+    let options = IndexOptions::builder().unique(true).build();
+    let model = IndexModel::builder()
+        .keys(doc! { "email": 1 })
+        .options(options)
+        .build();
 
-            if collections.contains(&"user".to_string()) {
-                let options = IndexOptions::builder().unique(true).build();
-                let model = IndexModel::builder()
-                    .keys(doc! { "email": 1 })
-                    .options(options)
-                    .build();
-
-                db.collection::<User>("user").create_index(model).await?;
-            }
-        }
-        Err(err) => {
-            dbg!(err);
-        }
-    };
+    db.collection::<User>("user").create_index(model).await?;
 
     Ok(())
 }

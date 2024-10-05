@@ -1,5 +1,6 @@
 ARG RUST_VERSION=1.81.0
 ARG APP_NAME=anzar
+
 FROM rust:${RUST_VERSION}-alpine AS build
 ARG APP_NAME
 WORKDIR /app

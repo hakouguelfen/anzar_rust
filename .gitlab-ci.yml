@@ -1,0 +1,15 @@
+stages:
+  - test
+  - build
+  - deploy
+
+tests:
+  stage: test
+  image: rust:1.81.0-slim-bullseye
+  before_script:
+    - rustup component add clippy
+    - rustup component add rustfmt
+  script:
+    - cargo clippy -- --D warnings
+    - cargo fmt -- --check
+    - cargo test

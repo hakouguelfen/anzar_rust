@@ -14,7 +14,7 @@ async fn find_user(claims: Claims, repo: Data<RepositoryManager>) -> Result<Http
     let user_id: ObjectId = ObjectId::parse_str(claims.sub).unwrap_or_default();
 
     match repo.user_repo.find_by_id(user_id).await {
-        Some(user) => Ok(HttpResponse::Ok().json(user)),
+        Some(user) => Ok(HttpResponse::Ok().json(user.as_response())),
         None => Err(Error::NotFound),
     }
 }
@@ -23,7 +23,7 @@ async fn activate_account(claims: Claims, repo: Data<RepositoryManager>) -> Resu
     let user_id: ObjectId = ObjectId::parse_str(claims.sub).unwrap_or_default();
 
     match repo.user_repo.activate_account(user_id).await {
-        Some(user) => Ok(HttpResponse::Ok().json(user)),
+        Some(user) => Ok(HttpResponse::Ok().json(user.as_response())),
         None => Err(Error::BadRequest),
     }
 }

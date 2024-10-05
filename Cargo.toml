@@ -1,17 +1,24 @@
 [package]
 name = "anzar"
 version = "0.1.0"
+authors = ["Hakou Guelfen <hakoudev@gmail.com>"]
 edition = "2021"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+path = "src/main.rs"
+name = "anzar"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
 actix-cors = "0.7.0"
-actix-multipart = "0.6.1"
-actix-web = "4.5.1"
+actix-multipart = "0.7.2"
+actix-web = "4.9.0"
 mongodb = "3.1.0"
 chrono = "0.4.37"
 derive_more = { version = "1.0", features = ["display"] }
-dotenv = "0.15.0"
 jsonwebtoken = "9.3.0"
 serde = "1.0.197"
 serde_json = "1.0.115"
@@ -27,5 +34,11 @@ async-trait = "0.1.82"
 sha3 = "0.10.8"
 hex = "0.4.3"
 bcrypt = "0.15.1"
+
 log = "0.4.22"
 env_logger = "0.11.5"
+dotenvy = "0.15.7"
+config = "0.14.0"
+
+[dev-dependencies]
+reqwest = { version = "0.12.8", features = ["json"] }

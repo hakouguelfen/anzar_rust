@@ -13,14 +13,13 @@ services:
       - JWT_ACCESS_TOKEN_SECRET=${JWT_ACCESS_TOKEN_SECRET}
       - JWT_REFRESH_TOKEN_SECRET=${JWT_REFRESH_TOKEN_SECRET}
       - DATABASE_URI=${DATABASE_URI}
+      - DATABASE_NAME=${DATABASE_NAME}
       - RUST_LOG=debug
 
   db:
     image: mongo:latest
     ports:
       - 27017:27017
-    # expose:
-    #   - 27017
     volumes:
       - mongodata:/data/db
     healthcheck:
