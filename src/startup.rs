@@ -16,9 +16,6 @@ async fn health_check() -> HttpResponse {
 }
 
 pub fn run(listener: TcpListener, db: mongodb::Database) -> Result<Server, std::io::Error> {
-    // env_logger::init();
-    dotenvy::dotenv().expect("env file not found");
-
     let database = Arc::new(db);
     let repo_manager = web::Data::new(RepositoryManager::new(database.clone()));
 

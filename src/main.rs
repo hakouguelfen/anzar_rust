@@ -4,6 +4,9 @@ use anzar::{configuration, startup};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    env_logger::init();
+    dotenvy::dotenv().expect("env file not found");
+
     let configuration = configuration::get_configuration().expect("Failed to read configuration");
 
     let address = format!("127.0.0.1:{}", configuration.port);

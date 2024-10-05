@@ -5,6 +5,8 @@ use anzar::configuration;
 pub struct Common;
 impl Common {
     pub async fn spawn_app() -> String {
+        dotenvy::dotenv().expect("env file not found");
+
         let listener = TcpListener::bind("localhost:0").expect("Failed to random port");
         let port = listener.local_addr().unwrap().port();
 
