@@ -38,9 +38,8 @@ pub trait UserRepo: Send + Sync {
 impl UserRepo for DatabaseUserRepo {
     async fn find_by_email(&self, email: &str) -> Option<User> {
         let filter = doc! {"email": email};
-        let user = self.collection.find_one(filter).await.ok()?;
 
-        user
+        self.collection.find_one(filter).await.ok()?
     }
     async fn create_user(&self, user: &User) -> Result<InsertOneResult, Error> {
         log::debug!("User Creation in Proccess ...");
@@ -48,31 +47,26 @@ impl UserRepo for DatabaseUserRepo {
         self.collection
             .insert_one(user)
             .await
-            .map(|response| {
+            .inspect(|_| {
                 log::debug!("User Creation Successeded");
-                response
             })
-            .map_err(|err| {
-                log::debug!("User Creation Failed");
-                err
+            .inspect_err(|err| {
+                log::debug!("User Creation Failed {err}");
             })
     }
     async fn find_by_id(&self, id: ObjectId) -> Option<User> {
         let filter = doc! {"_id": id};
-        let user_detail = self.collection.find_one(filter).await.ok()?;
 
-        user_detail
+        self.collection.find_one(filter).await.ok()?
     }
     async fn activate_account(&self, id: ObjectId) -> Option<User> {
         let filter = doc! {"_id": id};
         let update = doc! { "$set": doc! {"isPremium": true} };
-        let user_detail = self
-            .collection
+
+        self.collection
             .find_one_and_update(filter, update)
             .await
-            .ok()?;
-
-        user_detail
+            .ok()?
     }
     async fn remove_refresh_token(&self, id: ObjectId) -> Option<User> {
         let filter = doc! {"_id": id};

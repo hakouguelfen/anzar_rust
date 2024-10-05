@@ -17,7 +17,7 @@ use super::user::User;
 use super::RefreshTokenRepo;
 
 pub async fn check_credentials(repo: &Data<RepositoryManager>, req: LoginRequest) -> Result<User> {
-    let user: User = find_by_email(&repo, req.email).await?;
+    let user: User = find_by_email(repo, req.email).await?;
 
     if !verify(&req.password, &user.password).unwrap_or(false) {
         return Err(Error::WrongCredentials);
@@ -30,7 +30,7 @@ pub async fn find_by_email(repo: &Data<RepositoryManager>, email: String) -> Res
     repo.user_repo
         .find_by_email(&email)
         .await
-        .ok_or_else(|| Error::WrongCredentials)
+        .ok_or(Error::WrongCredentials)
 }
 
 pub async fn create_user(repo: &Data<RepositoryManager>, req: User) -> Result<User> {
@@ -61,13 +61,13 @@ pub async fn validate_token(repo: &Data<RepositoryManager>, payload: AuthPayload
         .user_repo
         .find_by_id(user_id)
         .await
-        .ok_or_else(|| Error::WrongCredentials)?;
+        .ok_or(Error::WrongCredentials)?;
 
     let tokens: Vec<RefreshToken> = repo
         .token_repo
         .find(user_id)
         .await
-        .ok_or_else(|| Error::BadRequest)?;
+        .ok_or(Error::BadRequest)?;
 
     let mut token_data: Option<RefreshToken> = None;
     for token in tokens {
@@ -98,21 +98,21 @@ pub async fn logout(repo: Data<RepositoryManager>, user_id: ObjectId) -> Result<
         .user_repo
         .remove_refresh_token(user_id)
         .await
-        .ok_or_else(|| Error::InternalError)?;
+        .ok_or(Error::InternalError)?;
     Ok(user)
 }
 
 pub async fn issue_and_save_tokens(repo: &Data<RepositoryManager>, user: &User) -> Result<Tokens> {
     let user_id: ObjectId = user.id.unwrap_or_default();
 
-    let tokens: Tokens = JwtEncoderBuilder::new()
-        .sub(user_id.to_string())
+    let tokens: Tokens = JwtEncoderBuilder::default()
+        .user_id(user_id.to_string())
         .role(user.role.clone())
         .build()?;
 
     let hashed_refresh_token = hash_token(&tokens.refresh_token);
 
-    let refresh_token = RefreshToken::new()
+    let refresh_token = RefreshToken::default()
         .with_user_id(user_id)
         .with_hash(hashed_refresh_token)
         .with_issued_at(Local::now().timestamp() as usize)

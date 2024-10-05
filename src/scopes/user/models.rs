@@ -1,15 +1,11 @@
 use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub enum Role {
+    #[default]
     User,
     Admin,
-}
-impl Default for Role {
-    fn default() -> Self {
-        Role::User
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]

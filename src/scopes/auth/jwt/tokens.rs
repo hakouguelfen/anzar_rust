@@ -45,28 +45,24 @@ impl JwtDecoderBuilder {
 
     fn decode_access_token(&self) -> Result<Claims> {
         let key = &KEYS.decoding_acc_tok;
-        let claims = decode::<Claims>(&self.token, &key, &Validation::default())?.claims;
+        let claims = decode::<Claims>(&self.token, key, &Validation::default())?.claims;
         Ok(claims)
     }
     fn decode_refresh_token(&self) -> Result<Claims> {
         let key = &KEYS.decoding_ref_tok;
-        let claims = decode::<Claims>(&self.token, &key, &Validation::default())?.claims;
+        let claims = decode::<Claims>(&self.token, key, &Validation::default())?.claims;
         Ok(claims)
     }
 }
 
 #[derive(Default)]
 pub struct JwtEncoderBuilder {
-    sub: String,
+    user_id: String,
     role: Role,
 }
 impl JwtEncoderBuilder {
-    pub fn new() -> Self {
-        JwtEncoderBuilder::default()
-    }
-
-    pub fn sub(mut self, sub: impl Into<String>) -> Self {
-        self.sub = sub.into();
+    pub fn user_id(mut self, user_id: impl Into<String>) -> Self {
+        self.user_id = user_id.into();
         self
     }
     pub fn role(mut self, role: Role) -> Self {
@@ -79,14 +75,14 @@ impl JwtEncoderBuilder {
         let refresh_key = &KEYS.encoding_ref_tok;
 
         let access_token = self.encode(
-            &self.sub,
+            &self.user_id,
             &self.role,
             TokenType::AccessToken,
             access_key,
             Duration::minutes(15),
         )?;
         let refresh_token = self.encode(
-            &self.sub,
+            &self.user_id,
             &self.role,
             TokenType::RefreshToken,
             refresh_key,
@@ -108,8 +104,8 @@ impl JwtEncoderBuilder {
         key: &EncodingKey,
         duration: Duration,
     ) -> Result<String> {
-        let claims = Claims::new(&sub, token_type, &role, duration);
-        encode(&Header::default(), &claims, &key)
+        let claims = Claims::new(sub, token_type, role, duration);
+        encode(&Header::default(), &claims, key)
     }
 }
 

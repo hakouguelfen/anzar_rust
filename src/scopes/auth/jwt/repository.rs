@@ -43,13 +43,11 @@ impl RefreshTokenRepo for DatabaseTokenRepo {
     async fn invalidate(&self, id: ObjectId) -> Option<RefreshToken> {
         let filter = doc! {"_id": id};
         let update = doc! { "$set": doc! {"valid": false} };
-        let token_detail = self
-            .collection
+
+        self.collection
             .find_one_and_update(filter, update)
             .await
-            .ok()?;
-
-        token_detail
+            .ok()?
     }
     async fn revoke(&self, user_id: ObjectId) -> Result<UpdateResult, Error> {
         let filter = doc! {"userId": user_id};

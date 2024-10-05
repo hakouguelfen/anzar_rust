@@ -20,6 +20,12 @@ pub struct RefreshToken {
     pub valid: bool,
 }
 
+impl Default for RefreshToken {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RefreshToken {
     pub fn new() -> Self {
         RefreshToken {
