@@ -6,8 +6,11 @@ ARG APP_NAME
 WORKDIR /app
 
 RUN apk add --no-cache musl-dev
-
+# COPY configuration.yaml /app/configuration.yaml
+# COPY .env /app/.env
 RUN --mount=type=bind,source=src,target=src \
+    # --mount=type=bind,source=configuration.yaml,target=configuration.yaml \
+    # --mount=type=bind,source=.env,target=.env \
     --mount=type=bind,source=Cargo.toml,target=Cargo.toml \
     --mount=type=bind,source=Cargo.lock,target=Cargo.lock \
     --mount=type=cache,target=/app/target/ \
@@ -31,5 +34,9 @@ RUN adduser \
 
 USER appuser
 COPY --from=build /bin/server /bin/
+# COPY --from=build /app/configuration.yaml /app/configuration.yaml
+# COPY --from=build /app/.env /app/.env
+# WORKDIR /app
+
 EXPOSE 3000
 CMD ["/bin/server"]
