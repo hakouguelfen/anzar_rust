@@ -90,7 +90,7 @@ pub async fn validate_token(repo: &Data<RepositoryManager>, payload: AuthPayload
         }
     }
 
-    let refresh_token = token_data.ok_or_else(|| Error::InvalidToken)?;
+    let refresh_token = token_data.ok_or(Error::InvalidToken)?;
 
     if !refresh_token.valid {
         // TODO: send an email indicating a possible breach

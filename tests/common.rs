@@ -32,7 +32,7 @@ impl Common {
         let configuration = get_configuration().expect("Failed to read configuration");
         let connection_string = configuration.database.connection_string();
         let database_name = Uuid::new().to_string();
-        let db = DataBaseRepo::new(connection_string, database_name).await;
+        let db = DataBaseRepo::start(connection_string, database_name).await;
 
         let server = anzar::startup::run(listener, db).expect("Failed to bind address");
         let _ = actix_web::rt::spawn(server);

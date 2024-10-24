@@ -5,7 +5,7 @@ use crate::scopes::user;
 pub struct DataBaseRepo;
 
 impl DataBaseRepo {
-    pub async fn new(connection_string: String, database_name: String) -> Database {
+    pub async fn start(connection_string: String, database_name: String) -> Database {
         let client = mongodb::Client::with_uri_str(&connection_string)
             .await
             .expect("Failed to connect to mongodb");
