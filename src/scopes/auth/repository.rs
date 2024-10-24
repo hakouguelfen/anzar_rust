@@ -30,10 +30,12 @@ pub async fn check_credentials(repo: &Data<RepositoryManager>, req: LoginRequest
 
 #[tracing::instrument(name = "Find user by email", skip(email, repo))]
 pub async fn find_by_email(repo: &Data<RepositoryManager>, email: String) -> Result<User> {
-    repo.user_repo.find_by_email(&email).await.ok_or({
+    let s = repo.user_repo.find_by_email(&email).await.ok_or_else(|| {
         tracing::error!("Failed to find user by email");
         Error::WrongCredentials
-    })
+    })?;
+
+    Ok(s)
 }
 
 #[tracing::instrument(name = "Create user", skip(req, repo))]
@@ -70,12 +72,12 @@ pub async fn validate_token(repo: &Data<RepositoryManager>, payload: AuthPayload
         Error::WrongCredentials
     })?;
 
-    let user: User = repo.user_repo.find_by_id(user_id).await.ok_or({
+    let user: User = repo.user_repo.find_by_id(user_id).await.ok_or_else(|| {
         tracing::error!("Failed to find user by id: {}", user_id);
         Error::WrongCredentials
     })?;
 
-    let tokens: Vec<RefreshToken> = repo.token_repo.find(user_id).await.ok_or({
+    let tokens: Vec<RefreshToken> = repo.token_repo.find(user_id).await.ok_or_else(|| {
         tracing::error!("Failed to find refreshToken by user_id: {}", user_id);
         Error::BadRequest
     })?;
@@ -88,7 +90,7 @@ pub async fn validate_token(repo: &Data<RepositoryManager>, payload: AuthPayload
         }
     }
 
-    let refresh_token = token_data.ok_or(Error::InvalidToken)?;
+    let refresh_token = token_data.ok_or_else(|| Error::InvalidToken)?;
 
     if !refresh_token.valid {
         // TODO: send an email indicating a possible breach
@@ -104,7 +106,7 @@ pub async fn validate_token(repo: &Data<RepositoryManager>, payload: AuthPayload
     repo.token_repo
         .invalidate(refresh_token.id.unwrap_or_default())
         .await
-        .ok_or({
+        .ok_or_else(|| {
             tracing::error!(
                 "Failed to invalidate refreshToken: {}",
                 refresh_token.id.unwrap_or_default()
@@ -117,10 +119,14 @@ pub async fn validate_token(repo: &Data<RepositoryManager>, payload: AuthPayload
 
 #[tracing::instrument(name = "Remove refreshToken", skip(user_id, repo))]
 pub async fn logout(repo: Data<RepositoryManager>, user_id: ObjectId) -> Result<User> {
-    let user = repo.user_repo.remove_refresh_token(user_id).await.ok_or({
-        tracing::error!("Failed to logout and remove refreshToken from Database");
-        Error::InternalError
-    })?;
+    let user = repo
+        .user_repo
+        .remove_refresh_token(user_id)
+        .await
+        .ok_or_else(|| {
+            tracing::error!("Failed to logout and remove refreshToken from Database");
+            Error::InternalError
+        })?;
 
     Ok(user)
 }

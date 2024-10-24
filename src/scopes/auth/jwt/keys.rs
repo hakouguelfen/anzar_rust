@@ -1,6 +1,9 @@
-use std::{env, sync::LazyLock};
+use std::sync::LazyLock;
 
 use jsonwebtoken::{DecodingKey, EncodingKey};
+use secrecy::ExposeSecret;
+
+use crate::configuration::get_configuration;
 
 pub struct Keys {
     pub encoding_acc_tok: EncodingKey,
@@ -23,8 +26,14 @@ impl Keys {
 }
 
 pub static KEYS: LazyLock<Keys> = LazyLock::new(|| {
-    let acc_tok_secret = env::var("JWT_ACCESS_TOKEN_SECRET").expect("Error loading env variable");
-    let ref_tok_secret = env::var("JWT_REFRESH_TOKEN_SECRET").expect("Error loading env variable");
+    // FIXME: Fix this, use middleware or pass it as app_data in startup
+    let configuration = get_configuration().expect("Failed to read configuration");
 
-    Keys::new(acc_tok_secret.as_bytes(), ref_tok_secret.as_bytes())
+    let jwt_acc_secret = configuration.application.jwt_acc_secret;
+    let jwt_ref_secret = configuration.application.jwt_ref_secret;
+
+    Keys::new(
+        jwt_acc_secret.expose_secret().as_bytes(),
+        jwt_ref_secret.expose_secret().as_bytes(),
+    )
 });

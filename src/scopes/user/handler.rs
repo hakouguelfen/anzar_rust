@@ -10,6 +10,11 @@ use crate::scopes::auth::Claims;
 
 use super::repository::UserRepo;
 
+#[tracing::instrument(
+    name = "Find user",
+    skip(claims, repo),
+    fields(user_id = %claims.sub)
+)]
 async fn find_user(claims: Claims, repo: Data<RepositoryManager>) -> Result<HttpResponse> {
     let user_id: ObjectId = ObjectId::parse_str(claims.sub).unwrap_or_default();
 
@@ -19,6 +24,11 @@ async fn find_user(claims: Claims, repo: Data<RepositoryManager>) -> Result<Http
     }
 }
 
+#[tracing::instrument(
+    name = "Activate user account",
+    skip(claims, repo),
+    fields(user_id = %claims.sub)
+)]
 async fn activate_account(claims: Claims, repo: Data<RepositoryManager>) -> Result<HttpResponse> {
     let user_id: ObjectId = ObjectId::parse_str(claims.sub).unwrap_or_default();
 

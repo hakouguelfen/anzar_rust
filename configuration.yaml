@@ -1,8 +1,0 @@
-port: 3000
-database:
-  port: 27017
-  # host: "db" # name <db> found in docker compose file
-  host: "localhost" # name <db> found in docker compose file
-  username: "hakou"
-  password: "hakou"
-  database_name: "dev"

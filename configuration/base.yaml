@@ -1,0 +1,8 @@
+application:
+  port: 3000
+  jwt_acc_secret: "JWT_ACCESS_TOKEN_SECRET"
+  jwt_ref_secret: "JWT_REFRESH_TOKEN_SECRET"
+database:
+  port: 27017
+  username: "hakou"
+  password: "hakou"

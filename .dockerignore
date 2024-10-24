@@ -1,5 +1,7 @@
 # Rust-specific files
-/target/
+target/
+tests/
+Dockerfile
 **/*.rs.bk
 
 # Version control

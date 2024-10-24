@@ -15,8 +15,6 @@ async fn health_check() -> HttpResponse {
 }
 
 pub fn run(listener: TcpListener, db: mongodb::Database) -> Result<Server, std::io::Error> {
-    dotenvy::dotenv().expect("env file not found");
-
     let repo_manager = web::Data::new(RepositoryManager::new(db));
 
     let server = HttpServer::new(move || {

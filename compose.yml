@@ -7,14 +7,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    # volumes:
-    #   - .:/app
-    environment:
-      - JWT_ACCESS_TOKEN_SECRET=${JWT_ACCESS_TOKEN_SECRET}
-      - JWT_REFRESH_TOKEN_SECRET=${JWT_REFRESH_TOKEN_SECRET}
-      - DATABASE_URI=${DATABASE_URI}
-      - DATABASE_NAME=${DATABASE_NAME}
-      - RUST_LOG=debug
 
   db:
     image: mongo:latest

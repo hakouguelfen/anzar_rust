@@ -1,4 +1,5 @@
 ARG RUST_VERSION=1.81.0
+ARG ALPINE_VERSION=3.20.3
 ARG APP_NAME=anzar
 
 FROM rust:${RUST_VERSION}-alpine AS build
@@ -6,10 +7,8 @@ ARG APP_NAME
 WORKDIR /app
 
 RUN apk add --no-cache musl-dev
-COPY configuration.yaml /app/configuration.yaml
 
 RUN --mount=type=bind,source=src,target=src \
-    --mount=type=bind,source=configuration.yaml,target=configuration.yaml \
     --mount=type=bind,source=Cargo.toml,target=Cargo.toml \
     --mount=type=bind,source=Cargo.lock,target=Cargo.lock \
     --mount=type=cache,target=/app/target/ \
@@ -18,7 +17,7 @@ RUN --mount=type=bind,source=src,target=src \
     cp ./target/release/$APP_NAME /bin/server
 
 # Final stage
-FROM alpine:latest AS final
+FROM alpine:${ALPINE_VERSION} AS final
 RUN apk --no-cache add ca-certificates
 
 ARG UID=10001
@@ -33,7 +32,8 @@ RUN adduser \
 
 USER appuser
 COPY --from=build /bin/server /bin/
-COPY --from=build /app/configuration.yaml /app/configuration.yaml
+COPY configuration configuration
+ENV APP_ENVIRONMENT=production
 
 EXPOSE 3000
 CMD ["/bin/server"]
