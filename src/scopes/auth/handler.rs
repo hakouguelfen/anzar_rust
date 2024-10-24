@@ -29,6 +29,11 @@ async fn login(req: Json<LoginRequest>, repo: Data<RepositoryManager>) -> Result
         .map(|tokens| Ok(HttpResponse::load_tokens(tokens, user.as_response())))?
 }
 
+#[tracing::instrument(
+    name = "Register user",
+    skip(req, repo),
+    fields(user_email = %req.email, user_name = %req.username)
+)]
 async fn register(req: Json<User>, repo: Data<RepositoryManager>) -> Result<HttpResponse> {
     let user: User = repository::create_user(&repo, req.into_inner()).await?;
 
@@ -37,6 +42,11 @@ async fn register(req: Json<User>, repo: Data<RepositoryManager>) -> Result<Http
         .map(|tokens| Ok(HttpResponse::load_tokens(tokens, user.as_response())))?
 }
 
+#[tracing::instrument(
+    name = "Regenerate user accessToken",
+    skip(payload, repo),
+    fields(user_id = %payload.user_id)
+)]
 async fn refresh_token(
     payload: AuthPayload,
     repo: Data<RepositoryManager>,
@@ -49,6 +59,11 @@ async fn refresh_token(
         .map(|tokens| Ok(HttpResponse::Ok().json(tokens)))?
 }
 
+#[tracing::instrument(
+    name = "Logout user",
+    skip(claims, repo),
+    fields(user_id = %claims.sub)
+)]
 async fn logout(claims: Claims, repo: Data<RepositoryManager>) -> Result<HttpResponse> {
     let user_id: ObjectId = ObjectId::parse_str(claims.sub).unwrap_or_default();
     repository::logout(repo, user_id)
