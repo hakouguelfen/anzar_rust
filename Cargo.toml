@@ -14,7 +14,6 @@ name = "anzar"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
 actix-cors = "0.7.0"
-actix-multipart = "0.7.2"
 actix-web = "4.9.0"
 mongodb = "3.1.0"
 chrono = "0.4.37"
@@ -25,8 +24,12 @@ serde_json = "1.0.115"
 
 futures = "0.3.30"
 uuid = "1.10.0"
+dotenvy = "0.15.7"
+config = "0.14.0"
 
-rstest = "0.22.0"
+secrecy = { version = "0.10.3", features = ["serde"] }
+
+# Tests
 mockall = "0.13.0"
 async-trait = "0.1.82"
 
@@ -35,10 +38,13 @@ sha3 = "0.10.8"
 hex = "0.4.3"
 bcrypt = "0.15.1"
 
-log = "0.4.22"
-env_logger = "0.11.5"
-dotenvy = "0.15.7"
-config = "0.14.0"
+# Tracing
+tracing = { version = "0.1.40", features = ["log"] }
+tracing-log = "0.2.0"
+tracing-bunyan-formatter = "0.3.9"
+tracing-subscriber = { version = "0.3.18", features = ["registry", "env-filter"] }
+bunyan = "0.1.9"
+tracing-actix-web = "0.7.14"
 
 [dev-dependencies]
 reqwest = { version = "0.12.8", features = ["json"] }

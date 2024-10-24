@@ -1,19 +1,15 @@
-use mongodb::{Client, Database};
-use std::env;
+use mongodb::Database;
 
 use crate::scopes::user;
 
 pub struct DataBaseRepo;
 
 impl DataBaseRepo {
-    pub async fn default() -> Database {
-        let uri = env::var("DATABASE_URI").expect("Error loading env variable");
-        let db_name = env::var("DATABASE_NAME").expect("Error loading env variable");
-
-        let client = Client::with_uri_str(uri)
+    pub async fn new(connection_string: String, database_name: String) -> Database {
+        let client = mongodb::Client::with_uri_str(&connection_string)
             .await
-            .expect("Coudln't connect to DB");
-        let db: Database = client.database(&db_name);
+            .expect("Failed to connect to mongodb");
+        let db = client.database(&database_name);
 
         user::create_unique_email_index(&db)
             .await

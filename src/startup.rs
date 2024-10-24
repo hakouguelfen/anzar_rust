@@ -1,12 +1,11 @@
 use actix_cors::Cors;
 use actix_web::dev::Server;
-use actix_web::middleware::Logger;
 use actix_web::{http, web, HttpResponse};
 
 use actix_web::{App, HttpServer};
+use tracing_actix_web::TracingLogger;
 
 use std::net::TcpListener;
-use std::sync::Arc;
 
 use crate::core::repository::repository_manager::RepositoryManager;
 use crate::scopes::{auth, user};
@@ -18,8 +17,7 @@ async fn health_check() -> HttpResponse {
 pub fn run(listener: TcpListener, db: mongodb::Database) -> Result<Server, std::io::Error> {
     dotenvy::dotenv().expect("env file not found");
 
-    let database = Arc::new(db);
-    let repo_manager = web::Data::new(RepositoryManager::new(database.clone()));
+    let repo_manager = web::Data::new(RepositoryManager::new(db));
 
     let server = HttpServer::new(move || {
         let cors = Cors::default()
@@ -34,7 +32,7 @@ pub fn run(listener: TcpListener, db: mongodb::Database) -> Result<Server, std::
             .max_age(3600);
 
         App::new()
-            .wrap(Logger::default())
+            .wrap(TracingLogger::default())
             .wrap(cors)
             .app_data(repo_manager.clone())
             .service(auth::auth_scope())

@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use async_trait::async_trait;
 use futures::TryStreamExt;
 use mockall::automock;
@@ -16,7 +14,7 @@ pub struct DatabaseTokenRepo {
     collection: Collection<RefreshToken>,
 }
 impl DatabaseTokenRepo {
-    pub fn new(db: &Arc<Database>) -> Self {
+    pub fn new(db: &Database) -> Self {
         const COLL_NAME: &str = "refresh-token";
         DatabaseTokenRepo {
             collection: db.collection::<RefreshToken>(COLL_NAME),
@@ -27,7 +25,7 @@ impl DatabaseTokenRepo {
 #[automock]
 #[async_trait]
 pub trait RefreshTokenRepo: Send + Sync {
-    async fn create(&self, token: RefreshToken) -> Result<InsertOneResult, Error>;
+    async fn insert(&self, token: RefreshToken) -> Result<InsertOneResult, Error>;
     async fn invalidate(&self, token_id: ObjectId) -> Option<RefreshToken>;
     async fn revoke(&self, user_id: ObjectId) -> Result<UpdateResult, Error>;
     async fn find(&self, user_id: ObjectId) -> Option<Vec<RefreshToken>>;
@@ -35,7 +33,7 @@ pub trait RefreshTokenRepo: Send + Sync {
 
 #[async_trait]
 impl RefreshTokenRepo for DatabaseTokenRepo {
-    async fn create(&self, token: RefreshToken) -> Result<InsertOneResult, Error> {
+    async fn insert(&self, token: RefreshToken) -> Result<InsertOneResult, Error> {
         let token = self.collection.insert_one(token).await?;
 
         Ok(token)

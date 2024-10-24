@@ -1,10 +1,15 @@
 use std::net::TcpListener;
 
-use anzar::{configuration, startup};
+use anzar::core::repository::DataBaseRepo;
+
+use anzar::configuration;
+use anzar::startup;
+use anzar::telemetry::{get_subscriber, init_subscriber};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    env_logger::init();
+    let subscriber = get_subscriber("anzar".into(), "info".into(), std::io::stdout);
+    init_subscriber(subscriber);
 
     let configuration = configuration::get_configuration().expect("Failed to read configuration");
 
@@ -12,10 +17,8 @@ async fn main() -> std::io::Result<()> {
     let listener = TcpListener::bind(address)?;
 
     let connection_string = configuration.database.connection_string();
-    let client = mongodb::Client::with_uri_str(&connection_string)
-        .await
-        .expect("Failed to connect to mongodb");
-    let db = client.database(&configuration.database.database_name);
+    let database_name = configuration.database.database_name;
+    let db = DataBaseRepo::new(connection_string, database_name).await;
 
     startup::run(listener, db)?.await
 }

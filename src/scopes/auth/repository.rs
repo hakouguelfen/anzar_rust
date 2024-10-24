@@ -16,21 +16,24 @@ use super::user::repository::UserRepo;
 use super::user::User;
 use super::RefreshTokenRepo;
 
+#[tracing::instrument(name = "Check user credentials", skip(req, repo))]
 pub async fn check_credentials(repo: &Data<RepositoryManager>, req: LoginRequest) -> Result<User> {
     let user: User = find_by_email(repo, req.email).await?;
 
     if !verify(&req.password, &user.password).unwrap_or(false) {
+        tracing::error!("Failed to verify password");
         return Err(Error::WrongCredentials);
     }
 
     Ok(user)
 }
 
+#[tracing::instrument(name = "Find user by email", skip(email, repo))]
 pub async fn find_by_email(repo: &Data<RepositoryManager>, email: String) -> Result<User> {
-    repo.user_repo
-        .find_by_email(&email)
-        .await
-        .ok_or(Error::WrongCredentials)
+    repo.user_repo.find_by_email(&email).await.ok_or({
+        tracing::error!("Failed to find user by email");
+        Error::WrongCredentials
+    })
 }
 
 pub async fn create_user(repo: &Data<RepositoryManager>, req: User) -> Result<User> {
@@ -102,13 +105,15 @@ pub async fn logout(repo: Data<RepositoryManager>, user_id: ObjectId) -> Result<
     Ok(user)
 }
 
+#[tracing::instrument(name = "Issue authentication tokens", skip(user, repo))]
 pub async fn issue_and_save_tokens(repo: &Data<RepositoryManager>, user: &User) -> Result<Tokens> {
     let user_id: ObjectId = user.id.unwrap_or_default();
 
     let tokens: Tokens = JwtEncoderBuilder::default()
         .user_id(user_id.to_string())
         .role(user.role.clone())
-        .build()?;
+        .build()
+        .inspect_err(|e| tracing::error!("Failed to generate authentication tokens: {:?}", e))?;
 
     let hashed_refresh_token = hash_token(&tokens.refresh_token);
 
@@ -118,11 +123,10 @@ pub async fn issue_and_save_tokens(repo: &Data<RepositoryManager>, user: &User) 
         .with_issued_at(Local::now().timestamp() as usize)
         .with_expire_at((Local::now() + Duration::days(30)).timestamp() as usize);
 
-    let _ = repo
-        .token_repo
-        .create(refresh_token)
-        .await
-        .map_err(|_| Error::TokenCreation)?;
+    let _ = repo.token_repo.insert(refresh_token).await.map_err(|e| {
+        tracing::error!("Failed to insert refreshToken to database: {:?}", e);
+        Error::TokenCreation
+    })?;
 
     Ok(tokens)
 }
@@ -135,6 +139,5 @@ fn hash_token(token: &str) -> String {
 }
 
 fn verify_token(token: &str, stored_hash: &str) -> bool {
-    let calculated_hash = hash_token(token);
-    calculated_hash == stored_hash
+    hash_token(token) == stored_hash
 }

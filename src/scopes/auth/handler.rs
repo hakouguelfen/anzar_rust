@@ -16,6 +16,11 @@ use super::{error::Result, models::AuthPayload};
 use super::{extenstion::AuthResponseTrait, repository};
 use uuid::Uuid;
 
+#[tracing::instrument(
+    name = "Login user",
+    skip(req, repo),
+    fields(user_email = %req.email)
+)]
 async fn login(req: Json<LoginRequest>, repo: Data<RepositoryManager>) -> Result<HttpResponse> {
     let user: User = repository::check_credentials(&repo, req.into_inner()).await?;
 
