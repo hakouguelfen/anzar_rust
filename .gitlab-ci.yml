@@ -1,3 +1,20 @@
+image: rust:1.81.0
+
+variables:
+  CARGO_HOME: $CI_PROJECT_DIR/.cargo
+  MONGODB_URI: "mongodb://mongodb:27017/dev"
+  RUST_BACKTRACE: 1
+  RUSTFLAGS: "-D warnings"
+  # Enable Rust build caching
+  CARGO_INCREMENTAL: 0
+
+# Cache dependencies and build artifacts
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - target/
+    - .cargo/
+
 stages:
   - lint
   - test
@@ -12,18 +29,34 @@ lint:
     - rustup component add clippy
     - rustup component add rustfmt
   script:
-    - cargo clippy -- --D warnings
+    - cargo clippy
     - cargo fmt -- --check
+  # Only store artifacts that are needed for subsequent jobs
+  artifacts:
+    paths:
+      - target/
+    expire_in: 1 day
 
 test:
   stage: test
-  image: rust:1.81.0-slim-bullseye
   services:
-    - mongo:4.4
-  variables:
-    MONGODB_URI: "mongodb://localhost:27017/dev"
+    - name: mongo:4.4
+      alias: mongodb
   before_script:
     - apt-get update
     - apt-get install -y pkg-config build-essential libssl-dev
   script:
     - cargo test
+
+security-audit:
+  stage: test
+  script:
+    - cargo install cargo-audit
+    - cargo audit
+
+coverage:
+  stage: test
+  script:
+    - cargo install cargo-tarpaulin
+    - cargo tarpaulin --out Xml
+  coverage: '/(\d+\.?\d*%)/'
