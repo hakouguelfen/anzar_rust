@@ -1,9 +1,21 @@
 stages:
+  - lint
   - test
   - build
   - deploy
 
-tests:
+lint:
+  stage: lint
+  before_script:
+    - apt-get update
+    - apt-get install -y pkg-config build-essential libssl-dev
+    - rustup component add clippy
+    - rustup component add rustfmt
+  script:
+    - cargo clippy -- --D warnings
+    - cargo fmt -- --check
+
+test:
   stage: test
   image: rust:1.81.0-slim-bullseye
   services:
@@ -13,11 +25,5 @@ tests:
   before_script:
     - apt-get update
     - apt-get install -y pkg-config build-essential libssl-dev
-
-    - rustup component add clippy
-    - rustup component add rustfmt
-    # - curl -X POST http://localhost:3000/auth/register -H "Content-Type: application/json" -d '{ "email": "hakouguelfen@gmail.com", "password": "hakouguelfen", "username": "hakouguelfen", "role": "User", "isPremium": false }'
   script:
-   rgo clippy -- --D warnings
-    - cargo fmt -- --check
     - cargo test
