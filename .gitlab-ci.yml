@@ -1,8 +1,8 @@
-image: rust:1.81.0
+image: rust:1.81.0-alpine
 
 variables:
   CARGO_HOME: $CI_PROJECT_DIR/.cargo
-  MONGODB_URI: "mongodb://localhost:27017/dev"
+  MONGODB_URI: "mongodb://db:27017/production"
   RUST_BACKTRACE: 1
   RUSTFLAGS: "-D warnings"
   # Enable Rust build caching
@@ -21,32 +21,30 @@ stages:
   - build
   - deploy
 
-# lint:
-#   stage: lint
-#   before_script:
-#     - apt-get update
-#     - apt-get install -y pkg-config build-essential libssl-dev
-#     - rustup component add clippy
-#     - rustup component add rustfmt
-#   script:
-#     - cargo clippy
-#     - cargo fmt -- --check
-#   # Only store artifacts that are needed for subsequent jobs
-#   artifacts:
-#     paths:
-#       - target/
-#     expire_in: 1 day
+lint:
+  stage: lint
+  before_script:
+    - apk add --no-cache musl-dev openssl-dev pkgconfig
+    - rustup component add clippy
+    - rustup component add rustfmt
+  script:
+    - cargo clippy
+    - cargo fmt -- --check
+  # Only store artifacts that are needed for subsequent jobs
+  artifacts:
+    paths:
+      - target/
+    expire_in: 1 day
 
 test:
   stage: test
   services:
     - name: mongo:4.4
-      alias: localhost
+      alias: db
   before_script:
-    - apt-get update
-    - apt-get install -y pkg-config build-essential libssl-dev
+    - apk add --no-cache musl-dev openssl-dev pkgconfig
   script:
-    - cargo test
+    - APP_ENVIRONMENT=production cargo test
 
 # security-audit:
 #   stage: test

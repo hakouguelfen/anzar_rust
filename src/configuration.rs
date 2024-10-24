@@ -26,6 +26,8 @@ pub struct DatabaseSettings {
 impl DatabaseSettings {
     pub fn connection_string(&self) -> String {
         // mongodb+srv://<username>:<password>@<host>:<port>/<db_name>
+        // test: mongodb://localhost:27017/dev
+        // prod: mongodb://db:27017/production
         format!(
             "mongodb://{}:{}/{}",
             self.host, self.port, self.database_name
