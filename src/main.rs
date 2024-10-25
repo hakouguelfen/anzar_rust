@@ -24,8 +24,7 @@ async fn main() -> std::io::Result<()> {
     let listener = TcpListener::bind(address)?;
 
     let connection_string = configuration.database.connection_string();
-    let database_name = configuration.database.database_name;
-    let db = DataBaseRepo::start(connection_string, database_name).await;
+    let db = DataBaseRepo::start(connection_string).await;
 
     startup::run(listener, db)?.await
 }

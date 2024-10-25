@@ -4,7 +4,7 @@ use std::sync::LazyLock;
 use anzar::configuration::get_configuration;
 use anzar::core::repository::DataBaseRepo;
 use anzar::telemetry::{get_subscriber, init_subscriber};
-use mongodb::bson::Uuid;
+use uuid::Uuid;
 
 pub static TRACING: LazyLock<()> = LazyLock::new(|| {
     let subscriber_name = "test".into();
@@ -29,10 +29,10 @@ impl Common {
         let address = format!("http://localhost:{port}");
 
         // use test database
-        let configuration = get_configuration().expect("Failed to read configuration");
+        let mut configuration = get_configuration().expect("Failed to read configuration");
+        configuration.database.database_name = Uuid::new_v4().to_string();
         let connection_string = configuration.database.connection_string();
-        let database_name = Uuid::new().to_string();
-        let db = DataBaseRepo::start(connection_string, database_name).await;
+        let db = DataBaseRepo::start(connection_string).await;
 
         let server = anzar::startup::run(listener, db).expect("Failed to bind address");
         let _ = actix_web::rt::spawn(server);
