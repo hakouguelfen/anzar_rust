@@ -1,4 +1,4 @@
-image: rust:1.81.0-alpine
+image: rust:1.81.0
 
 variables:
   CARGO_HOME: $CI_PROJECT_DIR/.cargo
@@ -23,13 +23,11 @@ stages:
 
 lint:
   stage: lint
-  before_script:
-    - apk add --no-cache musl-dev openssl openssl-dev pkgconfig
-    - rustup component add clippy
-    - rustup component add rustfmt
   script:
-    - cargo clippy
+    - rustup component add rustfmt
     - cargo fmt -- --check
+    - rustup component add clippy
+    - cargo clippy
   # Only store artifacts that are needed for subsequent jobs
   artifacts:
     paths:
@@ -41,20 +39,13 @@ test:
   services:
     - name: mongo:4.4
       alias: db
-  before_script:
-    - apk add --no-cache musl-dev openssl openssl-dev pkgconfig
   script:
     - APP_ENVIRONMENT=production cargo test
+    - cargo install cargo-tarpaulin
+    - cargo tarpaulin --ignore-tests 
 
 security-audit:
   stage: test
   script:
     - cargo install cargo-audit
     - cargo audit
-
-coverage:
-  stage: test
-  script:
-    - cargo install cargo-tarpaulin
-    - cargo tarpaulin --out Xml
-  coverage: '/(\d+\.?\d*%)/'
