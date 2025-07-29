@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use mockall::automock;
 use mongodb::{
     bson::{doc, oid::ObjectId},
@@ -30,6 +31,9 @@ pub trait UserRepo: Send + Sync {
     async fn find_by_id(&self, id: ObjectId) -> Option<User>;
     async fn activate_account(&self, id: ObjectId) -> Option<User>;
     async fn remove_refresh_token(&self, id: ObjectId) -> Option<User>;
+    async fn update_password(&self, id: ObjectId, password: String) -> Option<User>;
+    async fn increment_reset_count(&self, id: ObjectId) -> Option<User>;
+    async fn update_last_password_reset(&self, id: ObjectId, time: DateTime<Utc>) -> Option<User>;
 }
 
 #[async_trait]
@@ -59,6 +63,36 @@ impl UserRepo for DatabaseUserRepo {
     async fn remove_refresh_token(&self, id: ObjectId) -> Option<User> {
         let filter = doc! {"_id": id};
         let update = doc! { "$unset": doc! {"refreshToken": ""} };
+
+        self.collection
+            .find_one_and_update(filter, update)
+            .return_document(ReturnDocument::After)
+            .await
+            .ok()?
+    }
+    async fn update_password(&self, id: ObjectId, password: String) -> Option<User> {
+        let filter = doc! {"_id": id};
+        let update = doc! { "$set": doc! {"password": password} };
+
+        self.collection
+            .find_one_and_update(filter, update)
+            .return_document(ReturnDocument::After)
+            .await
+            .ok()?
+    }
+    async fn increment_reset_count(&self, id: ObjectId) -> Option<User> {
+        let filter = doc! {"_id": id};
+        let update = doc! { "$inc": doc! {"password_reset_count": 1} };
+
+        self.collection
+            .find_one_and_update(filter, update)
+            .return_document(ReturnDocument::After)
+            .await
+            .ok()?
+    }
+    async fn update_last_password_reset(&self, id: ObjectId, time: DateTime<Utc>) -> Option<User> {
+        let filter = doc! {"_id": id};
+        let update = doc! { "$set": doc! {"last_password_reset": time.to_rfc3339()} };
 
         self.collection
             .find_one_and_update(filter, update)

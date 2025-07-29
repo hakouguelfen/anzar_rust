@@ -38,8 +38,8 @@ impl RefreshTokenRepo for DatabaseTokenRepo {
 
         Ok(token)
     }
-    async fn invalidate(&self, id: ObjectId) -> Option<RefreshToken> {
-        let filter = doc! {"_id": id};
+    async fn invalidate(&self, token_id: ObjectId) -> Option<RefreshToken> {
+        let filter = doc! {"_id": token_id};
         let update = doc! { "$set": doc! {"valid": false} };
 
         self.collection

@@ -1,49 +1,42 @@
-use crate::scopes::auth::Result;
+use resend_rs::{types::CreateEmailBaseOptions, Resend};
 
-#[derive(Default)]
+use crate::scopes::auth::{Error, Result};
+
 pub struct Email {
-    sender: String,
     reciever: String,
+    mail: Resend,
 }
+
+impl Default for Email {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Email {
     pub fn new() -> Self {
-        Email::default()
+        Self {
+            reciever: String::default(),
+            mail: Resend::new("re_dYG1K7jD_BUB6VjtLGXne1ezrjdRvQTwM"),
+        }
     }
-    pub fn with_sender(mut self, sender: impl Into<String>) -> Self {
-        self.sender = sender.into();
-        self
-    }
-    pub fn with_reciever(mut self, reciever: impl Into<String>) -> Self {
+    pub fn to(mut self, reciever: impl Into<String>) -> Self {
         self.reciever = reciever.into();
         self
     }
 
-    pub fn send(self) -> Result<String> {
-        // let email = Message::builder()
-        //     .from(self.sender.parse().unwrap())
-        //     .to(self.reciever.parse().unwrap())
-        //     .subject("Happy new year")
-        //     .body("Be happy!".to_string())
-        //     .unwrap();
+    pub async fn send(self, message: &str) -> Result<String> {
+        let subject = "Password Reseting";
+        let from = "onboarding@resend.dev";
 
-        // // Replace with your actual Gmail credentials
-        // let creds = Credentials::new(
-        //     "hakouklvn79@gmail.com".to_string(),
-        //     "death and life 1123581321".to_string(),
-        // );
+        let email = CreateEmailBaseOptions::new(from, [&self.reciever], subject).with_html(message);
 
-        // // Configure the mailer with Gmail's SMTP server
-        // let mailer = SmtpTransport::relay("smtp.gmail.com")
-        //     .unwrap()
-        //     .credentials(creds)
-        //     .build();
-
-        // // Send the email
-        // match mailer.send(&email) {
-        //     Ok(_) => Ok("Email sent successfully!".to_string()),
-        //     Err(_) => Err(Error::InternalError),
-        // }
-
-        Ok("Email sent successfully!".to_string())
+        match self.mail.emails.send(email).await {
+            Ok(_) => Ok("Email sent successfully!".to_string()),
+            Err(e) => {
+                eprintln!("Full error: {:#?}", e);
+                Err(Error::EmailSendFailed)
+            }
+        }
     }
 }

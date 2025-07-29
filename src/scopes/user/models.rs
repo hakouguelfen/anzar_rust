@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 
@@ -16,10 +17,24 @@ pub struct User {
     pub username: String,
     pub email: String,
     pub password: String,
+
+    #[serde(default, rename = "passwordResetCount")]
+    pub password_reset_count: u32,
+
+    #[serde(default, rename = "lastPasswordReset")]
+    pub last_password_reset: Option<DateTime<Utc>>,
+
+    #[serde(default)]
     pub role: Role,
 
-    #[serde(rename = "isPremium")]
+    #[serde(default, rename = "isPremium")]
     pub is_premium: bool,
+
+    #[serde(default, rename = "accountLocked")]
+    pub account_locked: bool,
+
+    #[serde(default, rename = "failedResetAttempts")]
+    pub failed_reset_attempts: u32,
 }
 
 #[derive(Serialize)]
@@ -31,6 +46,8 @@ pub struct UserResponse {
     pub role: Role,
     #[serde(rename = "isPremium")]
     pub is_premium: bool,
+    #[serde(rename = "accountLocked")]
+    pub account_locked: bool,
 }
 
 impl User {
@@ -42,6 +59,10 @@ impl User {
             role: Role::User,
             password: "".to_string(),
             is_premium: false,
+            password_reset_count: 0,
+            last_password_reset: None,
+            account_locked: false,
+            failed_reset_attempts: 0,
         }
     }
 
@@ -62,6 +83,7 @@ impl User {
             username: self.username,
             role: self.role,
             is_premium: self.is_premium,
+            account_locked: self.account_locked,
         }
     }
 }

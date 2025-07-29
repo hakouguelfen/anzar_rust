@@ -9,29 +9,63 @@ pub type Result<T> = core::result::Result<T, Error>;
 
 #[derive(Debug, Display)]
 pub enum Error {
-    #[display("An internal error occurred. Please try again later.")]
-    InternalError,
-
-    #[display("Something has occured while proccessing this request")]
-    BadRequest,
-
     #[display("User Creation Error")]
     UserCreationFailure,
 
     #[display("And error has occured while hashing")]
     HashingFailure,
 
-    #[display("Invalid token")]
+    // Authentication & Authorization - 401/403
+    #[display("Invalid credentials")]
+    InvalidCredentials,
+
+    #[display("Missing authentication credentials")]
+    MissingCredentials,
+
+    #[display("Invalid or expired token")]
     InvalidToken,
 
-    #[display("Wrong credentials")]
-    WrongCredentials,
+    #[display("Account has been suspended or blocked")]
+    AccountSuspended,
 
-    #[display("Token creation error")]
-    TokenCreation,
+    #[display("Rate Limit Exceeded")]
+    RateLimitExceeded,
 
-    #[display("Missing credentials")]
-    MissingCredentials,
+    // Not Found - 404
+    #[display("User not found")]
+    UserNotFound,
+
+    #[display("Token not found")]
+    TokenNotFound,
+
+    // Bad Request - 400
+    #[display("Invalid request format")]
+    InvalidRequest,
+
+    #[display("Token has expired")]
+    TokenExpired,
+
+    #[display("Token has already been used")]
+    TokenAlreadyUsed,
+
+    // Internal Server Error - 500
+    #[display("Failed to create a token")]
+    TokenCreationFailed,
+
+    #[display("Database operation failed")]
+    DatabaseError,
+
+    #[display("Failed to send email")]
+    EmailSendFailed,
+
+    #[display("Failed to update password")]
+    PasswordUpdateFailed,
+
+    #[display("Failed to revoke tokens")]
+    TokenRevocationFailed,
+
+    #[display("Internal server error")]
+    InternalServerError,
 }
 
 impl ResponseError for Error {
@@ -43,16 +77,25 @@ impl ResponseError for Error {
 
     fn status_code(&self) -> StatusCode {
         match self {
-            Error::TokenCreation => StatusCode::INTERNAL_SERVER_ERROR,
-            Error::HashingFailure => StatusCode::INTERNAL_SERVER_ERROR,
-            Error::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
+            Error::InvalidToken
+            | Error::UserCreationFailure
+            | Error::InvalidCredentials
+            | Error::MissingCredentials => StatusCode::UNAUTHORIZED,
 
-            Error::UserCreationFailure => StatusCode::UNAUTHORIZED,
-            Error::InvalidToken => StatusCode::UNAUTHORIZED,
-            Error::WrongCredentials => StatusCode::UNAUTHORIZED,
+            Error::AccountSuspended | Error::RateLimitExceeded => StatusCode::FORBIDDEN,
+            Error::UserNotFound | Error::TokenNotFound => StatusCode::NOT_FOUND,
 
-            Error::BadRequest => StatusCode::BAD_REQUEST,
-            Error::MissingCredentials => StatusCode::BAD_REQUEST,
+            Error::InvalidRequest | Error::TokenExpired | Error::TokenAlreadyUsed => {
+                StatusCode::BAD_REQUEST
+            }
+
+            Error::TokenCreationFailed
+            | Error::HashingFailure
+            | Error::DatabaseError
+            | Error::EmailSendFailed
+            | Error::PasswordUpdateFailed
+            | Error::TokenRevocationFailed
+            | Error::InternalServerError => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }

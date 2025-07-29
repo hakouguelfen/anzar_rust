@@ -6,11 +6,11 @@ use super::user::UserResponse;
 const X_REFRESH_TOKEN: &str = "X-Refresh-Token";
 
 pub trait AuthResponseTrait {
-    fn load_tokens(tokens: Tokens, user: UserResponse) -> Self;
+    fn set_auth_headers(tokens: Tokens, user: UserResponse) -> Self;
 }
 
 impl AuthResponseTrait for HttpResponse {
-    fn load_tokens(tokens: Tokens, user_response: UserResponse) -> Self {
+    fn set_auth_headers(tokens: Tokens, user_response: UserResponse) -> Self {
         HttpResponse::Ok()
             .append_header((header::ACCESS_CONTROL_EXPOSE_HEADERS, X_REFRESH_TOKEN))
             .append_header((

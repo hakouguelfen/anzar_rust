@@ -7,6 +7,7 @@ use tracing_actix_web::TracingLogger;
 
 use std::net::TcpListener;
 
+use crate::core::rate_limiter::RateLimiter;
 use crate::core::repository::repository_manager::RepositoryManager;
 use crate::scopes::{auth, user};
 
@@ -16,6 +17,7 @@ async fn health_check() -> HttpResponse {
 
 pub fn run(listener: TcpListener, db: mongodb::Database) -> Result<Server, std::io::Error> {
     let repo_manager = web::Data::new(RepositoryManager::new(db));
+    let rate_limitter = web::Data::new(RateLimiter::default());
 
     let server = HttpServer::new(move || {
         let cors = Cors::default()
@@ -33,6 +35,7 @@ pub fn run(listener: TcpListener, db: mongodb::Database) -> Result<Server, std::
             .wrap(TracingLogger::default())
             .wrap(cors)
             .app_data(repo_manager.clone())
+            .app_data(rate_limitter.clone())
             .service(auth::auth_scope())
             .service(user::user_scope())
             .route("/health_check", web::get().to(health_check))

@@ -16,7 +16,7 @@ name = "anzar"
 actix-cors = "0.7.0"
 actix-web = "4.9.0"
 mongodb = "3.1.0"
-chrono = "0.4.37"
+chrono = { version = "0.4.37", features = ["serde"] }
 derive_more = { version = "1.0", features = ["display"] }
 jsonwebtoken = "9.3.0"
 serde = "1.0.197"
@@ -34,9 +34,11 @@ mockall = "0.13.0"
 async-trait = "0.1.82"
 
 # Cryptography
-sha3 = "0.10.8"
-hex = "0.4.3"
-bcrypt = "0.15.1"
+sha3 = "0.10.8" # To be deleted
+sha2 = "0.10.9"
+argon2 = "0.5.3"
+base64 = "0.22.1"
+hex = "0.4.3" # To be deleted
 
 # Tracing
 tracing = { version = "0.1.40", features = ["log"] }
@@ -44,6 +46,9 @@ tracing-log = "0.2.0"
 tracing-bunyan-formatter = "0.3.9"
 tracing-subscriber = { version = "0.3.18", features = ["registry", "env-filter"] }
 tracing-actix-web = "0.7.14"
+
+rand = "0.9.1"
+resend-rs = "0.15.0"
 
 [dev-dependencies]
 reqwest = { version = "0.12.8", features = ["json"] }

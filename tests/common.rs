@@ -4,6 +4,7 @@ use std::sync::LazyLock;
 use anzar::configuration::get_configuration;
 use anzar::core::repository::DataBaseRepo;
 use anzar::telemetry::{get_subscriber, init_subscriber};
+use derive_more::derive::Display;
 use uuid::Uuid;
 
 pub static TRACING: LazyLock<()> = LazyLock::new(|| {
@@ -19,9 +20,14 @@ pub static TRACING: LazyLock<()> = LazyLock::new(|| {
     }
 });
 
+#[derive(Display)]
+pub struct TestApp {
+    pub address: String,
+}
+
 pub struct Common;
 impl Common {
-    pub async fn spawn_app() -> String {
+    pub async fn spawn_app() -> TestApp {
         LazyLock::force(&TRACING);
 
         let listener = TcpListener::bind("localhost:0").expect("Failed to random port");
@@ -37,6 +43,6 @@ impl Common {
         let server = anzar::startup::run(listener, db).expect("Failed to bind address");
         let _ = actix_web::rt::spawn(server);
 
-        address
+        TestApp { address }
     }
 }
