@@ -20,6 +20,8 @@ pub struct RefreshToken {
     pub valid: bool,
 }
 
+// TODO: Remove this default, use #[derive(Default)]
+// Add build function
 impl Default for RefreshToken {
     fn default() -> Self {
         Self::new()

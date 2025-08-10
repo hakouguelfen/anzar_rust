@@ -24,6 +24,9 @@ pub struct User {
     #[serde(default, rename = "lastPasswordReset")]
     pub last_password_reset: Option<DateTime<Utc>>,
 
+    #[serde(default, rename = "passwordResetWindowStart")]
+    pub password_reset_window_start: Option<DateTime<Utc>>,
+
     #[serde(default)]
     pub role: Role,
 
@@ -61,6 +64,7 @@ impl User {
             is_premium: false,
             password_reset_count: 0,
             last_password_reset: None,
+            password_reset_window_start: None,
             account_locked: false,
             failed_reset_attempts: 0,
         }

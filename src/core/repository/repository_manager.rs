@@ -1,20 +1,20 @@
 use mongodb::Database;
 
-use crate::scopes::auth::{DatabaseOTPRepo, DatabaseTokenRepo};
-use crate::scopes::user::repository::DatabaseUserRepo;
+use crate::scopes::auth::{service::AuthService, PasswordResetTokenService};
+use crate::scopes::user::service::UserService;
 
-pub struct RepositoryManager {
-    pub user_repo: DatabaseUserRepo,
-    pub token_repo: DatabaseTokenRepo,
-    pub otp_repo: DatabaseOTPRepo,
+pub struct ServiceManager {
+    pub auth_service: AuthService,
+    pub user_service: UserService,
+    pub password_reset_token_service: PasswordResetTokenService,
 }
 
-impl RepositoryManager {
+impl ServiceManager {
     pub fn new(database: Database) -> Self {
-        RepositoryManager {
-            user_repo: DatabaseUserRepo::new(&database),
-            token_repo: DatabaseTokenRepo::new(&database),
-            otp_repo: DatabaseOTPRepo::new(&database),
+        ServiceManager {
+            auth_service: AuthService::new(&database),
+            user_service: UserService::new(&database),
+            password_reset_token_service: PasswordResetTokenService::new(&database),
         }
     }
 }

@@ -61,11 +61,11 @@ pub struct JwtEncoderBuilder {
     role: Role,
 }
 impl JwtEncoderBuilder {
-    pub fn user_id(mut self, user_id: impl Into<String>) -> Self {
+    pub fn with_user_id(mut self, user_id: impl Into<String>) -> Self {
         self.user_id = user_id.into();
         self
     }
-    pub fn role(mut self, role: Role) -> Self {
+    pub fn with_role(mut self, role: Role) -> Self {
         self.role = role;
         self
     }

@@ -26,16 +26,10 @@ impl RateLimiter {
         }
 
         // Check if user has exceeded daily limit
-        if let Some(last_reset) = user.last_password_reset {
-            let time_since_last = Utc::now() - last_reset;
-            if time_since_last < chrono::Duration::hours(1)
+        if let Some(reset_start) = user.password_reset_window_start {
+            let time_since_reset = Utc::now() - reset_start;
+            if time_since_reset < chrono::Duration::hours(1)
                 && user.password_reset_count >= self.max_requests_per_hour
-            {
-                return Err(Error::RateLimitExceeded);
-            }
-
-            if time_since_last < chrono::Duration::days(1)
-                && user.password_reset_count >= self.max_requests_per_day
             {
                 return Err(Error::RateLimitExceeded);
             }

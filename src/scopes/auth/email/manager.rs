@@ -31,12 +31,11 @@ impl Email {
 
         let email = CreateEmailBaseOptions::new(from, [&self.reciever], subject).with_html(message);
 
-        match self.mail.emails.send(email).await {
-            Ok(_) => Ok("Email sent successfully!".to_string()),
-            Err(e) => {
-                eprintln!("Full error: {:#?}", e);
-                Err(Error::EmailSendFailed)
-            }
-        }
+        self.mail.emails.send(email).await.map_err(|e| {
+            tracing::error!("Failed to send password reset email: {:?}", e);
+            Error::EmailSendFailed
+        })?;
+
+        Ok("Email sent successfully!".to_string())
     }
 }

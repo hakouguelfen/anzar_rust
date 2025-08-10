@@ -10,13 +10,14 @@ use mongodb::{
 
 use super::model::RefreshToken;
 
-pub struct DatabaseTokenRepo {
+#[derive(Debug)]
+pub struct DatabaseJWTRepo {
     collection: Collection<RefreshToken>,
 }
-impl DatabaseTokenRepo {
+impl DatabaseJWTRepo {
     pub fn new(db: &Database) -> Self {
         const COLL_NAME: &str = "refresh-token";
-        DatabaseTokenRepo {
+        DatabaseJWTRepo {
             collection: db.collection::<RefreshToken>(COLL_NAME),
         }
     }
@@ -24,7 +25,7 @@ impl DatabaseTokenRepo {
 
 #[automock]
 #[async_trait]
-pub trait RefreshTokenRepo: Send + Sync {
+pub trait JWTRepo: Send + Sync {
     async fn insert(&self, token: RefreshToken) -> Result<InsertOneResult, Error>;
     async fn invalidate(&self, token_id: ObjectId) -> Option<RefreshToken>;
     async fn revoke(&self, user_id: ObjectId) -> Result<UpdateResult, Error>;
@@ -32,7 +33,7 @@ pub trait RefreshTokenRepo: Send + Sync {
 }
 
 #[async_trait]
-impl RefreshTokenRepo for DatabaseTokenRepo {
+impl JWTRepo for DatabaseJWTRepo {
     async fn insert(&self, token: RefreshToken) -> Result<InsertOneResult, Error> {
         let token = self.collection.insert_one(token).await?;
 

@@ -8,20 +8,20 @@ use mongodb::{
 
 use super::model::PasswordResetTokens;
 
-pub struct DatabaseOTPRepo {
+pub struct DatabasePasswordResetTokenRepo {
     collection: Collection<PasswordResetTokens>,
 }
 
-impl DatabaseOTPRepo {
+impl DatabasePasswordResetTokenRepo {
     pub fn new(db: &Database) -> Self {
         const COLL_NAME: &str = "password_reset_token";
-        DatabaseOTPRepo {
+        DatabasePasswordResetTokenRepo {
             collection: db.collection::<PasswordResetTokens>(COLL_NAME),
         }
     }
 }
 
-pub trait OTPRepo {
+pub trait PasswordResetRepo {
     fn insert(
         &self,
         otp: PasswordResetTokens,
@@ -38,7 +38,7 @@ pub trait OTPRepo {
         -> impl std::future::Future<Output = Option<PasswordResetTokens>>;
 }
 
-impl OTPRepo for DatabaseOTPRepo {
+impl PasswordResetRepo for DatabasePasswordResetTokenRepo {
     async fn insert(&self, otp: PasswordResetTokens) -> Result<InsertOneResult, Error> {
         let doc = self.collection.insert_one(otp).await?;
         Ok(doc)
