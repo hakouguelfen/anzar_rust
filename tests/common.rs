@@ -41,7 +41,7 @@ impl Common {
         let db = DataBaseRepo::start(connection_string).await;
 
         let server = anzar::startup::run(listener, db).expect("Failed to bind address");
-        let _ = actix_web::rt::spawn(server);
+        let _ = actix_web::rt::spawn(server).await;
 
         TestApp { address }
     }
