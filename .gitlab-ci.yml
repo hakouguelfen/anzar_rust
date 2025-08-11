@@ -2,7 +2,7 @@ image: rust:1.85.0
 
 variables:
   CARGO_HOME: $CI_PROJECT_DIR/.cargo
-  MONGODB_URI: "mongodb://db:27017/dev"
+  MONGODB_URI: "mongodb://db:27017/production"
   RUST_BACKTRACE: 1
   RUSTFLAGS: "-D warnings"
   # Enable Rust build caching
@@ -42,7 +42,7 @@ test:
     - name: mongo:4.4
       alias: db
   script:
-    - APP_ENVIRONMENT=local cargo test --jobs $(nproc)
+    - APP_ENVIRONMENT=production cargo test --jobs $(nproc)
     - cargo install cargo-tarpaulin
     - cargo tarpaulin --ignore-tests 
 security-audit:
