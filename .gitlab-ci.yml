@@ -7,7 +7,7 @@ variables:
   RUST_BACKTRACE: 1
   RUSTFLAGS: "-D warnings"
   # Enable Rust build caching
-  CARGO_INCREMENTAL: 1
+  CARGO_INCREMENTAL: 0
 
 # Cache dependencies and build artifacts
 cache:
@@ -32,7 +32,6 @@ prepare:
   script:
     - rustup default stable
     - rustup component add rustfmt clippy
-    - cargo build --tests
   artifacts:
     paths:
       - target/
