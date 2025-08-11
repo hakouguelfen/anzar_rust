@@ -29,7 +29,7 @@ stages:
 
 prepare:
   stage: prepare
-  before_script:
+  script:
     - rustup default stable
     - rustup component add rustfmt clippy
   artifacts:
