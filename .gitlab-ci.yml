@@ -19,7 +19,7 @@ cache:
       - target/
       - $CARGO_HOME/registry
       - $CARGO_HOME/git
-      # - $RUSTUP_HOME
+      - $RUSTUP_HOME
 
 stages:
   - lint
@@ -28,8 +28,9 @@ stages:
   - deploy
 
 
-# before_script:
-#   - rustup component add rustfmt clippy
+before_script:
+  - rustup default stable
+  - rustup component add rustfmt clippy
 
 lint:
   stage: lint
