@@ -32,10 +32,10 @@ prepare:
   script:
     - rustup default stable
     - rustup component add rustfmt clippy
-  artifacts:
-    paths:
-      - target/
-    expire_in: 1 week
+  # artifacts:
+  #   paths:
+  #     - target/
+  #   expire_in: 1 week
 
 lint:
   stage: lint
