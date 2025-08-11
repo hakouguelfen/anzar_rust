@@ -1,4 +1,5 @@
 name: anzar
+
 services:
   server:
     build: .

@@ -2,18 +2,20 @@ image: rust:1.85.0
 
 variables:
   CARGO_HOME: $CI_PROJECT_DIR/.cargo
-  MONGODB_URI: "mongodb://db:27017/production"
+  MONGODB_URI: "mongodb://db:27017/dev"
   RUST_BACKTRACE: 1
   RUSTFLAGS: "-D warnings"
   # Enable Rust build caching
-  CARGO_INCREMENTAL: 0
+  CARGO_INCREMENTAL: 1
 
 # Cache dependencies and build artifacts
 cache:
-  key: ${CI_COMMIT_REF_SLUG}
+  key:
+    files:
+      - Cargo.lock
   paths:
     - target/
-    - .cargo/
+    - $CARGO_HOME
 
 stages:
   - lint
@@ -40,12 +42,22 @@ test:
     - name: mongo:4.4
       alias: db
   script:
-    - APP_ENVIRONMENT=production cargo test
+    - APP_ENVIRONMENT=local cargo test --jobs $(nproc)
     - cargo install cargo-tarpaulin
     - cargo tarpaulin --ignore-tests 
-
 security-audit:
   stage: test
+  allow_failure: true
   script:
-    - cargo install cargo-audit
-    - cargo audit
+    - cargo install --locked cargo-audit
+    - cargo audit --deny warnings
+
+
+build:
+  stage: build
+  script:
+    - cargo build --release
+  artifacts:
+    paths:
+      - target/release/anzar
+    expire_in: 1 day
