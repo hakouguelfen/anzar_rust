@@ -1,4 +1,4 @@
-use actix_web::{http::header, HttpResponse};
+use actix_web::{HttpResponse, http::header};
 
 use super::tokens::Tokens;
 use super::user::UserResponse;

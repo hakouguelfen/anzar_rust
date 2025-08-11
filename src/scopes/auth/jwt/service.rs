@@ -1,9 +1,9 @@
-use mongodb::{bson::oid::ObjectId, Database};
+use mongodb::{Database, bson::oid::ObjectId};
 
 use crate::scopes::auth::{
+    DatabaseJWTRepo, Error, JWTRepo, Result,
     jwt::model::RefreshToken,
     utils::{AuthenticationHasher, Utils},
-    DatabaseJWTRepo, Error, JWTRepo, Result,
 };
 
 #[derive(Debug)]

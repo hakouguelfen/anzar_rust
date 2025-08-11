@@ -1,9 +1,9 @@
 use mongodb::{
+    Collection, Database, IndexModel,
     bson::{doc, oid::ObjectId},
     error::Error,
     options::IndexOptions,
     results::{InsertOneResult, UpdateResult},
-    Collection, Database, IndexModel,
 };
 
 use super::model::PasswordResetTokens;
@@ -35,7 +35,7 @@ pub trait PasswordResetRepo {
         user_id: ObjectId,
     ) -> impl std::future::Future<Output = Result<UpdateResult, Error>>;
     fn find(&self, token: String)
-        -> impl std::future::Future<Output = Option<PasswordResetTokens>>;
+    -> impl std::future::Future<Output = Option<PasswordResetTokens>>;
 }
 
 impl PasswordResetRepo for DatabasePasswordResetTokenRepo {

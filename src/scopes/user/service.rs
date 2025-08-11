@@ -1,11 +1,11 @@
 use chrono::Utc;
-use mongodb::{bson::oid::ObjectId, Database};
+use mongodb::{Database, bson::oid::ObjectId};
 
 use crate::scopes::{
     auth::{Error, Result},
     user::{
-        repository::{DatabaseUserRepo, UserRepo},
         User,
+        repository::{DatabaseUserRepo, UserRepo},
     },
 };
 

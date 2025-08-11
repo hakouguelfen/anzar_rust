@@ -1,6 +1,6 @@
 use chrono::{Duration, Local, Utc};
-use mongodb::bson::oid::ObjectId;
 use mongodb::Database;
+use mongodb::bson::oid::ObjectId;
 
 use crate::scopes::auth::jwt::service::JWTService;
 use crate::scopes::user::service::UserService;

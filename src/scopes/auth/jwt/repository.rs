@@ -2,10 +2,10 @@ use async_trait::async_trait;
 use futures::TryStreamExt;
 use mockall::automock;
 use mongodb::{
+    Collection, Cursor, Database,
     bson::{doc, oid::ObjectId},
     error::Error,
     results::{InsertOneResult, UpdateResult},
-    Collection, Cursor, Database,
 };
 
 use super::model::RefreshToken;

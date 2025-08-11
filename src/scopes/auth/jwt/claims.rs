@@ -1,6 +1,6 @@
-use std::future::{ready, Ready};
+use std::future::{Ready, ready};
 
-use actix_web::{dev::Payload, http::header, FromRequest, HttpRequest};
+use actix_web::{FromRequest, HttpRequest, dev::Payload, http::header};
 use chrono::{Duration, Local};
 use serde::{Deserialize, Serialize};
 

@@ -1,6 +1,6 @@
 use chrono::Duration;
-use jsonwebtoken::{decode, EncodingKey, Validation};
-use jsonwebtoken::{encode, errors::Error, Header};
+use jsonwebtoken::{EncodingKey, Validation, decode};
+use jsonwebtoken::{Header, encode, errors::Error};
 use serde::{Deserialize, Serialize};
 
 use crate::scopes::auth;

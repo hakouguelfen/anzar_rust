@@ -1,6 +1,6 @@
 use mongodb::Database;
 
-use crate::scopes::auth::{service::AuthService, PasswordResetTokenService};
+use crate::scopes::auth::{PasswordResetTokenService, service::AuthService};
 use crate::scopes::user::service::UserService;
 
 pub struct ServiceManager {

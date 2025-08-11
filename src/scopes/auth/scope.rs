@@ -1,6 +1,6 @@
 use actix_web::{
-    web::{self, Data, Json, Query},
     HttpResponse, Scope,
+    web::{self, Data, Json, Query},
 };
 use chrono::Utc;
 use mongodb::bson::oid::ObjectId;
@@ -12,13 +12,13 @@ use crate::{
 
 use super::extenstion::AuthResponseTrait;
 use super::user::User;
+use super::{Claims, reset_password::model::PasswordResetTokens};
 use super::{
     email::manager::Email,
     models::{EmailRequest, LoginRequest, TokenQuery},
     utils::{AuthenticationHasher, Utils},
 };
 use super::{error::Result, models::AuthPayload};
-use super::{reset_password::model::PasswordResetTokens, Claims};
 
 #[tracing::instrument(
     name = "Login user",

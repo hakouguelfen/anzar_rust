@@ -1,6 +1,6 @@
 use actix_web::{
-    web::{self, Data},
     HttpResponse, Scope,
+    web::{self, Data},
 };
 use mongodb::bson::oid::ObjectId;
 

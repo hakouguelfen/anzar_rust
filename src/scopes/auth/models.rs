@@ -1,11 +1,11 @@
-use std::future::{ready, Ready};
+use std::future::{Ready, ready};
 
-use actix_web::{dev::Payload, http::header, FromRequest, HttpRequest};
+use actix_web::{FromRequest, HttpRequest, dev::Payload, http::header};
 use serde::Deserialize;
 
-use super::tokens::JwtDecoderBuilder;
 use super::Error;
 use super::TokenType;
+use super::tokens::JwtDecoderBuilder;
 
 #[derive(Deserialize)]
 pub struct LoginRequest {

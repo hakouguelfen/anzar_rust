@@ -1,4 +1,4 @@
-use resend_rs::{types::CreateEmailBaseOptions, Resend};
+use resend_rs::{Resend, types::CreateEmailBaseOptions};
 
 use crate::scopes::auth::{Error, Result};
 

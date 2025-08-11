@@ -2,11 +2,11 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use mockall::automock;
 use mongodb::{
+    Collection, Database, IndexModel,
     bson::{doc, oid::ObjectId},
     error::Error,
     options::{IndexOptions, ReturnDocument},
     results::InsertOneResult,
-    Collection, Database, IndexModel,
 };
 
 use super::models::User;

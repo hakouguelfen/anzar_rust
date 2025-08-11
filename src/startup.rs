@@ -1,6 +1,6 @@
 use actix_cors::Cors;
 use actix_web::dev::Server;
-use actix_web::{http, web, HttpResponse};
+use actix_web::{HttpResponse, http, web};
 
 use actix_web::{App, HttpServer};
 use tracing_actix_web::TracingLogger;
