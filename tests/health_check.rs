@@ -9,6 +9,8 @@ async fn test_health_check() {
 
     let client = reqwest::Client::new();
 
+    dbg!(format!("{address}/health_check"));
+
     // Act
     let response = client
         .get(format!("{address}/health_check"))

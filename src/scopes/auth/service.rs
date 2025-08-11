@@ -29,7 +29,11 @@ impl AuthService {
 
     #[tracing::instrument(name = "Check user credentials", skip(req))]
     pub async fn check_credentials(&self, req: LoginRequest) -> Result<User> {
-        let user: User = self.user_service.find_by_email(&req.email).await?;
+        let user: User = self
+            .user_service
+            .find_by_email(&req.email)
+            .await
+            .map_err(|_| Error::InvalidCredentials)?;
 
         match Utils::verify_password(&req.password, &user.password) {
             true => Ok(user),
