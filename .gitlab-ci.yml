@@ -24,12 +24,14 @@ stages:
   - build
   - deploy
 
+
+before_script:
+  - rustup component add rustfmt clippy
+
 lint:
   stage: lint
-  before_script:
-    - rustup component add rustfmt
+  script:
     - cargo fmt -- --check
-    - rustup component add clippy
     - cargo clippy
 
 test:
