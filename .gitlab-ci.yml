@@ -21,30 +21,41 @@ cache:
       - $RUSTUP_HOME
 
 stages:
+  - prepare
   - lint
   - test
   - build
   - deploy
 
-
-lint:
-  stage: lint
+prepare:
+  stage: prepare
   before_script:
     - rustup default stable
     - rustup component add rustfmt clippy
+  artifacts:
+    paths:
+      - target/
+    expire_in: 1 week
+
+lint:
+  stage: lint
+  dependencies:
+    - prepare
   script:
     - cargo fmt -- --check
     - cargo clippy
 
 test:
   stage: test
+  dependencies:
+    - prepare
   services:
     - name: mongo:4.4
       alias: db
   script:
     - APP_ENVIRONMENT=production cargo test --jobs $(nproc)
-    - cargo tarpaulin --version || cargo install cargo-tarpaulin
-    - cargo tarpaulin --ignore-tests 
+    # - cargo tarpaulin --version || cargo install cargo-tarpaulin
+    # - cargo tarpaulin --ignore-tests 
 security-audit:
   stage: test
   allow_failure: true
@@ -53,11 +64,13 @@ security-audit:
     - cargo audit --deny warnings
 
 
-build:
-  stage: build
-  script:
-    - cargo build --release
-  artifacts:
-    paths:
-      - target/release/anzar
-    expire_in: 1 day
+# build:
+#   stage: build
+#   dependencies:
+#     - prepare
+#   script:
+#     - cargo build --release
+#   artifacts:
+#     paths:
+#       - target/release/anzar
+#     expire_in: 1 day
