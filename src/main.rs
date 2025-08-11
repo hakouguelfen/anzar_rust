@@ -26,5 +26,7 @@ async fn main() -> std::io::Result<()> {
     let connection_string = configuration.database.connection_string();
     let db = DataBaseRepo::start(connection_string).await;
 
-    startup::run(listener, db)?.await
+    let server = startup::run(listener, db)?;
+    drop(configuration);
+    server.await
 }
