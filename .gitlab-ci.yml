@@ -15,11 +15,11 @@ cache:
     paths:
       - $CARGO_HOME/bin
   - key: ${CI_COMMIT_REF_SLUG}
-  paths:
-    - target/
-    - $CARGO_HOME/registry
-    - $CARGO_HOME/git
-    # - $RUSTUP_HOME
+    paths:
+      - target/
+      - $CARGO_HOME/registry
+      - $CARGO_HOME/git
+      # - $RUSTUP_HOME
 
 stages:
   - lint
@@ -28,8 +28,8 @@ stages:
   - deploy
 
 
-before_script:
-  - rustup component add rustfmt clippy
+# before_script:
+#   - rustup component add rustfmt clippy
 
 lint:
   stage: lint
