@@ -32,6 +32,7 @@ prepare:
   script:
     - rustup default stable
     - rustup component add rustfmt clippy
+    - cargo build --tests
   artifacts:
     paths:
       - target/
