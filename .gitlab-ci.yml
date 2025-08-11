@@ -11,12 +11,15 @@ variables:
 
 # Cache dependencies and build artifacts
 cache:
-  key: ${CI_COMMIT_REF_SLUG}
+  - key: cargo-tools
+    paths:
+      - $CARGO_HOME/bin
+  - key: ${CI_COMMIT_REF_SLUG}
   paths:
     - target/
     - $CARGO_HOME/registry
     - $CARGO_HOME/git
-    - $RUSTUP_HOME
+    # - $RUSTUP_HOME
 
 stages:
   - lint
