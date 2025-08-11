@@ -43,13 +43,13 @@ test:
       alias: db
   script:
     - APP_ENVIRONMENT=production cargo test --jobs $(nproc)
-    - if ! command -v cargo-tarpaulin &> /dev/null; then cargo install cargo-tarpaulin; fi
+    - cargo tarpaulin --version || cargo install cargo-tarpaulin
     - cargo tarpaulin --ignore-tests 
 security-audit:
   stage: test
   allow_failure: true
   script:
-    - if ! command -v cargo-audit &> /dev/null; then cargo install --locked cargo-audit; fi
+    - cargo audit --version || cargo install cargo-audit
     - cargo audit --deny warnings
 
 
