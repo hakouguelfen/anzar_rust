@@ -11,9 +11,6 @@ variables:
 
 # Cache dependencies and build artifacts
 cache:
-  - key: cargo-tools
-    paths:
-      - $CARGO_HOME/bin
   key: ${CI_COMMIT_REF_SLUG}
   paths:
     - target/
@@ -34,7 +31,6 @@ lint:
     - cargo fmt -- --check
     - rustup component add clippy
     - cargo clippy
-    expire_in: 1 day
 
 test:
   stage: test
