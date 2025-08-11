@@ -2,6 +2,7 @@ image: rust:1.85.0
 
 variables:
   CARGO_HOME: $CI_PROJECT_DIR/.cargo
+  RUSTUP_HOME: $CI_PROJECT_DIR/.rustup
   MONGODB_URI: "mongodb://db:27017/production"
   RUST_BACKTRACE: 1
   RUSTFLAGS: "-D warnings"
@@ -10,12 +11,15 @@ variables:
 
 # Cache dependencies and build artifacts
 cache:
-  key:
-    files:
-      - Cargo.lock
+  - key: cargo-tools
+    paths:
+      - $CARGO_HOME/bin
+  key: ${CI_COMMIT_REF_SLUG}
   paths:
     - target/
-    - $CARGO_HOME
+    - $CARGO_HOME/registry
+    - $CARGO_HOME/git
+    - $RUSTUP_HOME
 
 stages:
   - lint
@@ -25,15 +29,11 @@ stages:
 
 lint:
   stage: lint
-  script:
+  before_script:
     - rustup component add rustfmt
     - cargo fmt -- --check
     - rustup component add clippy
     - cargo clippy
-  # Only store artifacts that are needed for subsequent jobs
-  artifacts:
-    paths:
-      - target/
     expire_in: 1 day
 
 test:
@@ -43,13 +43,13 @@ test:
       alias: db
   script:
     - APP_ENVIRONMENT=production cargo test --jobs $(nproc)
-    - cargo install cargo-tarpaulin
+    - if ! command -v cargo-tarpaulin &> /dev/null; then cargo install cargo-tarpaulin; fi
     - cargo tarpaulin --ignore-tests 
 security-audit:
   stage: test
   allow_failure: true
   script:
-    - cargo install --locked cargo-audit
+    - if ! command -v cargo-audit &> /dev/null; then cargo install --locked cargo-audit; fi
     - cargo audit --deny warnings
 
 
