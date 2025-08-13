@@ -45,6 +45,20 @@ COMMIT TRANSACTION
 
 ## RateLimiting
 if user failed more then 5 times: Lock account -> [ERROR::AcountLocked]
-
 Limit user from changing password 3 times in 1h -> [ERROR::RateLimitExceeded]
 
+
+
+RefreshToken:
+- Decode JWT, get jti.
+- if valid jti exist in DB -> invalidate and rotate
+- if not -> user is loggedOut
+
+Logout:
+- Send refreshToken
+- find refreshToken in DB and invalidate it
+
+
+NOT SURE:
+when accessToken is used, check existence of valid refreshToken in DB using jti.
+- if not valid, user should be loggedout.

@@ -5,7 +5,6 @@ use anzar::configuration::get_configuration;
 use anzar::core::repository::DataBaseRepo;
 use anzar::telemetry::{get_subscriber, init_subscriber};
 use derive_more::derive::Display;
-use uuid::Uuid;
 
 pub static TRACING: LazyLock<()> = LazyLock::new(|| {
     let subscriber_name = "test".into();
@@ -27,7 +26,7 @@ pub struct TestApp {
 
 pub struct Common;
 impl Common {
-    pub async fn spawn_app() -> TestApp {
+    pub async fn spawn_app(db_name: String) -> TestApp {
         LazyLock::force(&TRACING);
 
         let listener = TcpListener::bind("localhost:0").expect("Failed to random port");
@@ -36,7 +35,7 @@ impl Common {
 
         // use test database
         let mut configuration = get_configuration().expect("Failed to read configuration");
-        configuration.database.database_name = Uuid::new_v4().to_string();
+        configuration.database.database_name = db_name;
         let connection_string = configuration.database.connection_string();
         let db = DataBaseRepo::start(connection_string).await;
 

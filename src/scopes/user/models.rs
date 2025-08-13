@@ -40,7 +40,7 @@ pub struct User {
     pub failed_reset_attempts: u32,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct UserResponse {
     #[serde(rename = "_id")]
     pub id: String,
@@ -55,19 +55,7 @@ pub struct UserResponse {
 
 impl User {
     pub fn new(user: User) -> Self {
-        User {
-            id: None,
-            username: user.username,
-            email: user.email,
-            role: Role::User,
-            password: "".to_string(),
-            is_premium: false,
-            password_reset_count: 0,
-            last_password_reset: None,
-            password_reset_window_start: None,
-            account_locked: false,
-            failed_reset_attempts: 0,
-        }
+        user
     }
 
     pub fn with_id(&mut self, id: ObjectId) {

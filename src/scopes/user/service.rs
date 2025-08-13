@@ -46,17 +46,6 @@ impl UserService {
         Ok(insert_result.inserted_id.as_object_id().unwrap_or_default())
     }
 
-    #[tracing::instrument(name = "Create user account", skip(user_id))]
-    pub async fn clear_token(&self, user_id: ObjectId) -> Result<User> {
-        let user = self
-            .repository
-            .remove_refresh_token(user_id)
-            .await
-            .ok_or_else(|| db_error("remove refreshToken", user_id))?;
-
-        Ok(user)
-    }
-
     #[tracing::instrument(name = "Update Password", skip(user_id))]
     pub async fn update_password(&self, user_id: ObjectId, password: String) -> Result<User> {
         let user = self

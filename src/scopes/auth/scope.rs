@@ -57,7 +57,6 @@ async fn register(req: Json<User>, repo: Data<ServiceManager>) -> Result<HttpRes
     fields(user_id = %payload.user_id)
 )]
 async fn refresh_token(payload: AuthPayload, repo: Data<ServiceManager>) -> Result<HttpResponse> {
-    // NOTE: maybe save valid tokens to user doc
     let user: User = repo.auth_service.validate_token(payload).await?;
 
     repo.auth_service
@@ -68,15 +67,14 @@ async fn refresh_token(payload: AuthPayload, repo: Data<ServiceManager>) -> Resu
 
 #[tracing::instrument(
     name = "Logout user",
-    skip(claims, repo),
-    fields(user_id = %claims.sub)
+    skip(payload, repo),
+    fields(user_id = %payload.user_id)
 )]
-async fn logout(claims: Claims, repo: Data<ServiceManager>) -> Result<HttpResponse> {
-    let user_id: ObjectId = ObjectId::parse_str(claims.sub).unwrap_or_default();
+async fn logout(payload: AuthPayload, repo: Data<ServiceManager>) -> Result<HttpResponse> {
     repo.auth_service
-        .logout(user_id)
+        .logout(payload)
         .await
-        .map(|user| Ok(HttpResponse::Ok().json(user)))?
+        .map(|_| Ok(HttpResponse::Ok().finish()))?
 }
 
 #[tracing::instrument(name = "Forgot password", skip(repo, rate_limiter))]
@@ -204,7 +202,7 @@ async fn update_password(
     repo.password_reset_token_service.revoke(user_id).await?;
 
     repo.auth_service
-        .logout(user_id)
+        .logout_all(user_id)
         .await
         .map(|user| Ok(HttpResponse::Ok().json(user)))?
 }

@@ -5,7 +5,6 @@ use chrono::{Duration, Local};
 use serde::{Deserialize, Serialize};
 
 use crate::scopes::auth::Error;
-use crate::scopes::user::Role;
 
 use super::tokens::JwtDecoderBuilder;
 
@@ -26,18 +25,19 @@ pub struct Claims {
     pub sub: String,
     pub exp: usize,
     pub iat: usize,
+    pub jti: String,
     pub token_type: TokenType,
-    pub role: Role,
 }
 
 impl Claims {
-    pub fn new(sub: &String, token_type: TokenType, role: &Role, duration: Duration) -> Self {
+    // FIXME: Fix these str types <&String>
+    pub fn new(sub: &String, token_type: TokenType, duration: Duration, jti: &String) -> Self {
         Claims {
             sub: sub.to_string(),
             exp: (Local::now() + duration).timestamp() as usize,
             iat: Local::now().timestamp() as usize,
+            jti: jti.to_string(),
             token_type,
-            role: role.clone(),
         }
     }
 }

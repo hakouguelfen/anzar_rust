@@ -2,9 +2,9 @@ use chrono::Duration;
 use jsonwebtoken::{EncodingKey, Validation, decode};
 use jsonwebtoken::{Header, encode, errors::Error};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::scopes::auth;
-use crate::scopes::user::Role;
 
 use super::claims::{Claims, TokenType};
 use super::keys::KEYS;
@@ -58,15 +58,10 @@ impl JwtDecoderBuilder {
 #[derive(Default)]
 pub struct JwtEncoderBuilder {
     user_id: String,
-    role: Role,
 }
 impl JwtEncoderBuilder {
     pub fn with_user_id(mut self, user_id: impl Into<String>) -> Self {
         self.user_id = user_id.into();
-        self
-    }
-    pub fn with_role(mut self, role: Role) -> Self {
-        self.role = role;
         self
     }
 
@@ -76,22 +71,24 @@ impl JwtEncoderBuilder {
 
         let access_token = self.encode(
             &self.user_id,
-            &self.role,
             TokenType::AccessToken,
             access_key,
             Duration::minutes(15),
+            &Uuid::new_v4().to_string(),
         )?;
+        let refresh_token_jti = Uuid::new_v4().to_string();
         let refresh_token = self.encode(
             &self.user_id,
-            &self.role,
             TokenType::RefreshToken,
             refresh_key,
             Duration::days(15),
+            &refresh_token_jti,
         )?;
 
         let tokens: Tokens = Tokens::new()
             .with_access_token(&access_token)
-            .with_refresh_token(&refresh_token);
+            .with_refresh_token(&refresh_token)
+            .with_jti(&refresh_token_jti);
 
         Ok(tokens)
     }
@@ -99,12 +96,12 @@ impl JwtEncoderBuilder {
     pub fn encode(
         &self,
         sub: &String,
-        role: &Role,
         token_type: TokenType,
         key: &EncodingKey,
         duration: Duration,
+        jti: &String,
     ) -> Result<String> {
-        let claims = Claims::new(sub, token_type, role, duration);
+        let claims = Claims::new(sub, token_type, duration, jti);
         encode(&Header::default(), &claims, key)
     }
 }
@@ -116,6 +113,8 @@ pub struct Tokens {
 
     #[serde(rename = "refreshToken")]
     pub refresh_token: String,
+
+    pub refresh_token_jti: String,
 }
 impl Tokens {
     pub fn new() -> Self {
@@ -129,6 +128,11 @@ impl Tokens {
 
     pub fn with_refresh_token(mut self, refresh_token: &String) -> Self {
         self.refresh_token = refresh_token.to_string();
+        self
+    }
+
+    pub fn with_jti(mut self, jti: &String) -> Self {
+        self.refresh_token_jti = jti.to_string();
         self
     }
 }

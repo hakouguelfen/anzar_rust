@@ -30,7 +30,6 @@ pub trait UserRepo: Send + Sync {
     async fn create_user(&self, user: &User) -> Result<InsertOneResult, Error>;
     async fn find_by_email(&self, email: &str) -> Option<User>;
     async fn find_by_id(&self, id: ObjectId) -> Option<User>;
-    async fn remove_refresh_token(&self, id: ObjectId) -> Option<User>;
     async fn update_password(&self, id: ObjectId, password: String) -> Option<User>;
     async fn increment_reset_count(&self, id: ObjectId) -> Option<User>;
     async fn update_reset_window(&self, id: ObjectId) -> Option<User>;
@@ -51,16 +50,6 @@ impl UserRepo for DatabaseUserRepo {
         let filter = doc! {"_id": id};
 
         self.collection.find_one(filter).await.ok()?
-    }
-    async fn remove_refresh_token(&self, id: ObjectId) -> Option<User> {
-        let filter = doc! {"_id": id};
-        let update = doc! { "$unset": doc! {"refreshToken": ""} };
-
-        self.collection
-            .find_one_and_update(filter, update)
-            .return_document(ReturnDocument::After)
-            .await
-            .ok()?
     }
     async fn update_password(&self, id: ObjectId, password: String) -> Option<User> {
         let filter = doc! {"_id": id};

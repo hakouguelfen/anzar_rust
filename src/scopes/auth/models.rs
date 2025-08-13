@@ -27,12 +27,14 @@ pub struct EmailRequest {
 pub struct AuthPayload {
     pub user_id: String,
     pub refresh_token: String,
+    pub jti: String,
 }
 impl AuthPayload {
-    fn from(user_id: String, refresh_token: impl Into<String>) -> Self {
+    fn from(user_id: String, refresh_token: impl Into<String>, jti: String) -> Self {
         Self {
             user_id,
             refresh_token: refresh_token.into(),
+            jti,
         }
     }
 }
@@ -58,7 +60,7 @@ impl FromRequest for AuthPayload {
                     return Err(Error::InvalidToken);
                 }
 
-                Ok(AuthPayload::from(claims.sub, refresh_token))
+                Ok(AuthPayload::from(claims.sub, refresh_token, claims.jti))
             });
 
         ready(claims_response)

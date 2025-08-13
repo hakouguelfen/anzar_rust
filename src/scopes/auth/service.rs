@@ -1,4 +1,4 @@
-use chrono::{Duration, Local, Utc};
+use chrono::{Duration, Utc};
 use mongodb::Database;
 use mongodb::bson::oid::ObjectId;
 
@@ -46,6 +46,10 @@ impl AuthService {
 
     #[tracing::instrument(name = "Create user", skip(user_data))]
     pub async fn create_user(&self, user_data: User) -> Result<User> {
+        if user_data.email.is_empty() || user_data.password.is_empty() {
+            return Err(Error::MissingCredentials);
+        }
+
         let password_hash = Utils::hash_password(&user_data.password)?;
         let mut user: User = User::new(user_data).with_password(password_hash);
 
@@ -57,44 +61,27 @@ impl AuthService {
 
     #[tracing::instrument(name = "Create user", skip(payload))]
     pub async fn validate_token(&self, payload: AuthPayload) -> Result<User> {
-        if payload.user_id.is_empty() || payload.refresh_token.is_empty() {
-            tracing::error!(
-                "Failed to regenerate accessToken because (user_id | refresh_token) is empty"
-            );
-            return Err(Error::MissingCredentials);
-        }
+        let user_id: ObjectId = ObjectId::parse_str(&payload.user_id).unwrap_or_default();
 
-        let user_id: ObjectId = ObjectId::parse_str(&payload.user_id).map_err(|e| {
-            tracing::error!("Failed to parse user_id to ObjectId: {:?}", e);
-            Error::InvalidCredentials
-        })?;
-
+        // Use a middleware for this to check every req if account is active
         let user: User = self.user_service.find(user_id).await?;
-
-        // 4. Check if user account is active
         if user.account_locked {
             tracing::warn!("Blocked user attempted authentication: {}", user_id);
             return Err(Error::AccountSuspended);
         }
 
-        let refresh_token: RefreshToken = self
-            .jwt_service
-            .find(user_id, &payload.refresh_token)
-            .await?;
+        if self.jwt_service.find(payload).await.is_none() {
+            tracing::error!("Invalid refresh token detected for user: {}", user_id);
 
-        if !refresh_token.valid {
-            tracing::error!(
-                "Invalid refresh token detected for user: {} - revoking all tokens",
-                user_id
-            );
-            // Security: revoke all tokens for this user
+            // TODO: send an email
+            // revoke or invalidate one token ?
+            // maybe a user decided to revoke access to one of his devices
+            // then he tried to use that devices, token is revoked but trying to validate it
+            // will fail then self.jwt_service.revoke(user_id).await? will be excuted
+            // [NOT RECOMMENDED]
             self.jwt_service.revoke(user_id).await?;
             return Err(Error::InvalidToken);
         }
-
-        // if refresh token is valid, invalidated then issue a new pair of tokens
-        let token_id = refresh_token.id.unwrap_or_default();
-        self.jwt_service.invalidate(token_id).await?;
 
         Ok(user)
     }
@@ -105,7 +92,6 @@ impl AuthService {
 
         let tokens: Tokens = JwtEncoderBuilder::default()
             .with_user_id(user_id.to_string())
-            .with_role(user.role.clone())
             .build()
             .inspect_err(|e| {
                 tracing::error!("Failed to generate authentication tokens: {:?}", e)
@@ -116,20 +102,26 @@ impl AuthService {
         let refresh_token = RefreshToken::default()
             .with_user_id(user_id)
             .with_hash(hashed_refresh_token)
-            .with_issued_at(Local::now().timestamp() as usize)
-            .with_expire_at((Local::now() + Duration::days(30)).timestamp() as usize);
+            .with_jti(&tokens.refresh_token_jti)
+            .with_issued_at(Utc::now())
+            .with_expire_at(Utc::now() + Duration::days(30));
 
         self.jwt_service.insert(refresh_token).await?;
-
         Ok(tokens)
     }
 
+    #[tracing::instrument(name = "Remove refreshToken", skip(payload))]
+    pub async fn logout(&self, payload: AuthPayload) -> Result<()> {
+        self.jwt_service.invalidate(payload.jti).await?;
+
+        Ok(())
+    }
+
     #[tracing::instrument(name = "Remove refreshToken", skip(user_id))]
-    pub async fn logout(&self, user_id: ObjectId) -> Result<User> {
-        let user = self.user_service.clear_token(user_id).await?;
+    pub async fn logout_all(&self, user_id: ObjectId) -> Result<()> {
         self.jwt_service.revoke(user_id).await?;
 
-        Ok(user)
+        Ok(())
     }
 
     #[tracing::instrument(name = "Forgot password", skip(user))]

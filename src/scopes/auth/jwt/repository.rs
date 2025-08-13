@@ -1,12 +1,14 @@
 use async_trait::async_trait;
-use futures::TryStreamExt;
+use chrono::Utc;
 use mockall::automock;
 use mongodb::{
-    Collection, Cursor, Database,
+    Collection, Database,
     bson::{doc, oid::ObjectId},
     error::Error,
     results::{InsertOneResult, UpdateResult},
 };
+
+use crate::scopes::auth::jwt::model::RefreshTokenFilter;
 
 use super::model::RefreshToken;
 
@@ -27,9 +29,10 @@ impl DatabaseJWTRepo {
 #[async_trait]
 pub trait JWTRepo: Send + Sync {
     async fn insert(&self, token: RefreshToken) -> Result<InsertOneResult, Error>;
-    async fn invalidate(&self, token_id: ObjectId) -> Option<RefreshToken>;
+    async fn invalidate(&self, jti: String) -> Option<RefreshToken>;
     async fn revoke(&self, user_id: ObjectId) -> Result<UpdateResult, Error>;
-    async fn find(&self, user_id: ObjectId) -> Option<Vec<RefreshToken>>;
+    async fn find_by_filter(&self, filter: RefreshTokenFilter) -> Option<RefreshToken>;
+    async fn find(&self, id: ObjectId) -> Option<RefreshToken>;
 }
 
 #[async_trait]
@@ -39,8 +42,8 @@ impl JWTRepo for DatabaseJWTRepo {
 
         Ok(token)
     }
-    async fn invalidate(&self, token_id: ObjectId) -> Option<RefreshToken> {
-        let filter = doc! {"_id": token_id};
+    async fn invalidate(&self, jti: String) -> Option<RefreshToken> {
+        let filter = doc! {"jti": jti};
         let update = doc! { "$set": doc! {"valid": false} };
 
         self.collection
@@ -55,12 +58,50 @@ impl JWTRepo for DatabaseJWTRepo {
 
         Ok(token_detail)
     }
-    async fn find(&self, user_id: ObjectId) -> Option<Vec<RefreshToken>> {
-        let filter = doc! {"userId": user_id};
-        let cursor: Cursor<RefreshToken> = self.collection.find(filter).await.ok()?;
+    async fn find_by_filter(&self, filter: RefreshTokenFilter) -> Option<RefreshToken> {
+        let filter = doc! {
+            "jti": filter.jti,
+            "userId": filter.user_id,
+            "hash": filter.hash,
+            "valid": filter.valid
+        };
+        let update = doc! { "$set": doc! {"valid": false, "usedAt": Utc::now().to_rfc2822()} };
 
-        let tokens: Vec<RefreshToken> = cursor.try_collect().await.ok()?;
+        self.collection
+            .find_one_and_update(filter, update)
+            .await
+            .ok()?
+    }
 
-        Some(tokens)
+    async fn find(&self, id: ObjectId) -> Option<RefreshToken> {
+        let filter = doc! {"_id": id};
+
+        self.collection.find_one(filter).await.ok()?
     }
 }
+
+// db.refresh_tokens.createIndex({ "expireAt": 1 }, { expireAfterSeconds: 0 })
+// pub async fn create_token_hash_index(db: &Database) -> Result<(), mongodb::error::Error> {
+//     let options = IndexOptions::builder()
+//         .unique(true)
+//         // TODO: implement TTL index, for auto removing
+//         // use std::time::Duration;
+//         // .expire_after(Some(Duration::from_secs(60 * 60))) // 30 minutes
+//         .build();
+//     let model = IndexModel::builder()
+//         .keys(doc! { "tokenHash": 1 })
+//         .options(options)
+//         .build();
+//
+//     db.collection::<PasswordResetTokens>("password_reset_token")
+//         .create_index(model)
+//         .await?;
+//
+//     Ok(())
+// }
+//db.collection.createIndex({
+//   "userId": 1,
+//   "jti": 1,
+//   "hash": 1,
+//   "valid": 1
+// })

@@ -9,7 +9,7 @@ use sha2::{Digest, Sha256};
 
 pub trait AuthenticationHasher {
     fn hash_token(token: &str) -> String;
-    fn verify_token(token: &str, stored_hash: &str) -> bool;
+    fn _verify_token(token: &str, stored_hash: &str) -> bool;
     fn generate_token(length: usize) -> String;
     fn hash_password(password: &str) -> Result<String>;
     fn verify_password(password: &str, hash: &str) -> bool;
@@ -24,7 +24,7 @@ impl AuthenticationHasher for Utils {
         format!("{:x}", hasher.finalize())
     }
 
-    fn verify_token(token: &str, stored_hash: &str) -> bool {
+    fn _verify_token(token: &str, stored_hash: &str) -> bool {
         Self::hash_token(token) == stored_hash
     }
 

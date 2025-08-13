@@ -1,7 +1,15 @@
+use chrono::{DateTime, Utc};
 use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub struct RefreshTokenFilter {
+    pub jti: String,
+    pub user_id: ObjectId,
+    pub hash: String,
+    pub valid: bool,
+}
+
+#[derive(Default, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct RefreshToken {
     #[serde(serialize_with = "serialize_object_id")]
     #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
@@ -11,48 +19,39 @@ pub struct RefreshToken {
     pub user_id: Option<ObjectId>,
 
     #[serde(rename = "issuedAt")]
-    pub issued_at: usize,
-
+    pub issued_at: DateTime<Utc>,
     #[serde(rename = "expireAt")]
-    pub expire_at: usize,
+    pub expire_at: Option<DateTime<Utc>>,
+    #[serde(rename = "usedAt")]
+    pub used_at: Option<DateTime<Utc>>,
 
+    pub jti: String,
     pub hash: String,
     pub valid: bool,
 }
 
-// TODO: Remove this default, use #[derive(Default)]
 // Add build function
-impl Default for RefreshToken {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 impl RefreshToken {
-    pub fn new() -> Self {
-        RefreshToken {
-            id: None,
-            user_id: None,
-            issued_at: 0,
-            expire_at: 0,
-            hash: "".to_string(),
-            valid: true,
-        }
-    }
     pub fn with_user_id(mut self, user_id: ObjectId) -> Self {
         let _ = self.user_id.insert(user_id);
         self
     }
     pub fn with_hash(mut self, hash: String) -> Self {
         self.hash = hash;
+        self.valid = true;
         self
     }
-    pub fn with_issued_at(mut self, issued_at: usize) -> Self {
+    pub fn with_jti(mut self, jti: &String) -> Self {
+        self.jti = jti.into();
+        self
+    }
+    pub fn with_issued_at(mut self, issued_at: DateTime<Utc>) -> Self {
         self.issued_at = issued_at;
         self
     }
-    pub fn with_expire_at(mut self, expire_at: usize) -> Self {
-        self.expire_at = expire_at;
+    pub fn with_expire_at(mut self, expire_at: DateTime<Utc>) -> Self {
+        let _ = self.expire_at.insert(expire_at);
         self
     }
 }

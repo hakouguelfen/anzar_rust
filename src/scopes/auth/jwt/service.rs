@@ -2,7 +2,8 @@ use mongodb::{Database, bson::oid::ObjectId};
 
 use crate::scopes::auth::{
     DatabaseJWTRepo, Error, JWTRepo, Result,
-    jwt::model::RefreshToken,
+    jwt::model::{RefreshToken, RefreshTokenFilter},
+    models::AuthPayload,
     utils::{AuthenticationHasher, Utils},
 };
 
@@ -27,29 +28,21 @@ impl JWTService {
         Ok(())
     }
 
-    pub async fn find(&self, user_id: ObjectId, refresh_token: &str) -> Result<RefreshToken> {
-        let tokens = self.repository.find(user_id).await.ok_or_else(|| {
-            tracing::error!("No refresh tokens found for user: {}", user_id);
-            Error::InvalidToken
-        })?;
+    pub async fn find(&self, payload: AuthPayload) -> Option<RefreshToken> {
+        let user_id: ObjectId = ObjectId::parse_str(&payload.user_id).unwrap_or_default();
+        let filter = RefreshTokenFilter {
+            jti: payload.jti,
+            user_id,
+            hash: Utils::hash_token(&payload.refresh_token),
+            valid: true,
+        };
 
-        if tokens.is_empty() {
-            tracing::warn!("No refresh tokens available for user: {}", user_id);
-            return Err(Error::InvalidToken);
-        }
-
-        tokens
-            .into_iter()
-            .find(|token| Utils::verify_token(refresh_token, &token.hash))
-            .ok_or_else(|| {
-                tracing::warn!("Invalid refresh token for user: {}", user_id);
-                Error::InvalidToken
-            })
+        self.repository.find_by_filter(filter).await
     }
 
-    pub async fn invalidate(&self, token_id: ObjectId) -> Result<RefreshToken> {
-        self.repository.invalidate(token_id).await.ok_or_else(|| {
-            tracing::error!("Failed to invalidate refreshToken: {}", token_id);
+    pub async fn invalidate(&self, jti: String) -> Result<RefreshToken> {
+        self.repository.invalidate(jti).await.ok_or_else(|| {
+            tracing::error!("Failed to invalidate refreshToken");
             Error::TokenRevocationFailed
         })
     }

@@ -1,11 +1,13 @@
 mod common;
 
 use common::Common;
+use uuid::Uuid;
 
 #[actix_web::test]
 async fn test_health_check() {
     // Arrange
-    let address = Common::spawn_app().await;
+    let db_name = Uuid::new_v4().to_string();
+    let address = Common::spawn_app(db_name).await;
 
     let client = reqwest::Client::new();
 
