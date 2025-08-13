@@ -6,7 +6,9 @@ use mongodb::bson::oid::ObjectId;
 
 use crate::core::repository::repository_manager::ServiceManager;
 use crate::error::{Error, Result};
+
 use crate::scopes::auth::Claims;
+use crate::scopes::user::{User, UserResponse};
 
 #[tracing::instrument(
     name = "Find user",
@@ -17,7 +19,7 @@ async fn find_user(claims: Claims, repo: Data<ServiceManager>) -> Result<HttpRes
     let user_id: ObjectId = ObjectId::parse_str(claims.sub).unwrap_or_default();
 
     match repo.user_service.find(user_id).await {
-        Ok(user) => Ok(HttpResponse::Ok().json(user.as_response())),
+        Ok(user) => Ok(HttpResponse::Ok().json(<User as Into<UserResponse>>::into(user))),
         Err(_) => Err(Error::NotFound),
     }
 }

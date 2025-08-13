@@ -46,15 +46,13 @@ impl AuthService {
 
     #[tracing::instrument(name = "Create user", skip(user_data))]
     pub async fn create_user(&self, user_data: User) -> Result<User> {
-        if user_data.email.is_empty() || user_data.password.is_empty() {
-            return Err(Error::MissingCredentials);
-        }
+        user_data.validate()?;
 
         let password_hash = Utils::hash_password(&user_data.password)?;
-        let mut user: User = User::new(user_data).with_password(password_hash);
+        let mut user: User = User::from(user_data).with_password(password_hash);
 
         let user_id: ObjectId = self.user_service.insert(&user).await?;
-        user.with_id(user_id);
+        user.set_id(user_id);
 
         Ok(user)
     }

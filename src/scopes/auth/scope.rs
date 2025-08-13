@@ -34,7 +34,7 @@ async fn login(req: Json<LoginRequest>, repo: Data<ServiceManager>) -> Result<Ht
     repo.auth_service
         .issue_and_save_tokens(&user)
         .await
-        .map(|tokens| Ok(HttpResponse::set_auth_headers(tokens, user.as_response())))?
+        .map(|tokens| Ok(HttpResponse::set_auth_headers(tokens, user.into())))?
 }
 
 #[tracing::instrument(
@@ -48,7 +48,7 @@ async fn register(req: Json<User>, repo: Data<ServiceManager>) -> Result<HttpRes
     repo.auth_service
         .issue_and_save_tokens(&user)
         .await
-        .map(|tokens| Ok(HttpResponse::set_auth_headers(tokens, user.as_response())))?
+        .map(|tokens| Ok(HttpResponse::set_auth_headers(tokens, user.into())))?
 }
 
 #[tracing::instrument(

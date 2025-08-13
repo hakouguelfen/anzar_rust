@@ -2,6 +2,8 @@ use chrono::{DateTime, Utc};
 use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 
+use crate::scopes::auth::Error;
+
 #[derive(Default, Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub enum Role {
     #[default]
@@ -40,6 +42,28 @@ pub struct User {
     pub failed_reset_attempts: u32,
 }
 
+impl User {
+    pub fn from(user: User) -> Self {
+        user
+    }
+
+    pub fn set_id(&mut self, id: ObjectId) {
+        self.id = Some(id);
+    }
+
+    pub fn with_password(mut self, password: String) -> Self {
+        self.password = password;
+        self
+    }
+
+    pub fn validate(&self) -> Result<(), Error> {
+        if self.email.is_empty() || self.password.is_empty() {
+            return Err(Error::MissingCredentials);
+        }
+        Ok(())
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct UserResponse {
     #[serde(rename = "_id")]
@@ -53,29 +77,15 @@ pub struct UserResponse {
     pub account_locked: bool,
 }
 
-impl User {
-    pub fn new(user: User) -> Self {
-        user
-    }
-
-    pub fn with_id(&mut self, id: ObjectId) {
-        self.id = Some(id);
-    }
-
-    pub fn with_password(mut self, password: String) -> Self {
-        self.password = password;
-        self
-    }
-
-    pub fn as_response(self) -> UserResponse {
-        UserResponse {
-            // FIXME: dont use unwrap
-            id: self.id.unwrap().to_string(),
-            email: self.email,
-            username: self.username,
-            role: self.role,
-            is_premium: self.is_premium,
-            account_locked: self.account_locked,
+impl From<User> for UserResponse {
+    fn from(user: User) -> Self {
+        Self {
+            id: user.id.unwrap_or_default().to_string(),
+            username: user.username,
+            email: user.email,
+            role: user.role,
+            is_premium: user.is_premium,
+            account_locked: user.account_locked,
         }
     }
 }
