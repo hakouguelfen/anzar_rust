@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use mockall::automock;
 use mongodb::{
     Collection, Database, IndexModel,
@@ -33,7 +33,7 @@ pub trait UserRepo: Send + Sync {
     async fn update_password(&self, id: ObjectId, password: String) -> Option<User>;
     async fn increment_reset_count(&self, id: ObjectId) -> Option<User>;
     async fn update_reset_window(&self, id: ObjectId) -> Option<User>;
-    async fn update_last_password_reset(&self, id: ObjectId, time: DateTime<Utc>) -> Option<User>;
+    async fn update_last_password_reset(&self, id: ObjectId) -> Option<User>;
 }
 
 #[async_trait]
@@ -82,9 +82,9 @@ impl UserRepo for DatabaseUserRepo {
             .ok()?
     }
 
-    async fn update_last_password_reset(&self, id: ObjectId, time: DateTime<Utc>) -> Option<User> {
+    async fn update_last_password_reset(&self, id: ObjectId) -> Option<User> {
         let filter = doc! {"_id": id};
-        let update = doc! { "$set": doc! {"lastPasswordReset": time.to_rfc3339()} };
+        let update = doc! { "$set": doc! {"lastPasswordReset": Utc::now().to_rfc3339(), "passwordResetCount":0} };
 
         self.collection
             .find_one_and_update(filter, update)

@@ -15,3 +15,9 @@ pub struct TokenQuery {
 pub struct EmailRequest {
     pub email: String,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct ResetPasswordRequest {
+    pub token: String,
+    pub password: String,
+}

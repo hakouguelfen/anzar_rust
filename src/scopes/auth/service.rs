@@ -3,7 +3,9 @@ use mongodb::Database;
 use mongodb::bson::oid::ObjectId;
 
 use crate::core::extractors::AuthPayload;
+use crate::scopes::auth::PasswordResetTokenService;
 use crate::scopes::auth::jwt::service::JWTService;
+use crate::scopes::auth::model::PasswordResetTokens;
 use crate::scopes::user::service::UserService;
 
 use super::error::{Error, Result};
@@ -18,6 +20,7 @@ use super::utils::{AuthenticationHasher, Utils};
 pub struct AuthService {
     user_service: UserService,
     jwt_service: JWTService,
+    password_reset_token_service: PasswordResetTokenService,
 }
 
 impl AuthService {
@@ -25,6 +28,7 @@ impl AuthService {
         Self {
             user_service: UserService::new(db),
             jwt_service: JWTService::new(db),
+            password_reset_token_service: PasswordResetTokenService::new(db),
         }
     }
 
@@ -59,7 +63,7 @@ impl AuthService {
     }
 
     #[tracing::instrument(name = "Create user", skip(payload))]
-    pub async fn validate_token(&self, payload: AuthPayload, user_id: ObjectId) -> Result<()> {
+    pub async fn validate_jwt_token(&self, payload: AuthPayload, user_id: ObjectId) -> Result<()> {
         if self.jwt_service.find(payload).await.is_none() {
             tracing::error!("Invalid refresh token detected for user: {}", user_id);
 
@@ -128,5 +132,26 @@ impl AuthService {
 
         let user = self.user_service.increment_reset_count(user_id).await?;
         Ok(user)
+    }
+
+    pub async fn validate_reset_password_token(&self, token: &str) -> Result<PasswordResetTokens> {
+        let hash = Utils::hash_token(token);
+
+        // 2. Checks the database for a matching token
+        let reset_token = self.password_reset_token_service.find(hash).await?;
+
+        // 3. Verify token isn't expired or already used
+        if !reset_token.valid {
+            return Err(Error::TokenAlreadyUsed);
+        }
+        if Utc::now() > reset_token.expired_at {
+            let token_id = reset_token.id.unwrap_or_default();
+            self.password_reset_token_service
+                .invalidate(token_id)
+                .await?;
+            return Err(Error::TokenExpired);
+        }
+
+        Ok(reset_token)
     }
 }

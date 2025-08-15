@@ -1,4 +1,3 @@
-use chrono::Utc;
 use mongodb::{Database, bson::oid::ObjectId};
 
 use crate::scopes::{
@@ -78,7 +77,7 @@ impl UserService {
     #[tracing::instrument(name = "Update password", skip(user_id))]
     pub async fn update_last_password_reset(&self, user_id: ObjectId) -> Result<User> {
         self.repository
-            .update_last_password_reset(user_id, Utc::now())
+            .update_last_password_reset(user_id)
             .await
             .ok_or_else(|| db_error("update last password reset time", user_id))
     }

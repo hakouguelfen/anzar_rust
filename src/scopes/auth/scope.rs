@@ -2,16 +2,13 @@ use actix_web::{
     HttpResponse, Scope,
     web::{self, Data, Json, Query},
 };
-use chrono::Utc;
 
-use crate::{
-    core::{
-        extractors::{AuthPayload, AuthenticatedUser},
-        rate_limiter::RateLimiter,
-        repository::repository_manager::ServiceManager,
-    },
-    scopes::auth::Error,
+use crate::core::{
+    extractors::{AuthPayload, AuthenticatedUser},
+    rate_limiter::RateLimiter,
+    repository::repository_manager::ServiceManager,
 };
+use crate::scopes::auth::{Error, models::ResetPasswordRequest};
 
 use super::error::Result;
 use super::extenstion::AuthResponseTrait;
@@ -65,7 +62,9 @@ async fn refresh_token(
     repo: Data<ServiceManager>,
 ) -> Result<HttpResponse> {
     let user_id = authenticated_user.0.id.unwrap_or_default();
-    repo.auth_service.validate_token(payload, user_id).await?;
+    repo.auth_service
+        .validate_jwt_token(payload, user_id)
+        .await?;
 
     repo.auth_service
         .issue_and_save_tokens(&authenticated_user.0)
@@ -138,46 +137,32 @@ async fn reset_password(
     repo: Data<ServiceManager>,
     query: Query<TokenQuery>,
 ) -> Result<HttpResponse> {
-    // 1. Extract token from URL
     let token: &str = &query.token;
-    let hash = Utils::hash_token(token);
-
-    // 2. Checks the database for a matching token
-    let reset_token = repo.password_reset_token_service.find(hash).await?;
-
-    // 3. Verify token isn't expired or already used
-    if !reset_token.valid {
-        return Err(Error::TokenAlreadyUsed);
-    }
-    if Utc::now() > reset_token.expired_at {
-        let token_id = reset_token.id.unwrap_or_default();
-        repo.password_reset_token_service
-            .invalidate(token_id)
-            .await?;
-        return Err(Error::TokenExpired);
-    }
-
-    // 4. Check user account: blocked | suspended
-    let user_id = reset_token.user_id;
-    let user = repo.user_service.find(user_id).await?;
-    if user.account_locked {
-        return Err(Error::AccountSuspended);
-    }
+    repo.auth_service
+        .validate_reset_password_token(token)
+        .await?;
 
     Ok(HttpResponse::Ok().json("Password reset initiated"))
 }
 
 async fn update_password(
-    authenticated_user: AuthenticatedUser,
     repo: Data<ServiceManager>,
-    password: Query<String>,
+    request: Query<ResetPasswordRequest>,
 ) -> Result<HttpResponse> {
-    let user = authenticated_user.0;
-    let user_id = user.id.unwrap_or_default();
-    // 1. Validate token
+    // 1. ReValidate token
+    let token: &str = &request.token;
+    let reset_token = repo
+        .auth_service
+        .validate_reset_password_token(token)
+        .await?;
 
-    // 4. Ensure password is different then previous
-    if Utils::verify_password(&password, &user.password) {
+    // 2. Ensure password is different then previous
+    let user_id = reset_token.user_id;
+    let user = repo.user_service.find(user_id).await?;
+    if user.account_locked {
+        return Err(Error::AccountSuspended);
+    }
+    if Utils::verify_password(&request.password, &user.password) {
         tracing::warn!(
             "Current password is similair to previous password, user: {}",
             user_id
@@ -185,22 +170,26 @@ async fn update_password(
         return Err(Error::InvalidCredentials);
     }
 
-    // 5. Hash new password using argon2
-    let hashed_password = Utils::hash_password(&password)?;
+    // 3. Hash new password using argon2
+    let hashed_password = Utils::hash_password(&request.password)?;
     repo.user_service
         .update_password(user_id, hashed_password)
         .await?;
 
-    // 6. Mark token as used (used_at = now)
+    // 4. Invalidate PasswordResetToken, Mark it as used (used_at = now)
+    repo.password_reset_token_service
+        .invalidate(reset_token.id.unwrap_or_default())
+        .await?;
 
-    // 6.5. Update user.last_password_reset to now()
+    // 5. Update user.last_password_reset to now(), reset passwordResetCount->0
     repo.user_service
         .update_last_password_reset(user_id)
         .await?;
 
-    // 7. invalidate passwordTokens related to user
+    // 7. [TODO] invalidate passwordTokens related to user [THIS MAY NOT BE NEEDED]
     repo.password_reset_token_service.revoke(user_id).await?;
 
+    // 8. TODO it may not be neccessary
     repo.auth_service
         .logout_all(user_id)
         .await

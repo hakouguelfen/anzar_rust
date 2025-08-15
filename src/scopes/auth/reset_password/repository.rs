@@ -1,3 +1,4 @@
+use chrono::Utc;
 use mongodb::{
     Collection, Database, IndexModel,
     bson::{doc, oid::ObjectId},
@@ -8,6 +9,7 @@ use mongodb::{
 
 use super::model::PasswordResetTokens;
 
+#[derive(Debug)]
 pub struct DatabasePasswordResetTokenRepo {
     collection: Collection<PasswordResetTokens>,
 }
@@ -46,7 +48,7 @@ impl PasswordResetRepo for DatabasePasswordResetTokenRepo {
 
     async fn invalidate(&self, otp_id: ObjectId) -> Option<PasswordResetTokens> {
         let filter = doc! {"_id": otp_id};
-        let update = doc! { "$set": doc! {"valid": false} };
+        let update = doc! { "$set": doc! {"valid": false, "usedAt":Utc::now().to_rfc2822()} };
 
         self.collection
             .find_one_and_update(filter, update)
