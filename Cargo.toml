@@ -34,11 +34,9 @@ mockall = "0.13.0"
 async-trait = "0.1.82"
 
 # Cryptography
-sha3 = "0.10.8" # To be deleted
 sha2 = "0.10.9"
 argon2 = "0.5.3"
 base64 = "0.22.1"
-hex = "0.4.3" # To be deleted
 
 # Tracing
 tracing = { version = "0.1.40", features = ["log"] }

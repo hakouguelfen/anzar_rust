@@ -2,12 +2,13 @@ use chrono::{Duration, Utc};
 use mongodb::Database;
 use mongodb::bson::oid::ObjectId;
 
+use crate::core::extractors::AuthPayload;
 use crate::scopes::auth::jwt::service::JWTService;
 use crate::scopes::user::service::UserService;
 
 use super::error::{Error, Result};
 use super::jwt::model::RefreshToken;
-use super::models::{AuthPayload, LoginRequest};
+use super::models::LoginRequest;
 use super::tokens::{JwtEncoderBuilder, Tokens};
 use super::user::User;
 
@@ -58,16 +59,7 @@ impl AuthService {
     }
 
     #[tracing::instrument(name = "Create user", skip(payload))]
-    pub async fn validate_token(&self, payload: AuthPayload) -> Result<User> {
-        let user_id: ObjectId = ObjectId::parse_str(&payload.user_id).unwrap_or_default();
-
-        // Use a middleware for this to check every req if account is active
-        let user: User = self.user_service.find(user_id).await?;
-        if user.account_locked {
-            tracing::warn!("Blocked user attempted authentication: {}", user_id);
-            return Err(Error::AccountSuspended);
-        }
-
+    pub async fn validate_token(&self, payload: AuthPayload, user_id: ObjectId) -> Result<()> {
         if self.jwt_service.find(payload).await.is_none() {
             tracing::error!("Invalid refresh token detected for user: {}", user_id);
 
@@ -81,7 +73,7 @@ impl AuthService {
             return Err(Error::InvalidToken);
         }
 
-        Ok(user)
+        Ok(())
     }
 
     #[tracing::instrument(name = "Issue authentication tokens", skip(user))]

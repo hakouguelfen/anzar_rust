@@ -4,9 +4,7 @@ use actix_web::{FromRequest, HttpRequest, dev::Payload, http::header};
 use chrono::{Duration, Local};
 use serde::{Deserialize, Serialize};
 
-use crate::scopes::auth::Error;
-
-use super::tokens::JwtDecoderBuilder;
+use crate::scopes::auth::{Error, tokens::JwtDecoderBuilder};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum TokenType {

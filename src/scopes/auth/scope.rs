@@ -3,22 +3,25 @@ use actix_web::{
     web::{self, Data, Json, Query},
 };
 use chrono::Utc;
-use mongodb::bson::oid::ObjectId;
 
 use crate::{
-    core::{rate_limiter::RateLimiter, repository::repository_manager::ServiceManager},
+    core::{
+        extractors::{AuthPayload, AuthenticatedUser},
+        rate_limiter::RateLimiter,
+        repository::repository_manager::ServiceManager,
+    },
     scopes::auth::Error,
 };
 
+use super::error::Result;
 use super::extenstion::AuthResponseTrait;
+use super::reset_password::model::PasswordResetTokens;
 use super::user::User;
-use super::{Claims, reset_password::model::PasswordResetTokens};
 use super::{
     email::manager::Email,
     models::{EmailRequest, LoginRequest, TokenQuery},
     utils::{AuthenticationHasher, Utils},
 };
-use super::{error::Result, models::AuthPayload};
 
 #[tracing::instrument(
     name = "Login user",
@@ -53,14 +56,19 @@ async fn register(req: Json<User>, repo: Data<ServiceManager>) -> Result<HttpRes
 
 #[tracing::instrument(
     name = "Regenerate user accessToken",
-    skip(payload, repo),
+    skip(payload, repo, authenticated_user),
     fields(user_id = %payload.user_id)
 )]
-async fn refresh_token(payload: AuthPayload, repo: Data<ServiceManager>) -> Result<HttpResponse> {
-    let user: User = repo.auth_service.validate_token(payload).await?;
+async fn refresh_token(
+    payload: AuthPayload,
+    authenticated_user: AuthenticatedUser,
+    repo: Data<ServiceManager>,
+) -> Result<HttpResponse> {
+    let user_id = authenticated_user.0.id.unwrap_or_default();
+    repo.auth_service.validate_token(payload, user_id).await?;
 
     repo.auth_service
-        .issue_and_save_tokens(&user)
+        .issue_and_save_tokens(&authenticated_user.0)
         .await
         .map(|tokens| Ok(HttpResponse::Ok().json(tokens)))?
 }
@@ -160,21 +168,13 @@ async fn reset_password(
 }
 
 async fn update_password(
-    claims: Claims,
+    authenticated_user: AuthenticatedUser,
     repo: Data<ServiceManager>,
     password: Query<String>,
 ) -> Result<HttpResponse> {
+    let user = authenticated_user.0;
+    let user_id = user.id.unwrap_or_default();
     // 1. Validate token
-
-    // 2. Find User
-    let user_id: ObjectId = ObjectId::parse_str(claims.sub).unwrap_or_default();
-    let user: User = repo.user_service.find(user_id).await?;
-
-    // 3. Ensure user account is active
-    if user.account_locked {
-        tracing::warn!("Blocked user attempted to update password: {}", user_id);
-        return Err(Error::AccountSuspended);
-    }
 
     // 4. Ensure password is different then previous
     if Utils::verify_password(&password, &user.password) {

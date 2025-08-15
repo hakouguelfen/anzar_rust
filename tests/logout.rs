@@ -6,6 +6,8 @@ use crate::helpers::Helpers;
 use common::Common;
 use uuid::Uuid;
 
+const X_REFRESH_TOKEN: &str = "x-refresh-token";
+
 #[actix_web::test]
 async fn test_logout_success() {
     let db_name = Uuid::new_v4().to_string();
@@ -22,13 +24,13 @@ async fn test_logout_success() {
 
     let refresh_token: &str = response
         .headers()
-        .get("x-refresh-token")
+        .get(X_REFRESH_TOKEN)
         .and_then(|v| v.to_str().ok())
         .unwrap_or_default();
 
     let response = client
         .post(format!("{address}/auth/logout"))
-        .bearer_auth(refresh_token)
+        .header(X_REFRESH_TOKEN, format!("Bearer {refresh_token}"))
         .send()
         .await
         .expect("Failed to execute request.");
@@ -57,7 +59,7 @@ async fn test_logout_with_invalid_token() {
 
     let response = client
         .post(format!("{address}/auth/logout"))
-        .bearer_auth(refresh_token)
+        .header(X_REFRESH_TOKEN, format!("Bearer {refresh_token}"))
         .send()
         .await
         .expect("Failed to execute request.");

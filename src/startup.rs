@@ -1,5 +1,6 @@
 use actix_cors::Cors;
 use actix_web::dev::Server;
+use actix_web::middleware::from_fn;
 use actix_web::{HttpResponse, http, web};
 
 use actix_web::{App, HttpServer};
@@ -7,6 +8,7 @@ use tracing_actix_web::TracingLogger;
 
 use std::net::TcpListener;
 
+use crate::core::middlewares::account::auth_middleware;
 use crate::core::rate_limiter::RateLimiter;
 use crate::core::repository::repository_manager::ServiceManager;
 use crate::scopes::{auth, user};
@@ -34,6 +36,7 @@ pub fn run(listener: TcpListener, db: mongodb::Database) -> Result<Server, std::
         App::new()
             .wrap(TracingLogger::default())
             .wrap(cors)
+            .wrap(from_fn(auth_middleware))
             .app_data(repo_manager.clone())
             .app_data(rate_limitter.clone())
             .service(auth::auth_scope())

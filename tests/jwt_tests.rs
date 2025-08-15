@@ -2,7 +2,7 @@ mod common;
 mod helpers;
 mod test_cases;
 
-use anzar::scopes::{auth::TokenType, user::UserResponse};
+use anzar::{core::extractors::TokenType, scopes::user::UserResponse};
 use common::Common;
 
 use uuid::Uuid;
@@ -82,13 +82,14 @@ async fn test_protected_route_with_invalid_jwt() {
 
     // Login
     let response = Helpers::login(&db_name).await;
+    assert!(response.status().is_success());
+
     let valid_token: String = response
         .headers()
         .get("authorization")
         .and_then(|v| v.to_str().ok())
         .unwrap_or_default()
         .to_owned();
-    assert!(response.status().is_success());
 
     for (token, err_msg, status_code) in InvalidTestCases::jwt_tokens(valid_token) {
         let response = client

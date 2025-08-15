@@ -3,9 +3,11 @@ mod helpers;
 mod test_cases;
 
 use crate::{helpers::Helpers, test_cases::InvalidTestCases};
-use anzar::scopes::auth::{TokenType, tokens::Tokens};
+use anzar::{core::extractors::TokenType, scopes::auth::tokens::Tokens};
 use common::Common;
 use uuid::Uuid;
+
+const X_REFRESH_TOKEN: &str = "x-refresh-token";
 
 #[actix_web::test]
 async fn test_refresh_token_success() {
@@ -31,7 +33,7 @@ async fn test_refresh_token_success() {
     // refresh access token
     let response = client
         .post(format!("{address}/auth/refreshToken"))
-        .bearer_auth(refresh_token)
+        .header(X_REFRESH_TOKEN, format!("Bearer {refresh_token}"))
         .send()
         .await
         .expect("Failed to execute request.");
@@ -81,7 +83,7 @@ async fn test_refresh_with_invalid_token() {
     for (token, err_msg, status_code) in InvalidTestCases::refresh_tokens(valid_token) {
         let response = client
             .post(format!("{address}/auth/refreshToken"))
-            .header("authorization", token)
+            .header(X_REFRESH_TOKEN, token)
             .send()
             .await
             .expect("Failed to execute request.");
@@ -118,7 +120,7 @@ async fn test_refresh_token_single_use() {
     // refresh access token
     let response = client
         .post(format!("{address}/auth/refreshToken"))
-        .bearer_auth(refresh_token)
+        .header(X_REFRESH_TOKEN, format!("Bearer {refresh_token}"))
         .send()
         .await
         .expect("Failed to execute request.");
@@ -127,7 +129,7 @@ async fn test_refresh_token_single_use() {
     // refresh access token twice should fail
     let response = client
         .post(format!("{address}/auth/refreshToken"))
-        .bearer_auth(refresh_token)
+        .header(X_REFRESH_TOKEN, format!("Bearer {refresh_token}"))
         .send()
         .await
         .expect("Failed to execute request.");
@@ -141,4 +143,3 @@ async fn test_refresh_token_single_use() {
 
 // Check new tokens are diffrenet from old
 // Check new refreshToken hash stored in DB is diffrenet from old one
-// change expireAt attribute in accessToken and try to use it

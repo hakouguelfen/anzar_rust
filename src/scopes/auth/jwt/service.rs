@@ -1,10 +1,12 @@
 use mongodb::{Database, bson::oid::ObjectId};
 
-use crate::scopes::auth::{
-    DatabaseJWTRepo, Error, JWTRepo, Result,
-    jwt::model::{RefreshToken, RefreshTokenFilter},
-    models::AuthPayload,
-    utils::{AuthenticationHasher, Utils},
+use crate::{
+    core::extractors::AuthPayload,
+    scopes::auth::{
+        DatabaseJWTRepo, Error, JWTRepo, Result,
+        jwt::model::{RefreshToken, RefreshTokenFilter},
+        utils::{AuthenticationHasher, Utils},
+    },
 };
 
 #[derive(Debug)]

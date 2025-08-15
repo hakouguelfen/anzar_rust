@@ -4,9 +4,9 @@ use jsonwebtoken::{Header, encode, errors::Error};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::core::extractors::{Claims, TokenType};
 use crate::scopes::auth;
 
-use super::claims::{Claims, TokenType};
 use super::keys::KEYS;
 
 pub type Result<T> = core::result::Result<T, Error>;

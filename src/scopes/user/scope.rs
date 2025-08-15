@@ -1,27 +1,14 @@
 use actix_web::{
     HttpResponse, Scope,
-    web::{self, Data},
+    web::{self},
 };
-use mongodb::bson::oid::ObjectId;
 
-use crate::core::repository::repository_manager::ServiceManager;
-use crate::error::{Error, Result};
-
-use crate::scopes::auth::Claims;
 use crate::scopes::user::{User, UserResponse};
+use crate::{core::extractors::AuthenticatedUser, error::Result};
 
-#[tracing::instrument(
-    name = "Find user",
-    skip(claims, repo),
-    fields(user_id = %claims.sub)
-)]
-async fn find_user(claims: Claims, repo: Data<ServiceManager>) -> Result<HttpResponse> {
-    let user_id: ObjectId = ObjectId::parse_str(claims.sub).unwrap_or_default();
-
-    match repo.user_service.find(user_id).await {
-        Ok(user) => Ok(HttpResponse::Ok().json(<User as Into<UserResponse>>::into(user))),
-        Err(_) => Err(Error::NotFound),
-    }
+#[tracing::instrument(name = "Find user", skip(user))]
+async fn find_user(user: AuthenticatedUser) -> Result<HttpResponse> {
+    Ok(HttpResponse::Ok().json(<User as Into<UserResponse>>::into(user.0)))
 }
 
 pub fn user_scope() -> Scope {

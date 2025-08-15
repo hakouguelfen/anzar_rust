@@ -1,5 +1,8 @@
 #![allow(dead_code)]
-use anzar::scopes::auth::{Claims, TokenType, tokens::JwtDecoderBuilder};
+use anzar::{
+    core::extractors::{Claims, TokenType},
+    scopes::auth::tokens::JwtDecoderBuilder,
+};
 use reqwest::Response;
 
 use crate::{common::Common, test_cases::ValidTestCases};
