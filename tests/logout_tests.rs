@@ -1,9 +1,6 @@
-mod common;
-mod helpers;
-mod test_cases;
+mod shared;
+use shared::{Common, Helpers};
 
-use crate::helpers::Helpers;
-use common::Common;
 use uuid::Uuid;
 
 const X_REFRESH_TOKEN: &str = "x-refresh-token";

@@ -1,13 +1,8 @@
-mod common;
-mod helpers;
-mod test_cases;
+mod shared;
+use shared::{Common, Helpers, InvalidTestCases};
 
 use anzar::{core::extractors::TokenType, scopes::user::UserResponse};
-use common::Common;
-
 use uuid::Uuid;
-
-use crate::{helpers::Helpers, test_cases::InvalidTestCases};
 
 #[actix_web::test]
 async fn test_jwt_contains_correct_claims() {

@@ -1,12 +1,7 @@
-mod common;
-mod helpers;
-use common::Common;
+mod shared;
+use shared::{Common, Helpers, InvalidTestCases};
 
-mod test_cases;
-use test_cases::InvalidTestCases;
 use uuid::Uuid;
-
-use crate::helpers::Helpers;
 
 #[actix_web::test]
 async fn test_login_success() {

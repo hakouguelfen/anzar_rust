@@ -1,6 +1,6 @@
-mod common;
+mod shared;
 
-use common::Common;
+use crate::shared::Common;
 use uuid::Uuid;
 
 #[actix_web::test]

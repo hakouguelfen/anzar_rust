@@ -3,12 +3,13 @@ use anzar::{
     core::extractors::{Claims, TokenType},
     scopes::auth::tokens::JwtDecoderBuilder,
 };
+use jsonwebtoken::errors::Error;
 use reqwest::Response;
 
-use crate::{common::Common, test_cases::ValidTestCases};
-use jsonwebtoken::errors::Error;
-
 type Result<T> = core::result::Result<T, Error>;
+
+use super::common::Common;
+use super::test_cases::ValidTestCases;
 
 pub struct Helpers;
 impl Helpers {

@@ -1,10 +1,7 @@
-mod common;
-mod helpers;
-mod test_cases;
+mod shared;
+use shared::{Common, Helpers, InvalidTestCases};
 
-use crate::{helpers::Helpers, test_cases::InvalidTestCases};
 use anzar::{core::extractors::TokenType, scopes::auth::tokens::Tokens};
-use common::Common;
 use uuid::Uuid;
 
 const X_REFRESH_TOKEN: &str = "x-refresh-token";

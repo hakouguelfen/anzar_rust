@@ -16,6 +16,9 @@
 if user failed more then 5 times: Lock account -> [ERROR::AcountLocked]
 Limit user from changing password 3 times in 1h -> [ERROR::RateLimitExceeded]
 
+## TOADD:
+- validator
+
 
 
 RefreshToken:

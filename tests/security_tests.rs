@@ -1,14 +1,11 @@
-mod common;
-mod helpers;
+mod shared;
+use shared::{Common, Helpers};
 
-mod test_cases;
 use anzar::{
     core::extractors::TokenType,
     scopes::{auth::tokens::Tokens, user::UserResponse},
 };
 use uuid::Uuid;
-
-use crate::{common::Common, helpers::Helpers};
 
 const X_REFRESH_TOKEN: &str = "x-refresh-token";
 #[actix_web::test]
