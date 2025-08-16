@@ -28,6 +28,7 @@ async fn test_logout_success() {
         .and_then(|v| v.to_str().ok())
         .unwrap_or_default();
 
+    // Logout
     let response = client
         .post(format!("{address}/auth/logout"))
         .header(X_REFRESH_TOKEN, format!("Bearer {refresh_token}"))

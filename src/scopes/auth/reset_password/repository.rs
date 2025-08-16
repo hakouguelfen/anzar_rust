@@ -48,7 +48,7 @@ impl PasswordResetRepo for DatabasePasswordResetTokenRepo {
 
     async fn invalidate(&self, otp_id: ObjectId) -> Option<PasswordResetTokens> {
         let filter = doc! {"_id": otp_id};
-        let update = doc! { "$set": doc! {"valid": false, "usedAt":Utc::now().to_rfc2822()} };
+        let update = doc! { "$set": doc! { "valid": false, "usedAt": Utc::now().to_string() } };
 
         self.collection
             .find_one_and_update(filter, update)

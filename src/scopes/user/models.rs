@@ -64,7 +64,7 @@ impl User {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct UserResponse {
     #[serde(rename = "_id")]
     pub id: String,

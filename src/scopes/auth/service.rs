@@ -3,9 +3,8 @@ use mongodb::Database;
 use mongodb::bson::oid::ObjectId;
 
 use crate::core::extractors::AuthPayload;
-use crate::scopes::auth::PasswordResetTokenService;
-use crate::scopes::auth::jwt::service::JWTService;
 use crate::scopes::auth::model::PasswordResetTokens;
+use crate::scopes::auth::{JWTService, PasswordResetTokenService};
 use crate::scopes::user::service::UserService;
 
 use super::error::{Error, Result};
@@ -32,7 +31,6 @@ impl AuthService {
         }
     }
 
-    #[tracing::instrument(name = "Check user credentials", skip(req))]
     pub async fn check_credentials(&self, req: LoginRequest) -> Result<User> {
         let user: User = self
             .user_service
@@ -49,7 +47,6 @@ impl AuthService {
         }
     }
 
-    #[tracing::instrument(name = "Create user", skip(user_data))]
     pub async fn create_user(&self, user_data: User) -> Result<User> {
         user_data.validate()?;
 
@@ -62,7 +59,6 @@ impl AuthService {
         Ok(user)
     }
 
-    #[tracing::instrument(name = "Create user", skip(payload))]
     pub async fn validate_jwt_token(&self, payload: AuthPayload, user_id: ObjectId) -> Result<()> {
         if self.jwt_service.find(payload).await.is_none() {
             tracing::error!("Invalid refresh token detected for user: {}", user_id);
@@ -80,7 +76,6 @@ impl AuthService {
         Ok(())
     }
 
-    #[tracing::instrument(name = "Issue authentication tokens", skip(user))]
     pub async fn issue_and_save_tokens(&self, user: &User) -> Result<Tokens> {
         let user_id: ObjectId = user.id.unwrap_or_default();
 
@@ -104,21 +99,18 @@ impl AuthService {
         Ok(tokens)
     }
 
-    #[tracing::instrument(name = "Remove refreshToken", skip(payload))]
     pub async fn logout(&self, payload: AuthPayload) -> Result<()> {
         self.jwt_service.invalidate(payload.jti).await?;
 
         Ok(())
     }
 
-    #[tracing::instrument(name = "Remove refreshToken", skip(user_id))]
     pub async fn logout_all(&self, user_id: ObjectId) -> Result<()> {
         self.jwt_service.revoke(user_id).await?;
 
         Ok(())
     }
 
-    #[tracing::instrument(name = "Forgot password", skip(user))]
     pub async fn process_reset_request(&self, user: User) -> Result<User> {
         let user_id = user.id.unwrap_or_default();
 

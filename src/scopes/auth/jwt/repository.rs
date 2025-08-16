@@ -29,10 +29,11 @@ impl DatabaseJWTRepo {
 #[async_trait]
 pub trait JWTRepo: Send + Sync {
     async fn insert(&self, token: RefreshToken) -> Result<InsertOneResult, Error>;
-    async fn invalidate(&self, jti: String) -> Option<RefreshToken>;
+    async fn invalidate(&self, jti: String) -> Result<Option<RefreshToken>, Error>;
     async fn revoke(&self, user_id: ObjectId) -> Result<UpdateResult, Error>;
     async fn find_by_filter(&self, filter: RefreshTokenFilter) -> Option<RefreshToken>;
     async fn find(&self, id: ObjectId) -> Option<RefreshToken>;
+    async fn find_by_jti(&self, jti: String) -> Option<RefreshToken>;
 }
 
 #[async_trait]
@@ -42,14 +43,11 @@ impl JWTRepo for DatabaseJWTRepo {
 
         Ok(token)
     }
-    async fn invalidate(&self, jti: String) -> Option<RefreshToken> {
+    async fn invalidate(&self, jti: String) -> Result<Option<RefreshToken>, Error> {
         let filter = doc! {"jti": jti};
         let update = doc! { "$set": doc! {"valid": false} };
 
-        self.collection
-            .find_one_and_update(filter, update)
-            .await
-            .ok()?
+        self.collection.find_one_and_update(filter, update).await
     }
     async fn revoke(&self, user_id: ObjectId) -> Result<UpdateResult, Error> {
         let filter = doc! {"userId": user_id};
@@ -65,12 +63,18 @@ impl JWTRepo for DatabaseJWTRepo {
             "hash": filter.hash,
             "valid": filter.valid
         };
-        let update = doc! { "$set": doc! {"valid": false, "usedAt": Utc::now().to_rfc2822()} };
+        let update = doc! { "$set": doc! { "valid": false, "usedAt": Utc::now().to_string() } };
 
         self.collection
             .find_one_and_update(filter, update)
             .await
             .ok()?
+    }
+
+    async fn find_by_jti(&self, jti: String) -> Option<RefreshToken> {
+        let filter = doc! {"jti": jti};
+
+        self.collection.find_one(filter).await.ok()?
     }
 
     async fn find(&self, id: ObjectId) -> Option<RefreshToken> {

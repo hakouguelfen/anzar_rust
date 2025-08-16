@@ -27,7 +27,6 @@ impl UserService {
         })
     }
 
-    #[tracing::instrument(name = "Find user by email", skip(email))]
     pub async fn find_by_email(&self, email: &str) -> Result<User> {
         self.repository.find_by_email(email).await.ok_or_else(|| {
             tracing::error!("Failed to find user by email");
@@ -35,7 +34,6 @@ impl UserService {
         })
     }
 
-    #[tracing::instrument(name = "Create user account", skip(user))]
     pub async fn insert(&self, user: &User) -> Result<ObjectId> {
         let insert_result = self.repository.create_user(user).await.map_err(|e| {
             tracing::error!("Failed to insert new user to Database: {:?}", e);
@@ -45,7 +43,6 @@ impl UserService {
         Ok(insert_result.inserted_id.as_object_id().unwrap_or_default())
     }
 
-    #[tracing::instrument(name = "Update Password", skip(user_id))]
     pub async fn update_password(&self, user_id: ObjectId, password: String) -> Result<User> {
         let user = self
             .repository
@@ -56,7 +53,6 @@ impl UserService {
         Ok(user)
     }
 
-    #[tracing::instrument(name = "Forgot password", skip(user_id))]
     pub async fn update_reset_window(&self, user_id: ObjectId) -> Result<()> {
         self.repository
             .update_reset_window(user_id)
@@ -66,7 +62,6 @@ impl UserService {
         Ok(())
     }
 
-    #[tracing::instrument(name = "Forgot password", skip(user_id))]
     pub async fn increment_reset_count(&self, user_id: ObjectId) -> Result<User> {
         self.repository
             .increment_reset_count(user_id)
@@ -74,10 +69,9 @@ impl UserService {
             .ok_or_else(|| db_error("reset counter", user_id))
     }
 
-    #[tracing::instrument(name = "Update password", skip(user_id))]
-    pub async fn update_last_password_reset(&self, user_id: ObjectId) -> Result<User> {
+    pub async fn reset_password_state(&self, user_id: ObjectId) -> Result<User> {
         self.repository
-            .update_last_password_reset(user_id)
+            .reset_password_state(user_id)
             .await
             .ok_or_else(|| db_error("update last password reset time", user_id))
     }

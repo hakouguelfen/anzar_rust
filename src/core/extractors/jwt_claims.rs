@@ -1,10 +1,10 @@
 use std::future::{Ready, ready};
 
-use actix_web::{FromRequest, HttpRequest, dev::Payload, http::header};
+use actix_web::{FromRequest, HttpMessage, HttpRequest, dev::Payload};
 use chrono::{Duration, Local};
 use serde::{Deserialize, Serialize};
 
-use crate::scopes::auth::{Error, tokens::JwtDecoderBuilder};
+use crate::scopes::auth::Error;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum TokenType {
@@ -18,7 +18,7 @@ impl Default for TokenType {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
     pub sub: String,
     pub exp: usize,
@@ -45,25 +45,9 @@ impl FromRequest for Claims {
     type Future = Ready<Result<Self, Error>>;
 
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
-        let access_token: &str = req
-            .headers()
-            .get(header::AUTHORIZATION)
-            .and_then(|v| v.to_str().ok())
-            .and_then(|v| v.strip_prefix("Bearer "))
-            .unwrap_or_default();
-
-        let claims_response = JwtDecoderBuilder::new()
-            .with_token(access_token)
-            .with_token_type(TokenType::AccessToken)
-            .build()
-            .map_err(|_| Error::InvalidToken)
-            .and_then(|claims| {
-                if claims.token_type != TokenType::AccessToken {
-                    return Err(Error::InvalidToken);
-                }
-                Ok(claims)
-            });
-
-        ready(claims_response)
+        match req.extensions().get::<Claims>() {
+            Some(claims) => ready(Ok(claims.clone())),
+            None => ready(Err(Error::InvalidToken)),
+        }
     }
 }

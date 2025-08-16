@@ -181,15 +181,13 @@ async fn update_password(
         .invalidate(reset_token.id.unwrap_or_default())
         .await?;
 
-    // 5. Update user.last_password_reset to now(), reset passwordResetCount->0
-    repo.user_service
-        .update_last_password_reset(user_id)
-        .await?;
-
-    // 7. [TODO] invalidate passwordTokens related to user [THIS MAY NOT BE NEEDED]
+    // 5. [TODO] invalidate passwordTokens related to user [THIS MAY NOT BE NEEDED]
     repo.password_reset_token_service.revoke(user_id).await?;
 
-    // 8. TODO it may not be neccessary
+    // 6. Update user.last_password_reset to now(), reset passwordResetCount->0
+    repo.user_service.reset_password_state(user_id).await?;
+
+    // 7. TODO it may not be neccessary
     repo.auth_service
         .logout_all(user_id)
         .await

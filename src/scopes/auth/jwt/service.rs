@@ -42,11 +42,19 @@ impl JWTService {
         self.repository.find_by_filter(filter).await
     }
 
+    pub async fn find_by_jti(&self, jti: &str) -> Option<RefreshToken> {
+        self.repository.find_by_jti(jti.to_owned()).await
+    }
+
     pub async fn invalidate(&self, jti: String) -> Result<RefreshToken> {
-        self.repository.invalidate(jti).await.ok_or_else(|| {
-            tracing::error!("Failed to invalidate refreshToken");
-            Error::TokenRevocationFailed
-        })
+        match self.repository.invalidate(jti).await {
+            Ok(Some(token)) => Ok(token),
+            Ok(None) => Err(Error::InvalidToken),
+            Err(e) => {
+                dbg!(e);
+                Err(Error::TokenRevocationFailed)
+            }
+        }
     }
     pub async fn revoke(&self, user_id: ObjectId) -> Result<()> {
         self.repository.revoke(user_id).await.map_err(|e| {

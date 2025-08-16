@@ -1,6 +1,5 @@
 mod auth_payload;
 mod authenticated_user;
-mod guard;
 mod jwt_claims;
 
 pub use auth_payload::AuthPayload;

@@ -41,6 +41,16 @@ impl ValidTestCases {
             account_locked: false,
         }
     }
+    pub fn register_data2() -> RegisterRequest {
+        RegisterRequest {
+            username: "hakouguelfen2".into(),
+            email: "hakouguelfe2n@gmail.com".into(),
+            password: "hakouguelfen2".into(),
+            role: Role::User,
+            is_premium: false,
+            account_locked: false,
+        }
+    }
     pub fn blocked_account() -> RegisterRequest {
         RegisterRequest {
             username: "accountLocked".into(),
@@ -160,7 +170,7 @@ impl InvalidTestCases {
             (
                 "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODliZDhiZWIzZTg4MDdiMzI4OGNkMjYiLCJleHAiOjE3NTYzNDAwMzEsImlhdCI6MTc1NTA0NDAzMSwianRpIjoiMTdiYjYxYWItNTVkZC00MTRjLWE4NGItZGQxMzkyZjYwYzM5IiwidG9rZW5fdHlwZSI6IlJlZnJlc2hUb2tlbiJ9.zSmSyDjVmD6DZuF2Li6-fY3osco2rYfS1Ai9fYZ3j-k".to_string(),
                 "token is wrong",
-                404
+                401
             ),
             (
                 "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODliZDhiZWIzZTg4MDdiMzI4OGNkMjYiLCJleHAiOjE3NTUwNDQxMTcsImlhdCI6MTc1NTA0NDAzMSwianRpIjoiMTdiYjYxYWItNTVkZC00MTRjLWE4NGItZGQxMzkyZjYwYzM5IiwidG9rZW5fdHlwZSI6IlJlZnJlc2hUb2tlbiJ9.4na41dq0_11Gvx-1RcAVv6nCD7O5NZkkAYI6V3i70e4".to_string(),

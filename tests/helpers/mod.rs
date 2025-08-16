@@ -37,6 +37,19 @@ impl Helpers {
             .await
             .expect("Failed to execute request.")
     }
+
+    pub async fn create_user2(db_name: &str) -> Response {
+        let address = Common::spawn_app(db_name.into()).await;
+
+        let client = reqwest::Client::new();
+        let body = ValidTestCases::register_data2();
+        client
+            .post(format!("{address}/auth/register"))
+            .json(&body)
+            .send()
+            .await
+            .expect("Failed to execute request.")
+    }
     pub async fn create_user_with_account_blocked(db_name: &str) -> Response {
         let address = Common::spawn_app(db_name.into()).await;
 
