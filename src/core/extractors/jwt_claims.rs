@@ -3,7 +3,9 @@ use std::future::{Ready, ready};
 use actix_web::{FromRequest, HttpMessage, HttpRequest, dev::Payload};
 use chrono::{Duration, Local};
 use serde::{Deserialize, Serialize};
+use validator::Validate;
 
+use crate::core::validators::validate_objectid;
 use crate::scopes::auth::Error;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -18,8 +20,9 @@ impl Default for TokenType {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 pub struct Claims {
+    #[validate(length(equal = 24), custom(function = "validate_objectid"))]
     pub sub: String,
     pub exp: usize,
     pub iat: usize,

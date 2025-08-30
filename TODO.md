@@ -18,7 +18,16 @@ Limit user from changing password 3 times in 1h -> [ERROR::RateLimitExceeded]
 
 ## TOADD:
 - validator
+- tests for return type 
 
+
+## APIGATEWAY:
+- Paramater validation
+- Allow/Deny list
+- Auth
+- Rate Limit
+- Route to microservice
+- protocol conversion
 
 
 RefreshToken:

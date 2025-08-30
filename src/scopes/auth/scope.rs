@@ -1,17 +1,20 @@
 use actix_web::{
     HttpResponse, Scope,
-    web::{self, Data, Json, Query},
+    web::{self, Data},
 };
+use serde_json::json;
 
-use crate::core::{
-    extractors::{AuthPayload, AuthenticatedUser},
-    rate_limiter::RateLimiter,
-    repository::repository_manager::ServiceManager,
-};
 use crate::scopes::auth::{Error, models::ResetPasswordRequest};
+use crate::{
+    core::{
+        extractors::{AuthPayload, AuthenticatedUser, ValidatedPayload, ValidatedQuery},
+        rate_limiter::RateLimiter,
+        repository::repository_manager::ServiceManager,
+    },
+    scopes::auth::models::AuthResponse,
+};
 
 use super::error::Result;
-use super::extenstion::AuthResponseTrait;
 use super::reset_password::model::PasswordResetTokens;
 use super::user::User;
 use super::{
@@ -25,16 +28,17 @@ use super::{
     skip(req, repo),
     fields(user_email = %req.email)
 )]
-async fn login(req: Json<LoginRequest>, repo: Data<ServiceManager>) -> Result<HttpResponse> {
-    let user: User = repo
-        .auth_service
-        .check_credentials(req.into_inner())
-        .await?;
+async fn login(
+    ValidatedPayload(req): ValidatedPayload<LoginRequest>,
+    repo: Data<ServiceManager>,
+) -> Result<HttpResponse> {
+    let user: User = repo.auth_service.check_credentials(req).await?;
 
+    // NOTE: Login Should return 200 statusCode not 201
     repo.auth_service
         .issue_and_save_tokens(&user)
         .await
-        .map(|tokens| Ok(HttpResponse::set_auth_headers(tokens, user.into())))?
+        .map(|tokens| Ok(HttpResponse::Ok().json(AuthResponse::from(tokens, user.into()))))?
 }
 
 #[tracing::instrument(
@@ -42,13 +46,16 @@ async fn login(req: Json<LoginRequest>, repo: Data<ServiceManager>) -> Result<Ht
     skip(req, repo),
     fields(user_email = %req.email, user_name = %req.username)
 )]
-async fn register(req: Json<User>, repo: Data<ServiceManager>) -> Result<HttpResponse> {
-    let user: User = repo.auth_service.create_user(req.into_inner()).await?;
+async fn register(
+    ValidatedPayload(req): ValidatedPayload<User>,
+    repo: Data<ServiceManager>,
+) -> Result<HttpResponse> {
+    let user: User = repo.auth_service.create_user(req).await?;
 
     repo.auth_service
         .issue_and_save_tokens(&user)
         .await
-        .map(|tokens| Ok(HttpResponse::set_auth_headers(tokens, user.into())))?
+        .map(|tokens| Ok(HttpResponse::Created().json(AuthResponse::from(tokens, user.into()))))?
 }
 
 #[tracing::instrument(
@@ -81,17 +88,17 @@ async fn logout(payload: AuthPayload, repo: Data<ServiceManager>) -> Result<Http
     repo.auth_service
         .logout(payload)
         .await
-        .map(|_| Ok(HttpResponse::Ok().finish()))?
+        .map(|_| Ok(HttpResponse::Ok().json(json!({ "status": "ok" }))))?
 }
 
 #[tracing::instrument(name = "Forgot password", skip(repo, rate_limiter))]
 async fn forgot_password(
-    req: Json<EmailRequest>,
+    ValidatedPayload(req): ValidatedPayload<EmailRequest>,
     repo: Data<ServiceManager>,
     rate_limiter: Data<RateLimiter>,
 ) -> Result<HttpResponse> {
     // 1. Extract email from payload
-    let email: String = req.into_inner().email;
+    let email: String = req.email;
 
     /*
      * [ DON'T SEND A NON EXISTENCE EMAIL ERROR MESSAGE ]
@@ -135,7 +142,7 @@ async fn forgot_password(
 
 async fn reset_password(
     repo: Data<ServiceManager>,
-    query: Query<TokenQuery>,
+    ValidatedQuery(query): ValidatedQuery<TokenQuery>,
 ) -> Result<HttpResponse> {
     let token: &str = &query.token;
     repo.auth_service
@@ -147,7 +154,7 @@ async fn reset_password(
 
 async fn update_password(
     repo: Data<ServiceManager>,
-    request: Query<ResetPasswordRequest>,
+    ValidatedQuery(request): ValidatedQuery<ResetPasswordRequest>,
 ) -> Result<HttpResponse> {
     // 1. ReValidate token
     let token: &str = &request.token;

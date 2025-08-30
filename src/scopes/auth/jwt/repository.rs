@@ -45,7 +45,7 @@ impl JWTRepo for DatabaseJWTRepo {
     }
     async fn invalidate(&self, jti: String) -> Result<Option<RefreshToken>, Error> {
         let filter = doc! {"jti": jti};
-        let update = doc! { "$set": doc! {"valid": false} };
+        let update = doc! { "$set": doc! { "valid": false, "usedAt": Utc::now().to_string() } };
 
         self.collection.find_one_and_update(filter, update).await
     }

@@ -39,6 +39,9 @@ pub enum Error {
     TokenNotFound,
 
     // Bad Request - 400
+    #[display("Invalid request, {_0}")]
+    BadRequest(String),
+
     #[display("Invalid request format")]
     InvalidRequest,
 
@@ -85,9 +88,10 @@ impl ResponseError for Error {
             Error::AccountSuspended | Error::RateLimitExceeded => StatusCode::FORBIDDEN,
             Error::UserNotFound | Error::TokenNotFound => StatusCode::NOT_FOUND,
 
-            Error::InvalidRequest | Error::TokenExpired | Error::TokenAlreadyUsed => {
-                StatusCode::BAD_REQUEST
-            }
+            Error::BadRequest(_)
+            | Error::InvalidRequest
+            | Error::TokenExpired
+            | Error::TokenAlreadyUsed => StatusCode::BAD_REQUEST,
 
             Error::TokenCreationFailed
             | Error::HashingFailure

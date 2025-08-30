@@ -1,7 +1,7 @@
 mod shared;
 use shared::{Common, Helpers, InvalidTestCases};
 
-use anzar::{core::extractors::TokenType, scopes::user::UserResponse};
+use anzar::{core::extractors::TokenType, scopes::auth::AuthResponse};
 use uuid::Uuid;
 
 #[actix_web::test]
@@ -16,16 +16,11 @@ async fn test_jwt_contains_correct_claims() {
     let response = Helpers::login(&db_name).await;
     assert!(response.status().is_success());
 
-    let access_token: &str = response
-        .headers()
-        .get("authorization")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or_default();
-    let refresh_token: &str = response
-        .headers()
-        .get("x-refresh-token")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or_default();
+    let auth_response: AuthResponse = response.json().await.unwrap();
+
+    let access_token: &str = &auth_response.access_token;
+    let refresh_token: &str = &auth_response.refresh_token;
+
     assert!(!access_token.is_empty() && !refresh_token.is_empty());
     let access_token_claims = Helpers::decode_token(access_token, TokenType::AccessToken);
     let refresh_token_claims = Helpers::decode_token(refresh_token, TokenType::RefreshToken);
@@ -33,8 +28,7 @@ async fn test_jwt_contains_correct_claims() {
     assert!(access_token_claims.is_ok());
     assert!(refresh_token_claims.is_ok());
 
-    let content: UserResponse = response.json().await.unwrap();
-    assert_eq!(content.id, access_token_claims.unwrap().sub);
+    assert_eq!(auth_response.user.id, access_token_claims.unwrap().sub);
 }
 
 #[actix_web::test]
@@ -50,11 +44,9 @@ async fn test_protected_route_with_valid_jwt() {
     // Login
     let response = Helpers::login(&db_name).await;
     assert!(response.status().is_success());
-    let access_token: &str = response
-        .headers()
-        .get("authorization")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or_default();
+
+    let auth_response: AuthResponse = response.json().await.unwrap();
+    let access_token: &str = &auth_response.access_token;
 
     let response = client
         .get(format!("{address}/user"))
@@ -79,12 +71,8 @@ async fn test_protected_route_with_invalid_jwt() {
     let response = Helpers::login(&db_name).await;
     assert!(response.status().is_success());
 
-    let valid_token: String = response
-        .headers()
-        .get("authorization")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or_default()
-        .to_owned();
+    let auth_response: AuthResponse = response.json().await.unwrap();
+    let valid_token: String = auth_response.access_token;
 
     for (token, err_msg, status_code) in InvalidTestCases::jwt_tokens(valid_token) {
         let response = client

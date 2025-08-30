@@ -24,21 +24,21 @@ async fn test_login_failure() {
 
     let client = reqwest::Client::new();
 
-    for (invalid_body, error_message) in InvalidTestCases::login_credentials().iter() {
+    for (body, message, code) in InvalidTestCases::login_credentials().into_iter() {
         // Act
         let response = client
             .post(format!("{address}/auth/login"))
-            .json(&invalid_body)
+            .json(&body)
             .send()
             .await
             .expect("Failed to execute request.");
 
         // Assert
         assert_eq!(
-            401,
+            code,
             response.status().as_u16(),
             "The API did not fail when the payload was: {}",
-            error_message
+            message
         );
     }
 }

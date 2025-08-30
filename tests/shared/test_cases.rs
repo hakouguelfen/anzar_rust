@@ -65,14 +65,15 @@ impl ValidTestCases {
 
 pub struct InvalidTestCases;
 impl InvalidTestCases {
-    pub fn login_credentials() -> Vec<(LoginRequest, String)> {
+    pub fn login_credentials() -> Vec<(LoginRequest, String, u16)> {
         vec![
             (
                 LoginRequest {
                     email: "hakouguelfen@gmail.com".into(),
-                    password: "hakou".into(),
+                    password: "hakouismyname".into(),
                 },
                 "password is wrong".into(),
+                401,
             ),
             (
                 LoginRequest {
@@ -80,6 +81,7 @@ impl InvalidTestCases {
                     password: "hakouguelfen".into(),
                 },
                 "email is wrong".into(),
+                401,
             ),
             (
                 LoginRequest {
@@ -87,6 +89,7 @@ impl InvalidTestCases {
                     password: "hakouguelfen".into(),
                 },
                 "email is missing".into(),
+                400,
             ),
             (
                 LoginRequest {
@@ -94,6 +97,7 @@ impl InvalidTestCases {
                     password: "".into(),
                 },
                 "password is missing".into(),
+                400,
             ),
             (
                 LoginRequest {
@@ -101,11 +105,12 @@ impl InvalidTestCases {
                     password: "".into(),
                 },
                 "both is missing".into(),
+                400,
             ),
         ]
     }
 
-    pub fn registration_credentials() -> Vec<(RegisterRequest, String)> {
+    pub fn registration_credentials() -> Vec<(RegisterRequest, String, u16)> {
         vec![
             (
                 RegisterRequest {
@@ -117,6 +122,7 @@ impl InvalidTestCases {
                     account_locked: false,
                 },
                 "missing email field".into(),
+                400,
             ),
             (
                 RegisterRequest {
@@ -128,6 +134,7 @@ impl InvalidTestCases {
                     account_locked: false,
                 },
                 "missing password field".into(),
+                400,
             ),
             (
                 RegisterRequest {
@@ -139,6 +146,7 @@ impl InvalidTestCases {
                     account_locked: false,
                 },
                 "duplication emails".into(),
+                401,
             ),
         ]
     }

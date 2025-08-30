@@ -1,23 +1,53 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use validator::Validate;
 
-#[derive(Deserialize)]
+use crate::{
+    core::validators::validate_token,
+    scopes::{auth::tokens::Tokens, user::UserResponse},
+};
+
+#[derive(Debug, Deserialize, Validate)]
 pub struct LoginRequest {
+    #[validate(email)]
     pub email: String,
+    #[validate(length(min = 8, message = "password must be at least 8 characters"))]
     pub password: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Validate, Deserialize)]
 pub struct TokenQuery {
+    #[validate(length(equal = 32), custom(function = "validate_token"))]
     pub token: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Validate, Deserialize)]
 pub struct EmailRequest {
+    #[validate(email)]
     pub email: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Validate, Deserialize)]
 pub struct ResetPasswordRequest {
+    #[validate(length(equal = 32), custom(function = "validate_token"))]
     pub token: String,
+    #[validate(length(min = 8, message = "password must be at least 8 characters"))]
     pub password: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AuthResponse {
+    #[serde(rename = "accessToken")]
+    pub access_token: String,
+    #[serde(rename = "refreshToken")]
+    pub refresh_token: String,
+    pub user: UserResponse,
+}
+impl AuthResponse {
+    pub fn from(tokens: Tokens, user_response: UserResponse) -> Self {
+        Self {
+            access_token: tokens.access_token,
+            refresh_token: tokens.refresh_token,
+            user: user_response,
+        }
+    }
 }

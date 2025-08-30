@@ -114,6 +114,7 @@ pub struct Tokens {
     #[serde(rename = "refreshToken")]
     pub refresh_token: String,
 
+    #[serde(rename = "refreshTokenJti")]
     pub refresh_token_jti: String,
 }
 impl Tokens {

@@ -7,36 +7,51 @@ use actix_web::{
     web,
 };
 use mongodb::bson::oid::ObjectId;
+use serde_json::{Value, json};
 
-use crate::core::extractors::{AuthPayload, Claims, TokenType};
 use crate::core::repository::repository_manager::ServiceManager;
 use crate::scopes::{auth::tokens::JwtDecoderBuilder, user::User};
+use crate::{
+    core::extractors::{AuthPayload, Claims, TokenType},
+    scopes::auth::Error as AuthError,
+};
 
 const X_REFRESH_TOKEN: &str = "x-refresh-token";
+
+fn parse_error(error: AuthError) -> Value {
+    json!({"error": error.to_string()})
+}
+
+fn extract_token_from_header(req: &ServiceRequest, key: String) -> Option<&str> {
+    req.headers()
+        .get(key)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+}
 
 fn decode_claims(token: &str, token_type: TokenType) -> Result<Claims, Error> {
     JwtDecoderBuilder::new()
         .with_token(token)
         .with_token_type(token_type)
         .build()
-        .map_err(|_| actix_web::error::ErrorUnauthorized("Invalid token"))
+        .map_err(|_| actix_web::error::ErrorUnauthorized(parse_error(AuthError::InvalidToken)))
 }
 
 async fn validate_refresh_token(req: &ServiceRequest, jti: &str) -> Result<(), Error> {
     let repo_manager = req.app_data::<web::Data<ServiceManager>>().ok_or_else(|| {
-        actix_web::error::ErrorInternalServerError("Service manager is not available")
+        actix_web::error::ErrorInternalServerError(AuthError::InternalServerError)
     })?;
 
     let refresh_token = repo_manager
         .jwt_service
         .find_by_jti(jti)
         .await
-        .ok_or_else(|| actix_web::error::ErrorUnauthorized("No RefreshToken was found"))?;
+        .ok_or_else(|| actix_web::error::ErrorUnauthorized(parse_error(AuthError::InvalidToken)))?;
 
     if !refresh_token.valid {
-        return Err(actix_web::error::ErrorUnauthorized(
-            "RefreshToken is invalid",
-        ));
+        return Err(actix_web::error::ErrorUnauthorized(parse_error(
+            AuthError::InvalidToken,
+        )));
     }
 
     Ok(())
@@ -44,7 +59,7 @@ async fn validate_refresh_token(req: &ServiceRequest, jti: &str) -> Result<(), E
 
 async fn check_user_account(req: &ServiceRequest, user_id: &str) -> Result<(), Error> {
     let repo_manager = req.app_data::<web::Data<ServiceManager>>().ok_or_else(|| {
-        actix_web::error::ErrorInternalServerError("Service manager is not available")
+        actix_web::error::ErrorInternalServerError(parse_error(AuthError::InternalServerError))
     })?;
 
     let user_id: ObjectId = ObjectId::parse_str(user_id).unwrap_or_default();
@@ -52,10 +67,12 @@ async fn check_user_account(req: &ServiceRequest, user_id: &str) -> Result<(), E
         .user_service
         .find(user_id)
         .await
-        .map_err(|_| actix_web::error::ErrorNotFound("No User Found"))?;
+        .map_err(|_| actix_web::error::ErrorNotFound(parse_error(AuthError::UserNotFound)))?;
 
     if user.account_locked {
-        return Err(actix_web::error::ErrorForbidden("Account is blocked"));
+        return Err(actix_web::error::ErrorForbidden(parse_error(
+            AuthError::AccountSuspended,
+        )));
     }
 
     req.extensions_mut().insert::<User>(user);
@@ -67,17 +84,20 @@ pub async fn auth_middleware(
     req: ServiceRequest,
     next: Next<impl MessageBody>,
 ) -> Result<ServiceResponse<impl MessageBody>, Error> {
+    if [
+        "/health_check",
+        "/configuration/register_context",
+        "/auth/login",
+        "/auth/register",
+    ]
+    .contains(&req.path())
+    {
+        return next.call(req).await;
+    }
+
     // pre-processing
-    let access_token = req
-        .headers()
-        .get(header::AUTHORIZATION)
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.strip_prefix("Bearer "));
-    let refresh_token = req
-        .headers()
-        .get(X_REFRESH_TOKEN)
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.strip_prefix("Bearer "));
+    let access_token = extract_token_from_header(&req, header::AUTHORIZATION.to_string());
+    let refresh_token = extract_token_from_header(&req, X_REFRESH_TOKEN.to_string());
 
     if let Some(token) = access_token {
         let claims = decode_claims(token, TokenType::AccessToken)?;
@@ -91,6 +111,11 @@ pub async fn auth_middleware(
         check_user_account(&req, &claims.sub).await?;
         let payload = AuthPayload::from(claims.sub, token, claims.jti);
         req.extensions_mut().insert::<AuthPayload>(payload);
+    }
+
+    if access_token.is_none() && refresh_token.is_none() {
+        let err = actix_web::error::ErrorUnauthorized(parse_error(AuthError::InvalidToken));
+        return Err(err);
     }
 
     next.call(req).await

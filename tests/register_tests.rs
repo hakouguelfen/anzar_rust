@@ -17,9 +17,9 @@ async fn test_register_failures() {
     let address = Common::spawn_app(db_name).await;
     let client = reqwest::Client::new();
 
-    for (invalid_body, error_message) in InvalidTestCases::registration_credentials().iter() {
+    for (body, message, code) in InvalidTestCases::registration_credentials().into_iter() {
         // for duplication email test, need to create a valid user before
-        if error_message == "duplication emails" {
+        if message == "duplication emails" {
             let valid_data = ValidTestCases::register_data();
             client
                 .post(format!("{address}/auth/register"))
@@ -32,17 +32,17 @@ async fn test_register_failures() {
         // Act
         let response = client
             .post(format!("{address}/auth/register"))
-            .json(&invalid_body)
+            .json(&body)
             .send()
             .await
             .expect("Failed to execute request.");
 
         // Assert
         assert_eq!(
-            401,
+            code,
             response.status().as_u16(),
             "The API did not fail when the payload was: {}",
-            error_message
+            message
         );
     }
 }

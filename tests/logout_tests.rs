@@ -1,4 +1,5 @@
 mod shared;
+use anzar::scopes::auth::AuthResponse;
 use shared::{Common, Helpers};
 
 use uuid::Uuid;
@@ -19,11 +20,8 @@ async fn test_logout_success() {
     let response = Helpers::login(&db_name).await;
     assert!(response.status().is_success());
 
-    let refresh_token: &str = response
-        .headers()
-        .get(X_REFRESH_TOKEN)
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or_default();
+    let auth_response: AuthResponse = response.json().await.unwrap();
+    let refresh_token: &str = &auth_response.refresh_token;
 
     // Logout
     let response = client
@@ -49,15 +47,12 @@ async fn test_logout_with_invalid_token() {
     let response = Helpers::login(&db_name).await;
     assert!(response.status().is_success());
 
-    let refresh_token: &str = response
-        .headers()
-        .get("authorization")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or_default();
+    let auth_response: AuthResponse = response.json().await.unwrap();
+    let access_token: &str = &auth_response.access_token;
 
     let response = client
         .post(format!("{address}/auth/logout"))
-        .header(X_REFRESH_TOKEN, format!("Bearer {refresh_token}"))
+        .header(X_REFRESH_TOKEN, format!("Bearer {access_token}"))
         .send()
         .await
         .expect("Failed to execute request.");

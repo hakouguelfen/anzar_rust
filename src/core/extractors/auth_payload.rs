@@ -1,11 +1,15 @@
 use std::future::{Ready, ready};
 
+use crate::core::validators::validate_objectid;
 use crate::scopes::auth::Error;
+
 use actix_web::{FromRequest, HttpMessage, HttpRequest, dev::Payload};
 use serde::Deserialize;
+use validator::Validate;
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, Validate)]
 pub struct AuthPayload {
+    #[validate(length(equal = 24), custom(function = "validate_objectid"))]
     pub user_id: String,
     pub refresh_token: String,
     pub jti: String,

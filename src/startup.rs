@@ -11,7 +11,7 @@ use std::net::TcpListener;
 use crate::core::middlewares::account::auth_middleware;
 use crate::core::rate_limiter::RateLimiter;
 use crate::core::repository::repository_manager::ServiceManager;
-use crate::scopes::{auth, user};
+use crate::scopes::{auth, config, user};
 
 async fn health_check() -> HttpResponse {
     HttpResponse::Ok().finish()
@@ -39,6 +39,7 @@ pub fn run(listener: TcpListener, db: mongodb::Database) -> Result<Server, std::
             .wrap(from_fn(auth_middleware))
             .app_data(repo_manager.clone())
             .app_data(rate_limitter.clone())
+            .service(config::config_scope())
             .service(auth::auth_scope())
             .service(user::user_scope())
             .route("/health_check", web::get().to(health_check))

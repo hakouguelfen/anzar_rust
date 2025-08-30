@@ -3,7 +3,7 @@ use shared::{Common, Helpers};
 
 use anzar::{
     core::extractors::TokenType,
-    scopes::{auth::tokens::Tokens, user::UserResponse},
+    scopes::auth::{AuthResponse, tokens::Tokens},
 };
 use uuid::Uuid;
 
@@ -17,24 +17,21 @@ async fn test_password_not_returned_in_responses() {
     // Create User
     let response = Helpers::create_user(&db_name).await;
     assert!(response.status().is_success());
-    let user = response.json::<UserResponse>().await;
-    assert!(user.is_ok());
+    let auth_response = response.json::<AuthResponse>().await;
+    assert!(auth_response.is_ok());
 
     // Login
     let response = Helpers::login(&db_name).await;
     assert!(response.status().is_success());
-    let user = response.json::<UserResponse>().await;
-    assert!(user.is_ok());
+    let auth_response = response.json::<AuthResponse>().await;
+    assert!(auth_response.is_ok());
 
     // Login
     let response = Helpers::login(&db_name).await;
     assert!(response.status().is_success());
 
-    let refresh_token: &str = response
-        .headers()
-        .get(X_REFRESH_TOKEN)
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or_default();
+    let auth_response: AuthResponse = response.json().await.unwrap();
+    let refresh_token: &str = &auth_response.refresh_token;
 
     // Logout
     let response = client
@@ -63,11 +60,8 @@ async fn test_complete_auth_flow() {
     let response = Helpers::login(&db_name).await;
     assert!(response.status().is_success());
 
-    let refresh_token: &str = response
-        .headers()
-        .get(X_REFRESH_TOKEN)
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or_default();
+    let auth_response: AuthResponse = response.json().await.unwrap();
+    let refresh_token: &str = &auth_response.refresh_token;
     assert!(!refresh_token.is_empty());
 
     // [3] Refresh access token

@@ -1,7 +1,10 @@
 mod shared;
 use shared::{Common, Helpers, InvalidTestCases};
 
-use anzar::{core::extractors::TokenType, scopes::auth::tokens::Tokens};
+use anzar::{
+    core::extractors::TokenType,
+    scopes::auth::{AuthResponse, tokens::Tokens},
+};
 use uuid::Uuid;
 
 const X_REFRESH_TOKEN: &str = "x-refresh-token";
@@ -20,11 +23,8 @@ async fn test_refresh_token_success() {
     let response = Helpers::login(&db_name).await;
     assert!(response.status().is_success());
 
-    let refresh_token: &str = response
-        .headers()
-        .get("x-refresh-token")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or_default();
+    let auth_response: AuthResponse = response.json().await.unwrap();
+    let refresh_token: &str = &auth_response.refresh_token;
     assert!(!refresh_token.is_empty());
 
     // refresh access token
@@ -70,12 +70,8 @@ async fn test_refresh_with_invalid_token() {
     let response = Helpers::login(&db_name).await;
     assert!(response.status().is_success());
 
-    let valid_token: String = response
-        .headers()
-        .get("x-refresh-token")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or_default()
-        .to_owned();
+    let auth_response: AuthResponse = response.json().await.unwrap();
+    let valid_token: String = auth_response.refresh_token;
 
     for (token, err_msg, status_code) in InvalidTestCases::refresh_tokens(valid_token) {
         let response = client
@@ -108,11 +104,8 @@ async fn test_refresh_token_single_use() {
     let response = Helpers::login(&db_name).await;
     assert!(response.status().is_success());
 
-    let refresh_token: &str = response
-        .headers()
-        .get("x-refresh-token")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or_default();
+    let auth_response: AuthResponse = response.json().await.unwrap();
+    let refresh_token: &str = &auth_response.refresh_token;
 
     // refresh access token
     let response = client

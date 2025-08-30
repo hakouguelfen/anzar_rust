@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
+use validator::Validate;
 
 use crate::scopes::auth::Error;
 
@@ -11,13 +12,16 @@ pub enum Role {
     Admin,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Validate)]
 pub struct User {
     #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
     pub id: Option<ObjectId>,
 
+    #[validate(length(min = 4, message = "username must be at least 4 characters"))]
     pub username: String,
+    #[validate(email)]
     pub email: String,
+    #[validate(length(min = 8, message = "password must be at least 8 characters"))]
     pub password: String,
 
     #[serde(default, rename = "passwordResetCount")]
@@ -64,12 +68,16 @@ impl User {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct UserResponse {
     #[serde(rename = "_id")]
     pub id: String,
+
+    #[validate(length(min = 4, message = "username must be at least 4 characters"))]
     pub username: String,
+    #[validate(email)]
     pub email: String,
+
     pub role: Role,
     #[serde(rename = "isPremium")]
     pub is_premium: bool,

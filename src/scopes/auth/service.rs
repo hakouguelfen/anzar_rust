@@ -96,6 +96,7 @@ impl AuthService {
             .with_expire_at(Utc::now() + Duration::days(30));
 
         self.jwt_service.insert(refresh_token).await?;
+
         Ok(tokens)
     }
 
