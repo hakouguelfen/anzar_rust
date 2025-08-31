@@ -1,17 +1,17 @@
 mod shared;
 
-use crate::shared::Common;
+use crate::shared::{Common, register_context};
 use uuid::Uuid;
 
 #[actix_web::test]
 async fn test_health_check() {
     // Arrange
     let db_name = Uuid::new_v4().to_string();
-    let address = Common::spawn_app(db_name).await;
-
+    let address = Common::spawn_app(db_name.clone()).await;
     let client = reqwest::Client::new();
 
-    dbg!(format!("{address}/health_check"));
+    let db = format!("mongodb://localhost:27017/{db_name}");
+    register_context(&address.address, db).await;
 
     // Act
     let response = client

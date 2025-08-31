@@ -1,10 +1,12 @@
 use std::net::TcpListener;
 use std::sync::LazyLock;
 
-use anzar::configuration::get_configuration;
+use anzar::configuration::{get_app_config, get_configuration, update_app_config};
 use anzar::core::repository::DataBaseRepo;
+use anzar::scopes::config::{Configuration, EmailAndPassword};
 use anzar::telemetry::{get_subscriber, init_subscriber};
 use derive_more::derive::Display;
+use reqwest::Response;
 
 pub static TRACING: LazyLock<()> = LazyLock::new(|| {
     let subscriber_name = "test".into();
@@ -36,13 +38,34 @@ impl Common {
         // use test database
         let mut configuration = get_configuration().expect("Failed to read configuration");
         configuration.database.database_name = db_name;
-
-        let connection_string = configuration.database.connection_string();
-        let _db = DataBaseRepo::start(connection_string).await;
+        let _connection_string = configuration.database.connection_string();
 
         let server = anzar::startup::run(listener).expect("Failed to bind address");
 
         actix_web::rt::spawn(server);
+
+        // let app_config = get_app_config();
+        // if app_config.id.is_none() {
+        //     register_context(&address, connection_string).await;
+        // }
+
         TestApp { address }
     }
+}
+
+pub async fn register_context(address: &String, db: String) -> Response {
+    let client = reqwest::Client::new();
+
+    let body = Configuration {
+        id: None,
+        api_url: address.clone(),
+        database: db,
+        email_and_password: EmailAndPassword { enable: true },
+    };
+    client
+        .post(format!("{address}/configuration/register_context"))
+        .json(&body)
+        .send()
+        .await
+        .expect("Failed to execute request.")
 }

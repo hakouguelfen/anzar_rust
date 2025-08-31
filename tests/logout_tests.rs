@@ -4,6 +4,8 @@ use shared::{Common, Helpers};
 
 use uuid::Uuid;
 
+use crate::shared::register_context;
+
 const X_REFRESH_TOKEN: &str = "x-refresh-token";
 
 #[actix_web::test]
@@ -12,12 +14,15 @@ async fn test_logout_success() {
     let address = Common::spawn_app(db_name.clone()).await;
     let client = reqwest::Client::new();
 
+    let db = format!("mongodb://localhost:27017/{db_name}");
+    register_context(&address.address, db).await;
+
     // Create User
-    let response = Helpers::create_user(&db_name).await;
+    let response = Helpers::create_user(&address).await;
     assert!(response.status().is_success());
 
     // Login
-    let response = Helpers::login(&db_name).await;
+    let response = Helpers::login(&address).await;
     assert!(response.status().is_success());
 
     let auth_response: AuthResponse = response.json().await.unwrap();
@@ -30,6 +35,7 @@ async fn test_logout_success() {
         .send()
         .await
         .expect("Failed to execute request.");
+    dbg!(&response);
     assert!(response.status().is_success());
 }
 
@@ -39,12 +45,15 @@ async fn test_logout_with_invalid_token() {
     let address = Common::spawn_app(db_name.clone()).await;
     let client = reqwest::Client::new();
 
+    let db = format!("mongodb://localhost:27017/{db_name}");
+    register_context(&address.address, db).await;
+
     // Create User
-    let response = Helpers::create_user(&db_name).await;
+    let response = Helpers::create_user(&address).await;
     assert!(response.status().is_success());
 
     // Login
-    let response = Helpers::login(&db_name).await;
+    let response = Helpers::login(&address).await;
     assert!(response.status().is_success());
 
     let auth_response: AuthResponse = response.json().await.unwrap();

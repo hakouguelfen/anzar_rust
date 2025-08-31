@@ -7,6 +7,8 @@ use anzar::{
 };
 use uuid::Uuid;
 
+use crate::shared::register_context;
+
 const X_REFRESH_TOKEN: &str = "x-refresh-token";
 #[actix_web::test]
 async fn test_password_not_returned_in_responses() {
@@ -14,20 +16,23 @@ async fn test_password_not_returned_in_responses() {
     let address = Common::spawn_app(db_name.clone()).await;
     let client = reqwest::Client::new();
 
+    let db = format!("mongodb://localhost:27017/{db_name}");
+    register_context(&address.address, db).await;
+
     // Create User
-    let response = Helpers::create_user(&db_name).await;
+    let response = Helpers::create_user(&address).await;
     assert!(response.status().is_success());
     let auth_response = response.json::<AuthResponse>().await;
     assert!(auth_response.is_ok());
 
     // Login
-    let response = Helpers::login(&db_name).await;
+    let response = Helpers::login(&address).await;
     assert!(response.status().is_success());
     let auth_response = response.json::<AuthResponse>().await;
     assert!(auth_response.is_ok());
 
     // Login
-    let response = Helpers::login(&db_name).await;
+    let response = Helpers::login(&address).await;
     assert!(response.status().is_success());
 
     let auth_response: AuthResponse = response.json().await.unwrap();
@@ -52,12 +57,15 @@ async fn test_complete_auth_flow() {
     let address = Common::spawn_app(db_name.clone()).await;
     let client = reqwest::Client::new();
 
+    let db = format!("mongodb://localhost:27017/{db_name}");
+    register_context(&address.address, db).await;
+
     // [1] Create User
-    let response = Helpers::create_user(&db_name).await;
+    let response = Helpers::create_user(&address).await;
     assert!(response.status().is_success());
 
     // [2] Login
-    let response = Helpers::login(&db_name).await;
+    let response = Helpers::login(&address).await;
     assert!(response.status().is_success());
 
     let auth_response: AuthResponse = response.json().await.unwrap();

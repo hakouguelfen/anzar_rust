@@ -7,6 +7,8 @@ use anzar::{
 };
 use uuid::Uuid;
 
+use crate::shared::register_context;
+
 const X_REFRESH_TOKEN: &str = "x-refresh-token";
 
 #[actix_web::test]
@@ -15,12 +17,15 @@ async fn test_refresh_token_success() {
     let address = Common::spawn_app(db_name.clone()).await;
     let client = reqwest::Client::new();
 
+    let db = format!("mongodb://localhost:27017/{db_name}");
+    register_context(&address.address, db).await;
+
     // Create User
-    let response = Helpers::create_user(&db_name).await;
+    let response = Helpers::create_user(&address).await;
     assert!(response.status().is_success());
 
     // Login
-    let response = Helpers::login(&db_name).await;
+    let response = Helpers::login(&address).await;
     assert!(response.status().is_success());
 
     let auth_response: AuthResponse = response.json().await.unwrap();
@@ -62,12 +67,15 @@ async fn test_refresh_with_invalid_token() {
     let address = Common::spawn_app(db_name.clone()).await;
     let client = reqwest::Client::new();
 
+    let db = format!("mongodb://localhost:27017/{db_name}");
+    register_context(&address.address, db).await;
+
     // Create User
-    let response = Helpers::create_user_with_account_blocked(&db_name).await;
+    let response = Helpers::create_user_with_account_blocked(&address).await;
     assert!(response.status().is_success());
 
     // Login
-    let response = Helpers::login(&db_name).await;
+    let response = Helpers::login(&address).await;
     assert!(response.status().is_success());
 
     let auth_response: AuthResponse = response.json().await.unwrap();
@@ -96,12 +104,15 @@ async fn test_refresh_token_single_use() {
     let address = Common::spawn_app(db_name.clone()).await;
     let client = reqwest::Client::new();
 
+    let db = format!("mongodb://localhost:27017/{db_name}");
+    register_context(&address.address, db).await;
+
     // Create User
-    let response = Helpers::create_user(&db_name).await;
+    let response = Helpers::create_user(&address).await;
     assert!(response.status().is_success());
 
     // Login
-    let response = Helpers::login(&db_name).await;
+    let response = Helpers::login(&address).await;
     assert!(response.status().is_success());
 
     let auth_response: AuthResponse = response.json().await.unwrap();

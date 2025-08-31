@@ -8,14 +8,14 @@ use reqwest::Response;
 
 type Result<T> = core::result::Result<T, Error>;
 
+use crate::shared::{TestApp, register_context};
+
 use super::common::Common;
 use super::test_cases::ValidTestCases;
 
 pub struct Helpers;
 impl Helpers {
-    pub async fn login(db_name: &str) -> Response {
-        let address = Common::spawn_app(db_name.into()).await;
-
+    pub async fn login(address: &TestApp) -> Response {
         let client = reqwest::Client::new();
         let body = ValidTestCases::login_data();
         client
@@ -26,9 +26,7 @@ impl Helpers {
             .expect("Failed to execute request.")
     }
 
-    pub async fn create_user(db_name: &str) -> Response {
-        let address = Common::spawn_app(db_name.into()).await;
-
+    pub async fn create_user(address: &TestApp) -> Response {
         let client = reqwest::Client::new();
         let body = ValidTestCases::register_data();
         client
@@ -39,9 +37,7 @@ impl Helpers {
             .expect("Failed to execute request.")
     }
 
-    pub async fn create_user2(db_name: &str) -> Response {
-        let address = Common::spawn_app(db_name.into()).await;
-
+    pub async fn create_user2(address: &TestApp) -> Response {
         let client = reqwest::Client::new();
         let body = ValidTestCases::register_data2();
         client
@@ -51,9 +47,7 @@ impl Helpers {
             .await
             .expect("Failed to execute request.")
     }
-    pub async fn create_user_with_account_blocked(db_name: &str) -> Response {
-        let address = Common::spawn_app(db_name.into()).await;
-
+    pub async fn create_user_with_account_blocked(address: &TestApp) -> Response {
         let client = reqwest::Client::new();
         let body = ValidTestCases::blocked_account();
         client
