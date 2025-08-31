@@ -9,12 +9,15 @@ use actix_web::{
 use mongodb::bson::oid::ObjectId;
 use serde_json::{Value, json};
 
-use crate::core::repository::repository_manager::ServiceManager;
-use crate::scopes::{auth::tokens::JwtDecoderBuilder, user::User};
+use crate::{
+    configuration::get_app_config,
+    scopes::{auth::tokens::JwtDecoderBuilder, user::User},
+};
 use crate::{
     core::extractors::{AuthPayload, Claims, TokenType},
     scopes::auth::Error as AuthError,
 };
+use crate::{core::repository::repository_manager::ServiceManager, startup::AppState};
 
 const X_REFRESH_TOKEN: &str = "x-refresh-token";
 
@@ -80,10 +83,30 @@ async fn check_user_account(req: &ServiceRequest, user_id: &str) -> Result<(), E
     Ok(())
 }
 
+async fn init_db(req: &ServiceRequest) -> Result<(), Error> {
+    // save config
+    let app_state = req.app_data::<web::Data<AppState>>().ok_or_else(|| {
+        actix_web::error::ErrorInternalServerError(AuthError::InternalServerError)
+    })?;
+
+    let connection_string = {
+        let configuration = get_app_config();
+        configuration.database.to_string()
+    };
+
+    let service_manager = ServiceManager::new(connection_string).await;
+
+    let mut service = app_state.service_manager.lock().unwrap();
+    *service = Some(service_manager);
+
+    Ok(())
+}
+
 pub async fn auth_middleware(
     req: ServiceRequest,
     next: Next<impl MessageBody>,
 ) -> Result<ServiceResponse<impl MessageBody>, Error> {
+    dbg!(&req.path());
     if [
         "/health_check",
         "/configuration/register_context",
@@ -92,8 +115,13 @@ pub async fn auth_middleware(
     ]
     .contains(&req.path())
     {
+        if &req.path().to_string() != "/configuration/register_context" {
+            init_db(&req).await?;
+        }
         return next.call(req).await;
     }
+
+    //
 
     // pre-processing
     let access_token = extract_token_from_header(&req, header::AUTHORIZATION.to_string());

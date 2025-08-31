@@ -15,7 +15,7 @@ use super::user::User;
 
 use super::utils::{AuthenticationHasher, Utils};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AuthService {
     user_service: UserService,
     jwt_service: JWTService,

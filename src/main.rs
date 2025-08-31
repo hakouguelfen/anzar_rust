@@ -1,8 +1,6 @@
 use std::net::TcpListener;
 use std::sync::LazyLock;
 
-use anzar::core::repository::DataBaseRepo;
-
 use anzar::configuration::get_configuration;
 use anzar::scopes::auth::keys::KEYS;
 use anzar::startup;
@@ -23,10 +21,7 @@ async fn main() -> std::io::Result<()> {
     );
     let listener = TcpListener::bind(address)?;
 
-    let connection_string = configuration.database.connection_string();
-    let db = DataBaseRepo::start(connection_string).await;
-
-    let server = startup::run(listener, db)?;
+    let server = startup::run(listener)?;
     drop(configuration);
     server.await
 }

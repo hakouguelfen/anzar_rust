@@ -7,6 +7,7 @@ use actix_web::{App, HttpServer};
 use tracing_actix_web::TracingLogger;
 
 use std::net::TcpListener;
+use std::sync::{Arc, Mutex};
 
 use crate::core::middlewares::account::auth_middleware;
 use crate::core::rate_limiter::RateLimiter;
@@ -17,8 +18,15 @@ async fn health_check() -> HttpResponse {
     HttpResponse::Ok().finish()
 }
 
-pub fn run(listener: TcpListener, db: mongodb::Database) -> Result<Server, std::io::Error> {
-    let repo_manager = web::Data::new(ServiceManager::new(db));
+#[derive(Clone)]
+pub struct AppState {
+    pub service_manager: Arc<Mutex<Option<ServiceManager>>>,
+}
+
+pub fn run(listener: TcpListener) -> Result<Server, std::io::Error> {
+    let app_state = AppState {
+        service_manager: Arc::new(Mutex::new(None)),
+    };
     let rate_limitter = web::Data::new(RateLimiter::default());
 
     let server = HttpServer::new(move || {
@@ -37,7 +45,7 @@ pub fn run(listener: TcpListener, db: mongodb::Database) -> Result<Server, std::
             .wrap(TracingLogger::default())
             .wrap(cors)
             .wrap(from_fn(auth_middleware))
-            .app_data(repo_manager.clone())
+            .app_data(web::Data::new(app_state.clone()))
             .app_data(rate_limitter.clone())
             .service(config::config_scope())
             .service(auth::auth_scope())

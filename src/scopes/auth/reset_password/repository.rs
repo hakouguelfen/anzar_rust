@@ -9,7 +9,7 @@ use mongodb::{
 
 use super::model::PasswordResetTokens;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DatabasePasswordResetTokenRepo {
     collection: Collection<PasswordResetTokens>,
 }

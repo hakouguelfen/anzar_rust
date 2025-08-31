@@ -1,9 +1,9 @@
-use mongodb::Database;
-
+use crate::core::repository::DataBaseRepo;
 use crate::scopes::auth::JWTService;
 use crate::scopes::auth::{PasswordResetTokenService, service::AuthService};
 use crate::scopes::user::service::UserService;
 
+#[derive(Debug, Clone)]
 pub struct ServiceManager {
     pub auth_service: AuthService,
     pub user_service: UserService,
@@ -12,7 +12,9 @@ pub struct ServiceManager {
 }
 
 impl ServiceManager {
-    pub fn new(database: Database) -> Self {
+    pub async fn new(connection_string: String) -> Self {
+        let database = DataBaseRepo::start(connection_string).await;
+
         ServiceManager {
             auth_service: AuthService::new(&database),
             user_service: UserService::new(&database),

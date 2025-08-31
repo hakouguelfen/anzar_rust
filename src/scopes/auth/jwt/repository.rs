@@ -12,7 +12,7 @@ use crate::scopes::auth::jwt::model::RefreshTokenFilter;
 
 use super::model::RefreshToken;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DatabaseJWTRepo {
     collection: Collection<RefreshToken>,
 }

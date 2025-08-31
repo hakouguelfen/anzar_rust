@@ -4,15 +4,12 @@ use actix_web::{
 };
 use serde_json::json;
 
-use crate::scopes::auth::{Error, models::ResetPasswordRequest};
-use crate::{
-    core::{
-        extractors::{AuthPayload, AuthenticatedUser, ValidatedPayload, ValidatedQuery},
-        rate_limiter::RateLimiter,
-        repository::repository_manager::ServiceManager,
-    },
-    scopes::auth::models::AuthResponse,
+use crate::core::extractors::{
+    AuthPayload, AuthenticatedUser, ServiceManagerExtractor, ValidatedPayload, ValidatedQuery,
 };
+use crate::core::rate_limiter::RateLimiter;
+use crate::scopes::auth::models::AuthResponse;
+use crate::scopes::auth::{Error, models::ResetPasswordRequest};
 
 use super::error::Result;
 use super::reset_password::model::PasswordResetTokens;
@@ -30,11 +27,10 @@ use super::{
 )]
 async fn login(
     ValidatedPayload(req): ValidatedPayload<LoginRequest>,
-    repo: Data<ServiceManager>,
+    ServiceManagerExtractor(repo): ServiceManagerExtractor,
 ) -> Result<HttpResponse> {
     let user: User = repo.auth_service.check_credentials(req).await?;
 
-    // NOTE: Login Should return 200 statusCode not 201
     repo.auth_service
         .issue_and_save_tokens(&user)
         .await
@@ -48,7 +44,7 @@ async fn login(
 )]
 async fn register(
     ValidatedPayload(req): ValidatedPayload<User>,
-    repo: Data<ServiceManager>,
+    ServiceManagerExtractor(repo): ServiceManagerExtractor,
 ) -> Result<HttpResponse> {
     let user: User = repo.auth_service.create_user(req).await?;
 
@@ -66,7 +62,7 @@ async fn register(
 async fn refresh_token(
     payload: AuthPayload,
     authenticated_user: AuthenticatedUser,
-    repo: Data<ServiceManager>,
+    ServiceManagerExtractor(repo): ServiceManagerExtractor,
 ) -> Result<HttpResponse> {
     let user_id = authenticated_user.0.id.unwrap_or_default();
     repo.auth_service
@@ -84,7 +80,10 @@ async fn refresh_token(
     skip(payload, repo),
     fields(user_id = %payload.user_id)
 )]
-async fn logout(payload: AuthPayload, repo: Data<ServiceManager>) -> Result<HttpResponse> {
+async fn logout(
+    payload: AuthPayload,
+    ServiceManagerExtractor(repo): ServiceManagerExtractor,
+) -> Result<HttpResponse> {
     repo.auth_service
         .logout(payload)
         .await
@@ -94,7 +93,7 @@ async fn logout(payload: AuthPayload, repo: Data<ServiceManager>) -> Result<Http
 #[tracing::instrument(name = "Forgot password", skip(repo, rate_limiter))]
 async fn forgot_password(
     ValidatedPayload(req): ValidatedPayload<EmailRequest>,
-    repo: Data<ServiceManager>,
+    ServiceManagerExtractor(repo): ServiceManagerExtractor,
     rate_limiter: Data<RateLimiter>,
 ) -> Result<HttpResponse> {
     // 1. Extract email from payload
@@ -141,7 +140,7 @@ async fn forgot_password(
 }
 
 async fn reset_password(
-    repo: Data<ServiceManager>,
+    ServiceManagerExtractor(repo): ServiceManagerExtractor,
     ValidatedQuery(query): ValidatedQuery<TokenQuery>,
 ) -> Result<HttpResponse> {
     let token: &str = &query.token;
@@ -153,7 +152,7 @@ async fn reset_password(
 }
 
 async fn update_password(
-    repo: Data<ServiceManager>,
+    ServiceManagerExtractor(repo): ServiceManagerExtractor,
     ValidatedQuery(request): ValidatedQuery<ResetPasswordRequest>,
 ) -> Result<HttpResponse> {
     // 1. ReValidate token

@@ -3,7 +3,7 @@ use crate::scopes::auth::{Error, Result};
 use super::{DatabasePasswordResetTokenRepo, PasswordResetRepo, model::PasswordResetTokens};
 use mongodb::{Database, bson::oid::ObjectId};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PasswordResetTokenService {
     repository: DatabasePasswordResetTokenRepo,
 }

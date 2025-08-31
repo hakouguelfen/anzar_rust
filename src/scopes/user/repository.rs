@@ -11,7 +11,7 @@ use mongodb::{
 
 use super::models::User;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DatabaseUserRepo {
     collection: Collection<User>,
 }

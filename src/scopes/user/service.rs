@@ -8,7 +8,7 @@ use crate::scopes::{
     },
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct UserService {
     repository: DatabaseUserRepo,
 }

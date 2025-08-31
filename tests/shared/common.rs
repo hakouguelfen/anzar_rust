@@ -36,10 +36,11 @@ impl Common {
         // use test database
         let mut configuration = get_configuration().expect("Failed to read configuration");
         configuration.database.database_name = db_name;
-        let connection_string = configuration.database.connection_string();
-        let db = DataBaseRepo::start(connection_string).await;
 
-        let server = anzar::startup::run(listener, db).expect("Failed to bind address");
+        let connection_string = configuration.database.connection_string();
+        let _db = DataBaseRepo::start(connection_string).await;
+
+        let server = anzar::startup::run(listener).expect("Failed to bind address");
 
         actix_web::rt::spawn(server);
         TestApp { address }

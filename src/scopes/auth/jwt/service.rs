@@ -9,7 +9,7 @@ use crate::{
     },
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct JWTService {
     repository: DatabaseJWTRepo,
 }
