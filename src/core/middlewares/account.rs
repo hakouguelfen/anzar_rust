@@ -41,9 +41,13 @@ fn decode_claims(token: &str, token_type: TokenType) -> Result<Claims, Error> {
 }
 
 async fn validate_refresh_token(req: &ServiceRequest, jti: &str) -> Result<(), Error> {
-    let repo_manager = req.app_data::<web::Data<ServiceManager>>().ok_or_else(|| {
-        actix_web::error::ErrorInternalServerError(AuthError::InternalServerError)
-    })?;
+    let repo_manager = req
+        .app_data::<web::Data<AppState>>()
+        .and_then(|state| state.service_manager.lock().ok())
+        .and_then(|guard| guard.as_ref().map(|sm| sm.clone()))
+        .ok_or(actix_web::error::ErrorInternalServerError(parse_error(
+            AuthError::InternalServerError,
+        )))?;
 
     let refresh_token = repo_manager
         .jwt_service
@@ -61,9 +65,13 @@ async fn validate_refresh_token(req: &ServiceRequest, jti: &str) -> Result<(), E
 }
 
 async fn check_user_account(req: &ServiceRequest, user_id: &str) -> Result<(), Error> {
-    let repo_manager = req.app_data::<web::Data<ServiceManager>>().ok_or_else(|| {
-        actix_web::error::ErrorInternalServerError(parse_error(AuthError::InternalServerError))
-    })?;
+    let repo_manager = req
+        .app_data::<web::Data<AppState>>()
+        .and_then(|state| state.service_manager.lock().ok())
+        .and_then(|guard| guard.as_ref().map(|sm| sm.clone()))
+        .ok_or(actix_web::error::ErrorInternalServerError(parse_error(
+            AuthError::InternalServerError,
+        )))?;
 
     let user_id: ObjectId = ObjectId::parse_str(user_id).unwrap_or_default();
     let user: User = repo_manager
@@ -93,7 +101,6 @@ async fn init_db(req: &ServiceRequest) -> Result<(), Error> {
         let configuration = get_app_config();
         configuration.database.to_string()
     };
-
     let service_manager = ServiceManager::new(connection_string).await;
 
     let mut service = app_state.service_manager.lock().unwrap();
@@ -106,7 +113,6 @@ pub async fn auth_middleware(
     req: ServiceRequest,
     next: Next<impl MessageBody>,
 ) -> Result<ServiceResponse<impl MessageBody>, Error> {
-    dbg!(&req.path());
     if [
         "/health_check",
         "/configuration/register_context",

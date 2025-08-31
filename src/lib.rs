@@ -1,3 +1,4 @@
+pub mod adapters;
 pub mod configuration;
 pub mod core;
 pub mod error;

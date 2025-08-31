@@ -23,6 +23,7 @@ pub struct AuthService {
 }
 
 impl AuthService {
+    // TODO: auth_scope should only communicate to authService
     pub fn new(db: &Database) -> Self {
         Self {
             user_service: UserService::new(db),
