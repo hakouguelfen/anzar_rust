@@ -1,9 +1,9 @@
 use mongodb::Database;
 
-use crate::scopes::{auth, user};
+use crate::adapters::mongo::indexes::MongodbIndexes;
 
-pub struct DataBaseRepo;
-impl DataBaseRepo {
+pub struct MongoDB {}
+impl MongoDB {
     pub async fn start(connection_string: String) -> Database {
         let client = mongodb::Client::with_uri_str(&connection_string)
             .await
@@ -12,11 +12,14 @@ impl DataBaseRepo {
             .default_database()
             .expect("Failed to get default database");
 
-        user::create_unique_email_index(&db)
+        let mongodb_indexes = MongodbIndexes { db: db.clone() };
+        mongodb_indexes
+            .create_unique_email_index()
             .await
             .expect("Could not create user email index");
 
-        auth::create_token_hash_index(&db)
+        mongodb_indexes
+            .create_token_hash_index()
             .await
             .expect("Could not create hash token index");
 

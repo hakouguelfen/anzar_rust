@@ -35,7 +35,6 @@ async fn test_logout_success() {
         .send()
         .await
         .expect("Failed to execute request.");
-    dbg!(&response);
     assert!(response.status().is_success());
 }
 

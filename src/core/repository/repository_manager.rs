@@ -1,4 +1,4 @@
-use crate::core::repository::DataBaseRepo;
+use crate::adapters::mongo::MongoDB;
 use crate::scopes::auth::JWTService;
 use crate::scopes::auth::{PasswordResetTokenService, service::AuthService};
 use crate::scopes::user::service::UserService;
@@ -13,7 +13,7 @@ pub struct ServiceManager {
 
 impl ServiceManager {
     pub async fn new(connection_string: String) -> Self {
-        let database = DataBaseRepo::start(connection_string).await;
+        let database = MongoDB::start(connection_string).await;
 
         ServiceManager {
             auth_service: AuthService::new(&database),

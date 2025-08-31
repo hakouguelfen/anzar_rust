@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 
-pub struct RefreshTokenFilter {
+pub struct _RefreshTokenFilter {
     pub jti: String,
     pub user_id: ObjectId,
     pub hash: String,

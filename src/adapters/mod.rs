@@ -1,1 +1,1 @@
-pub mod mongodb_adapter;
+pub mod mongo;

@@ -5,7 +5,7 @@ use mongodb::{
 };
 
 use crate::{
-    adapters::mongodb_adapter::{MongodbAdapter, MongodbAdapterTrait},
+    adapters::mongo::{MongodbAdapter, MongodbAdapterTrait},
     scopes::{
         auth::{Error, Result},
         user::User,

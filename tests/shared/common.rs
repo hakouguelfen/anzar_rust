@@ -2,7 +2,6 @@ use std::net::TcpListener;
 use std::sync::LazyLock;
 
 use anzar::configuration::{get_app_config, get_configuration, update_app_config};
-use anzar::core::repository::DataBaseRepo;
 use anzar::scopes::config::{Configuration, EmailAndPassword};
 use anzar::telemetry::{get_subscriber, init_subscriber};
 use derive_more::derive::Display;
