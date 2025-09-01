@@ -4,12 +4,15 @@ use actix_web::{
 };
 use serde_json::json;
 
-use crate::core::extractors::{
-    AuthPayload, AuthenticatedUser, ServiceManagerExtractor, ValidatedPayload, ValidatedQuery,
-};
-use crate::core::rate_limiter::RateLimiter;
-use crate::scopes::auth::models::AuthResponse;
 use crate::scopes::auth::{Error, models::ResetPasswordRequest};
+use crate::scopes::auth::{models::AuthResponse, service::PasswordResetTokenServiceTrait};
+use crate::{
+    core::extractors::{
+        AuthPayload, AuthenticatedUser, ServiceManagerExtractor, ValidatedPayload, ValidatedQuery,
+    },
+    scopes::auth::service::UserServiceTrait,
+};
+use crate::{core::rate_limiter::RateLimiter, scopes::auth::service::JwtServiceTrait};
 
 use super::error::Result;
 use super::reset_password::model::PasswordResetTokens;
@@ -29,7 +32,10 @@ async fn login(
     ValidatedPayload(req): ValidatedPayload<LoginRequest>,
     ServiceManagerExtractor(repo): ServiceManagerExtractor,
 ) -> Result<HttpResponse> {
-    let user: User = repo.auth_service.check_credentials(req).await?;
+    let user: User = repo
+        .auth_service
+        .authenticate_user(&req.email, &req.password)
+        .await?;
 
     repo.auth_service
         .issue_and_save_tokens(&user)
@@ -65,9 +71,7 @@ async fn refresh_token(
     ServiceManagerExtractor(repo): ServiceManagerExtractor,
 ) -> Result<HttpResponse> {
     let user_id = authenticated_user.0.id.unwrap_or_default();
-    repo.auth_service
-        .validate_jwt_token(payload, user_id)
-        .await?;
+    repo.auth_service.validate_jwt(payload, user_id).await?;
 
     repo.auth_service
         .issue_and_save_tokens(&authenticated_user.0)
@@ -103,14 +107,16 @@ async fn forgot_password(
      * [ DON'T SEND A NON EXISTENCE EMAIL ERROR MESSAGE ]
      */
     // 2. Check if email exists
-    if let Ok(user) = repo.user_service.find_by_email(&email).await {
+    if let Ok(user) = repo.auth_service.find_user_by_email(&email).await {
         let user_id = user.id.unwrap_or_default();
 
         // Check rate limiting
         rate_limiter.check_rate_limit(&user)?;
 
         // 3. If exists: invalidate existing tokens
-        repo.password_reset_token_service.revoke(user_id).await?;
+        repo.auth_service
+            .revoke_password_reset_token(user_id)
+            .await?;
 
         // 4. Generate a new token + hash
         // try to use something like: Utils::generate_token(32).hash()
@@ -121,7 +127,7 @@ async fn forgot_password(
         let otp = PasswordResetTokens::default()
             .with_user_id(user_id)
             .with_token_hash(hashed_token);
-        repo.password_reset_token_service.insert(otp).await?;
+        repo.auth_service.insert_password_reset_token(otp).await?;
 
         // 6. If exists: send email: exp-> api/reset-password?token=xxxxxxx
         let to = "hakoudev@gmail.com";
@@ -164,7 +170,7 @@ async fn update_password(
 
     // 2. Ensure password is different then previous
     let user_id = reset_token.user_id;
-    let user = repo.user_service.find(user_id).await?;
+    let user = repo.auth_service.find_user(user_id).await?;
     if user.account_locked {
         return Err(Error::AccountSuspended);
     }
@@ -178,20 +184,22 @@ async fn update_password(
 
     // 3. Hash new password using argon2
     let hashed_password = Utils::hash_password(&request.password)?;
-    repo.user_service
-        .update_password(user_id, hashed_password)
+    repo.auth_service
+        .update_user_password(user_id, hashed_password)
         .await?;
 
     // 4. Invalidate PasswordResetToken, Mark it as used (used_at = now)
-    repo.password_reset_token_service
-        .invalidate(reset_token.id.unwrap_or_default())
+    repo.auth_service
+        .invalidate_password_reset_token(reset_token.id.unwrap_or_default())
         .await?;
 
     // 5. [TODO] invalidate passwordTokens related to user [THIS MAY NOT BE NEEDED]
-    repo.password_reset_token_service.revoke(user_id).await?;
+    repo.auth_service
+        .revoke_password_reset_token(user_id)
+        .await?;
 
     // 6. Update user.last_password_reset to now(), reset passwordResetCount->0
-    repo.user_service.reset_password_state(user_id).await?;
+    repo.auth_service.reset_password_state(user_id).await?;
 
     // 7. TODO it may not be neccessary
     repo.auth_service

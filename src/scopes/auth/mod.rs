@@ -3,7 +3,7 @@ mod jwt;
 mod models;
 mod reset_password;
 mod scope;
-mod utils;
+pub mod utils;
 
 pub mod email;
 pub mod service;
