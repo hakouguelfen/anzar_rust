@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::core::middlewares::account::auth_middleware;
 use crate::core::rate_limiter::RateLimiter;
-use crate::core::repository::repository_manager::ServiceManager;
+use crate::scopes::auth::service::AuthService;
 use crate::scopes::{auth, config, user};
 
 async fn health_check() -> HttpResponse {
@@ -20,12 +20,12 @@ async fn health_check() -> HttpResponse {
 
 #[derive(Clone)]
 pub struct AppState {
-    pub service_manager: Arc<Mutex<Option<ServiceManager>>>,
+    pub auth_service: Arc<Mutex<Option<AuthService>>>,
 }
 
 pub fn run(listener: TcpListener) -> Result<Server, std::io::Error> {
     let app_state = AppState {
-        service_manager: Arc::new(Mutex::new(None)),
+        auth_service: Arc::new(Mutex::new(None)),
     };
     let rate_limitter = web::Data::new(RateLimiter::default());
 

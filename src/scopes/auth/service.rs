@@ -1,7 +1,7 @@
 use chrono::{Duration, Utc};
-use mongodb::Database;
 use mongodb::bson::oid::ObjectId;
 
+use crate::adapters::mongo::MongoDB;
 use crate::core::extractors::AuthPayload;
 use crate::scopes::auth::jwt::model::RefreshToken;
 use crate::scopes::auth::model::PasswordResetTokens;
@@ -22,11 +22,12 @@ pub struct AuthService {
     password_reset_token_service: PasswordResetTokenService,
 }
 impl AuthService {
-    pub fn new(db: &Database) -> Self {
+    pub async fn new(connection_string: String) -> Self {
+        let db = MongoDB::start(connection_string).await;
         Self {
-            user_service: UserService::new(db),
-            jwt_service: JWTService::new(db),
-            password_reset_token_service: PasswordResetTokenService::new(db),
+            user_service: UserService::new(&db),
+            jwt_service: JWTService::new(&db),
+            password_reset_token_service: PasswordResetTokenService::new(&db),
         }
     }
 }
@@ -108,6 +109,10 @@ pub trait JwtServiceTrait {
     fn logout(&self, payload: AuthPayload) -> impl std::future::Future<Output = Result<()>> + Send;
     fn logout_all(&self, user_id: ObjectId)
     -> impl std::future::Future<Output = Result<()>> + Send;
+    fn find_jwt_by_jti(
+        &self,
+        jti: &str,
+    ) -> impl std::future::Future<Output = Option<RefreshToken>> + Send;
 }
 impl JwtServiceTrait for AuthService {
     async fn validate_jwt(&self, payload: AuthPayload, user_id: ObjectId) -> Result<()> {
@@ -156,6 +161,10 @@ impl JwtServiceTrait for AuthService {
     async fn logout_all(&self, user_id: ObjectId) -> Result<()> {
         self.jwt_service.revoke(user_id).await?;
         Ok(())
+    }
+
+    async fn find_jwt_by_jti(&self, jti: &str) -> Option<RefreshToken> {
+        self.jwt_service.find_by_jti(jti).await
     }
 }
 

@@ -9,15 +9,21 @@ use actix_web::{
 use mongodb::bson::oid::ObjectId;
 use serde_json::{Value, json};
 
+use crate::startup::AppState;
 use crate::{
     configuration::get_app_config,
-    scopes::{auth::tokens::JwtDecoderBuilder, user::User},
+    scopes::{
+        auth::{
+            service::{AuthService, JwtServiceTrait, UserServiceTrait},
+            tokens::JwtDecoderBuilder,
+        },
+        user::User,
+    },
 };
 use crate::{
     core::extractors::{AuthPayload, Claims, TokenType},
     scopes::auth::Error as AuthError,
 };
-use crate::{core::repository::repository_manager::ServiceManager, startup::AppState};
 
 const X_REFRESH_TOKEN: &str = "x-refresh-token";
 
@@ -41,17 +47,16 @@ fn decode_claims(token: &str, token_type: TokenType) -> Result<Claims, Error> {
 }
 
 async fn validate_refresh_token(req: &ServiceRequest, jti: &str) -> Result<(), Error> {
-    let repo_manager = req
+    let auth_service = req
         .app_data::<web::Data<AppState>>()
-        .and_then(|state| state.service_manager.lock().ok())
+        .and_then(|state| state.auth_service.lock().ok())
         .and_then(|guard| guard.as_ref().map(|sm| sm.clone()))
         .ok_or(actix_web::error::ErrorInternalServerError(parse_error(
             AuthError::InternalServerError,
         )))?;
 
-    let refresh_token = repo_manager
-        .jwt_service
-        .find_by_jti(jti)
+    let refresh_token = auth_service
+        .find_jwt_by_jti(jti)
         .await
         .ok_or_else(|| actix_web::error::ErrorUnauthorized(parse_error(AuthError::InvalidToken)))?;
 
@@ -65,18 +70,17 @@ async fn validate_refresh_token(req: &ServiceRequest, jti: &str) -> Result<(), E
 }
 
 async fn check_user_account(req: &ServiceRequest, user_id: &str) -> Result<(), Error> {
-    let repo_manager = req
+    let auth_service = req
         .app_data::<web::Data<AppState>>()
-        .and_then(|state| state.service_manager.lock().ok())
+        .and_then(|state| state.auth_service.lock().ok())
         .and_then(|guard| guard.as_ref().map(|sm| sm.clone()))
         .ok_or(actix_web::error::ErrorInternalServerError(parse_error(
             AuthError::InternalServerError,
         )))?;
 
     let user_id: ObjectId = ObjectId::parse_str(user_id).unwrap_or_default();
-    let user: User = repo_manager
-        .user_service
-        .find(user_id)
+    let user: User = auth_service
+        .find_user(user_id)
         .await
         .map_err(|_| actix_web::error::ErrorNotFound(parse_error(AuthError::UserNotFound)))?;
 
@@ -101,10 +105,10 @@ async fn init_db(req: &ServiceRequest) -> Result<(), Error> {
         let configuration = get_app_config();
         configuration.database.to_string()
     };
-    let service_manager = ServiceManager::new(connection_string).await;
+    let auth_service = AuthService::new(connection_string).await;
 
-    let mut service = app_state.service_manager.lock().unwrap();
-    *service = Some(service_manager);
+    let mut service = app_state.auth_service.lock().unwrap();
+    *service = Some(auth_service);
 
     Ok(())
 }
