@@ -51,8 +51,9 @@ impl User {
         user
     }
 
-    pub fn set_id(&mut self, id: ObjectId) {
-        self.id = Some(id);
+    pub fn set_id(&mut self, id: String) {
+        let user_id = ObjectId::parse_str(id).unwrap_or_default();
+        self.id = Some(user_id);
     }
 
     pub fn with_password(mut self, password: String) -> Self {

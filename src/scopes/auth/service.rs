@@ -1,7 +1,9 @@
-use chrono::{Duration, Utc};
-use mongodb::bson::oid::ObjectId;
+use std::sync::Arc;
 
-use crate::adapters::mongo::MongoDB;
+use chrono::{Duration, Utc};
+
+use crate::adapters::database_adapter::DatabaseAdapter;
+use crate::adapters::mongo::{MongoDB, MongodbAdapter};
 use crate::core::extractors::AuthPayload;
 use crate::scopes::auth::jwt::model::RefreshToken;
 use crate::scopes::auth::model::PasswordResetTokens;
@@ -15,19 +17,32 @@ use super::user::User;
 
 use super::utils::{AuthenticationHasher, Utils};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AuthService {
     user_service: UserService,
     jwt_service: JWTService,
     password_reset_token_service: PasswordResetTokenService,
 }
+
 impl AuthService {
     pub async fn new(connection_string: String) -> Self {
+        // Decide which DatabaseAdapter here
         let db = MongoDB::start(connection_string).await;
+
+        let user_adapter: Arc<dyn DatabaseAdapter<User>> =
+            Arc::new(MongodbAdapter::<User>::new(&db, "user"));
+
+        let jwt_adapter: Arc<dyn DatabaseAdapter<RefreshToken>> =
+            Arc::new(MongodbAdapter::<RefreshToken>::new(&db, "refresh-token"));
+
+        let reset_token_adapter: Arc<dyn DatabaseAdapter<PasswordResetTokens>> = Arc::new(
+            MongodbAdapter::<PasswordResetTokens>::new(&db, "password_reset_token"),
+        );
+
         Self {
-            user_service: UserService::new(&db),
-            jwt_service: JWTService::new(&db),
-            password_reset_token_service: PasswordResetTokenService::new(&db),
+            user_service: UserService::new(user_adapter),
+            jwt_service: JWTService::new(jwt_adapter),
+            password_reset_token_service: PasswordResetTokenService::new(reset_token_adapter),
         }
     }
 }
@@ -38,22 +53,16 @@ pub trait UserServiceTrait {
         &self,
         email: &str,
         password: &str,
-    ) -> impl std::future::Future<Output = Result<User>> + Send;
-    fn create_user(&self, user: User) -> impl std::future::Future<Output = Result<User>> + Send;
-    fn find_user_by_email(
-        &self,
-        email: &str,
-    ) -> impl std::future::Future<Output = Result<User>> + Send;
-    fn find_user(&self, id: ObjectId) -> impl std::future::Future<Output = Result<User>> + Send;
+    ) -> impl std::future::Future<Output = Result<User>>;
+    fn create_user(&self, user: User) -> impl std::future::Future<Output = Result<User>>;
+    fn find_user_by_email(&self, email: &str) -> impl std::future::Future<Output = Result<User>>;
+    fn find_user(&self, id: String) -> impl std::future::Future<Output = Result<User>>;
     fn update_user_password(
         &self,
-        id: ObjectId,
+        id: String,
         hash: String,
-    ) -> impl std::future::Future<Output = Result<User>> + Send;
-    fn reset_password_state(
-        &self,
-        id: ObjectId,
-    ) -> impl std::future::Future<Output = Result<User>> + Send;
+    ) -> impl std::future::Future<Output = Result<User>>;
+    fn reset_password_state(&self, id: String) -> impl std::future::Future<Output = Result<User>>;
 }
 impl UserServiceTrait for AuthService {
     async fn authenticate_user(&self, email: &str, password: &str) -> Result<User> {
@@ -76,7 +85,7 @@ impl UserServiceTrait for AuthService {
         let password_hash = Utils::hash_password(&user_data.password)?;
         let mut user: User = User::from(user_data).with_password(password_hash);
 
-        let user_id: ObjectId = self.user_service.insert(&user).await?;
+        let user_id: String = self.user_service.insert(&user).await?;
         user.set_id(user_id);
 
         Ok(user)
@@ -84,13 +93,13 @@ impl UserServiceTrait for AuthService {
     async fn find_user_by_email(&self, email: &str) -> Result<User> {
         self.user_service.find_by_email(email).await
     }
-    async fn find_user(&self, id: ObjectId) -> Result<User> {
+    async fn find_user(&self, id: String) -> Result<User> {
         self.user_service.find(id).await
     }
-    async fn update_user_password(&self, id: ObjectId, hash: String) -> Result<User> {
+    async fn update_user_password(&self, id: String, hash: String) -> Result<User> {
         self.user_service.update_password(id, hash).await
     }
-    async fn reset_password_state(&self, id: ObjectId) -> Result<User> {
+    async fn reset_password_state(&self, id: String) -> Result<User> {
         self.user_service.reset_password_state(id).await
     }
 }
@@ -100,22 +109,19 @@ pub trait JwtServiceTrait {
     fn validate_jwt(
         &self,
         payload: AuthPayload,
-        user_id: ObjectId,
-    ) -> impl std::future::Future<Output = Result<()>> + Send;
+        user_id: String,
+    ) -> impl std::future::Future<Output = Result<()>>;
     fn issue_and_save_tokens(
         &self,
         user: &User,
-    ) -> impl std::future::Future<Output = Result<Tokens>> + Send;
-    fn logout(&self, payload: AuthPayload) -> impl std::future::Future<Output = Result<()>> + Send;
-    fn logout_all(&self, user_id: ObjectId)
-    -> impl std::future::Future<Output = Result<()>> + Send;
-    fn find_jwt_by_jti(
-        &self,
-        jti: &str,
-    ) -> impl std::future::Future<Output = Option<RefreshToken>> + Send;
+    ) -> impl std::future::Future<Output = Result<Tokens>>;
+    fn logout(&self, payload: AuthPayload) -> impl std::future::Future<Output = Result<()>>;
+    fn logout_all(&self, user_id: String) -> impl std::future::Future<Output = Result<()>>;
+    fn find_jwt_by_jti(&self, jti: &str)
+    -> impl std::future::Future<Output = Option<RefreshToken>>;
 }
 impl JwtServiceTrait for AuthService {
-    async fn validate_jwt(&self, payload: AuthPayload, user_id: ObjectId) -> Result<()> {
+    async fn validate_jwt(&self, payload: AuthPayload, user_id: String) -> Result<()> {
         if self.jwt_service.find(payload).await.is_none() {
             tracing::error!("Invalid refresh token detected for user: {}", user_id);
 
@@ -132,10 +138,10 @@ impl JwtServiceTrait for AuthService {
         Ok(())
     }
     async fn issue_and_save_tokens(&self, user: &User) -> Result<Tokens> {
-        let user_id: ObjectId = user.id.unwrap_or_default();
+        let user_id = user.id.unwrap_or_default().to_string();
 
         let tokens: Tokens = JwtEncoderBuilder::default()
-            .with_user_id(user_id.to_string())
+            .with_user_id(user_id.clone())
             .build()
             .inspect_err(|e| {
                 tracing::error!("Failed to generate authentication tokens: {:?}", e)
@@ -158,7 +164,7 @@ impl JwtServiceTrait for AuthService {
         self.jwt_service.invalidate(payload.jti).await?;
         Ok(())
     }
-    async fn logout_all(&self, user_id: ObjectId) -> Result<()> {
+    async fn logout_all(&self, user_id: String) -> Result<()> {
         self.jwt_service.revoke(user_id).await?;
         Ok(())
     }
@@ -173,24 +179,21 @@ pub trait PasswordResetTokenServiceTrait {
     fn validate_reset_password_token(
         &self,
         token: &str,
-    ) -> impl std::future::Future<Output = Result<PasswordResetTokens>> + Send;
-    fn process_reset_request(
-        &self,
-        user: User,
-    ) -> impl std::future::Future<Output = Result<User>> + Send;
+    ) -> impl std::future::Future<Output = Result<PasswordResetTokens>>;
+    fn process_reset_request(&self, user: User) -> impl std::future::Future<Output = Result<User>>;
 
     fn invalidate_password_reset_token(
         &self,
-        id: ObjectId,
-    ) -> impl std::future::Future<Output = Result<PasswordResetTokens>> + Send;
+        id: String,
+    ) -> impl std::future::Future<Output = Result<PasswordResetTokens>>;
     fn revoke_password_reset_token(
         &self,
-        user_id: ObjectId,
-    ) -> impl std::future::Future<Output = Result<()>> + Send;
+        user_id: String,
+    ) -> impl std::future::Future<Output = Result<()>>;
     fn insert_password_reset_token(
         &self,
         otp: PasswordResetTokens,
-    ) -> impl std::future::Future<Output = Result<()>> + Send;
+    ) -> impl std::future::Future<Output = Result<()>>;
 }
 impl PasswordResetTokenServiceTrait for AuthService {
     async fn validate_reset_password_token(&self, token: &str) -> Result<PasswordResetTokens> {
@@ -204,7 +207,7 @@ impl PasswordResetTokenServiceTrait for AuthService {
             return Err(Error::TokenAlreadyUsed);
         }
         if Utc::now() > reset_token.expired_at {
-            let token_id = reset_token.id.unwrap_or_default();
+            let token_id = reset_token.id.unwrap_or_default().to_string();
             self.password_reset_token_service
                 .invalidate(token_id)
                 .await?;
@@ -222,17 +225,22 @@ impl PasswordResetTokenServiceTrait for AuthService {
             .is_none_or(|start| Utc::now() - start > Duration::hours(1));
 
         if window_expired {
-            self.user_service.update_reset_window(user_id).await?;
+            self.user_service
+                .update_reset_window(user_id.to_string())
+                .await?;
         }
 
-        let user = self.user_service.increment_reset_count(user_id).await?;
+        let user = self
+            .user_service
+            .increment_reset_count(user_id.to_string())
+            .await?;
         Ok(user)
     }
 
-    async fn invalidate_password_reset_token(&self, id: ObjectId) -> Result<PasswordResetTokens> {
+    async fn invalidate_password_reset_token(&self, id: String) -> Result<PasswordResetTokens> {
         self.password_reset_token_service.invalidate(id).await
     }
-    async fn revoke_password_reset_token(&self, user_id: ObjectId) -> Result<()> {
+    async fn revoke_password_reset_token(&self, user_id: String) -> Result<()> {
         self.password_reset_token_service.revoke(user_id).await
     }
     async fn insert_password_reset_token(&self, otp: PasswordResetTokens) -> Result<()> {

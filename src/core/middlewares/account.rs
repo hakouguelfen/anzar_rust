@@ -6,7 +6,6 @@ use actix_web::{
     middleware::Next,
     web,
 };
-use mongodb::bson::oid::ObjectId;
 use serde_json::{Value, json};
 
 use crate::startup::AppState;
@@ -78,9 +77,8 @@ async fn check_user_account(req: &ServiceRequest, user_id: &str) -> Result<(), E
             AuthError::InternalServerError,
         )))?;
 
-    let user_id: ObjectId = ObjectId::parse_str(user_id).unwrap_or_default();
     let user: User = auth_service
-        .find_user(user_id)
+        .find_user(user_id.to_string())
         .await
         .map_err(|_| actix_web::error::ErrorNotFound(parse_error(AuthError::UserNotFound)))?;
 
@@ -105,6 +103,7 @@ async fn init_db(req: &ServiceRequest) -> Result<(), Error> {
         let configuration = get_app_config();
         configuration.database.to_string()
     };
+
     let auth_service = AuthService::new(connection_string).await;
 
     let mut service = app_state.auth_service.lock().unwrap();

@@ -1,11 +1,11 @@
-use mongodb::{
-    Collection, Database,
-    bson::Document,
-    error::Error,
-    options::ReturnDocument,
-    results::{InsertOneResult, UpdateResult},
-};
+use async_trait::async_trait;
+use mongodb::{Collection, Database, options::ReturnDocument};
 use serde::{Serialize, de::DeserializeOwned};
+
+use crate::{
+    adapters::{database_adapter::DatabaseAdapter, mongo::objectid_parser::ParsedObjectId},
+    scopes::auth::Error,
+};
 
 #[derive(Debug, Clone)]
 pub struct MongodbAdapter<T: Send + Sync> {
@@ -20,47 +20,53 @@ impl<T: Send + Sync> MongodbAdapter<T> {
     }
 }
 
-pub trait MongodbAdapterTrait<T: Send + Sync> {
-    fn insert(
-        &self,
-        data: T,
-    ) -> impl std::future::Future<Output = Result<InsertOneResult, Error>> + Send;
-    fn find_one(&self, filter: Document) -> impl std::future::Future<Output = Option<T>>;
-    fn find_one_and_update(
-        &self,
-        filter: Document,
-        update: Document,
-    ) -> impl std::future::Future<Output = Option<T>>;
-    fn update_many(
-        &self,
-        filter: Document,
-        update: Document,
-    ) -> impl std::future::Future<Output = Result<UpdateResult, Error>>;
-}
-
-impl<T> MongodbAdapterTrait<T> for MongodbAdapter<T>
+#[async_trait]
+impl<T> DatabaseAdapter<T> for MongodbAdapter<T>
 where
-    T: Send + Sync + Serialize + DeserializeOwned,
+    T: Send + Sync + Serialize + DeserializeOwned + 'static,
 {
-    async fn insert(&self, data: T) -> Result<InsertOneResult, Error> {
-        let doc = self.collection.insert_one(data).await?;
-        Ok(doc)
+    async fn insert(&self, data: T) -> Result<String, Error> {
+        let doc = self
+            .collection
+            .insert_one(data)
+            .await
+            .map_err(|_| Error::DatabaseError)?;
+        let id = doc.inserted_id.as_object_id().unwrap_or_default();
+        Ok(id.to_string())
     }
 
-    async fn find_one(&self, filter: Document) -> Option<T> {
-        self.collection.find_one(filter).await.ok()?
+    async fn find_one(&self, ParsedObjectId(filter): ParsedObjectId) -> Option<T> {
+        let mongo_filter = mongodb::bson::to_document(&filter).unwrap();
+        self.collection.find_one(mongo_filter).await.ok()?
     }
 
-    async fn find_one_and_update(&self, filter: Document, update: Document) -> Option<T> {
+    async fn find_one_and_update(
+        &self,
+        ParsedObjectId(filter): ParsedObjectId,
+        ParsedObjectId(update): ParsedObjectId,
+    ) -> Option<T> {
+        let mongo_filter = mongodb::bson::to_document(&filter).unwrap();
+        let mongo_update = mongodb::bson::to_document(&update).unwrap();
         self.collection
-            .find_one_and_update(filter, update)
+            .find_one_and_update(mongo_filter, mongo_update)
             .return_document(ReturnDocument::After)
             .await
             .ok()?
     }
 
-    async fn update_many(&self, filter: Document, update: Document) -> Result<UpdateResult, Error> {
-        let result = self.collection.update_many(filter, update).await?;
-        Ok(result)
+    async fn update_many(
+        &self,
+        ParsedObjectId(filter): ParsedObjectId,
+        ParsedObjectId(update): ParsedObjectId,
+    ) -> Result<(), Error> {
+        let mongo_filter = mongodb::bson::to_document(&filter).unwrap();
+        let mongo_update = mongodb::bson::to_document(&update).unwrap();
+
+        self.collection
+            .update_many(mongo_filter, mongo_update)
+            .await
+            .map_err(|_| Error::DatabaseError)?;
+
+        Ok(())
     }
 }

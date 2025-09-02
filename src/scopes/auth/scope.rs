@@ -71,7 +71,9 @@ async fn refresh_token(
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
 ) -> Result<HttpResponse> {
     let user_id = authenticated_user.0.id.unwrap_or_default();
-    auth_service.validate_jwt(payload, user_id).await?;
+    auth_service
+        .validate_jwt(payload, user_id.to_string())
+        .await?;
 
     auth_service
         .issue_and_save_tokens(&authenticated_user.0)
@@ -114,7 +116,9 @@ async fn forgot_password(
         rate_limiter.check_rate_limit(&user)?;
 
         // 3. If exists: invalidate existing tokens
-        auth_service.revoke_password_reset_token(user_id).await?;
+        auth_service
+            .revoke_password_reset_token(user_id.to_string())
+            .await?;
 
         // 4. Generate a new token + hash
         // try to use something like: Utils::generate_token(32).hash()
@@ -163,7 +167,7 @@ async fn update_password(
 
     // 2. Ensure password is different then previous
     let user_id = reset_token.user_id;
-    let user = auth_service.find_user(user_id).await?;
+    let user = auth_service.find_user(user_id.to_string()).await?;
     if user.account_locked {
         return Err(Error::AccountSuspended);
     }
@@ -178,23 +182,27 @@ async fn update_password(
     // 3. Hash new password using argon2
     let hashed_password = Utils::hash_password(&request.password)?;
     auth_service
-        .update_user_password(user_id, hashed_password)
+        .update_user_password(user_id.to_string(), hashed_password)
         .await?;
 
     // 4. Invalidate PasswordResetToken, Mark it as used (used_at = now)
     auth_service
-        .invalidate_password_reset_token(reset_token.id.unwrap_or_default())
+        .invalidate_password_reset_token(reset_token.id.unwrap_or_default().to_string())
         .await?;
 
     // 5. [TODO] invalidate passwordTokens related to user [THIS MAY NOT BE NEEDED]
-    auth_service.revoke_password_reset_token(user_id).await?;
+    auth_service
+        .revoke_password_reset_token(user_id.to_string())
+        .await?;
 
     // 6. Update user.last_password_reset to now(), reset passwordResetCount->0
-    auth_service.reset_password_state(user_id).await?;
+    auth_service
+        .reset_password_state(user_id.to_string())
+        .await?;
 
     // 7. TODO it may not be neccessary
     auth_service
-        .logout_all(user_id)
+        .logout_all(user_id.to_string())
         .await
         .map(|user| Ok(HttpResponse::Ok().json(user)))?
 }

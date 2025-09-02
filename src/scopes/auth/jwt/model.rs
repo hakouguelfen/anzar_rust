@@ -33,7 +33,8 @@ pub struct RefreshToken {
 // Add build function
 
 impl RefreshToken {
-    pub fn with_user_id(mut self, user_id: ObjectId) -> Self {
+    pub fn with_user_id(mut self, id: String) -> Self {
+        let user_id = ObjectId::parse_str(id).unwrap_or_default();
         let _ = self.user_id.insert(user_id);
         self
     }
