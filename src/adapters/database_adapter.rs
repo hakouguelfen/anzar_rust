@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use serde::{Serialize, de::DeserializeOwned};
 
-use crate::{adapters::mongo::objectid_parser::ParsedObjectId, scopes::auth::Error};
+use crate::scopes::auth::Error;
 
 pub type Document = serde_json::Value;
 
@@ -25,15 +25,7 @@ pub trait DatabaseAdapter<T: Send + Sync + Serialize + DeserializeOwned + 'stati
     Send + Sync
 {
     async fn insert(&self, data: T) -> Result<String, Error>;
-    async fn find_one(&self, filter: ParsedObjectId) -> Option<T>;
-    async fn find_one_and_update(
-        &self,
-        filter: ParsedObjectId,
-        update: ParsedObjectId,
-    ) -> Option<T>;
-    async fn update_many(
-        &self,
-        filter: ParsedObjectId,
-        update: ParsedObjectId,
-    ) -> Result<(), Error>;
+    async fn find_one(&self, filter: Document) -> Option<T>;
+    async fn find_one_and_update(&self, filter: Document, update: Document) -> Option<T>;
+    async fn update_many(&self, filter: Document, update: Document) -> Result<(), Error>;
 }

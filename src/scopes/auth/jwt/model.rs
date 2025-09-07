@@ -1,27 +1,24 @@
 use chrono::{DateTime, Utc};
-use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
+use sqlx::prelude::FromRow;
 
-pub struct _RefreshTokenFilter {
-    pub jti: String,
-    pub user_id: ObjectId,
-    pub hash: String,
-    pub valid: bool,
-}
-
-#[derive(Default, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Default, Clone, Debug, PartialEq, Eq, Deserialize, Serialize, FromRow)]
 pub struct RefreshToken {
-    #[serde(serialize_with = "serialize_object_id")]
-    #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
-    pub id: Option<ObjectId>,
+    // #[serde(serialize_with = "serialize_object_id")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
 
+    #[sqlx(rename = "userId")]
     #[serde(rename = "userId")]
-    pub user_id: Option<ObjectId>,
+    pub user_id: Option<String>,
 
+    #[sqlx(rename = "issuedAt")]
     #[serde(rename = "issuedAt")]
     pub issued_at: DateTime<Utc>,
+    #[sqlx(rename = "expireAt")]
     #[serde(rename = "expireAt")]
     pub expire_at: Option<DateTime<Utc>>,
+    #[sqlx(rename = "usedAt")]
     #[serde(rename = "usedAt")]
     pub used_at: Option<DateTime<Utc>>,
 
@@ -34,8 +31,7 @@ pub struct RefreshToken {
 
 impl RefreshToken {
     pub fn with_user_id(mut self, id: String) -> Self {
-        let user_id = ObjectId::parse_str(id).unwrap_or_default();
-        let _ = self.user_id.insert(user_id);
+        let _ = self.user_id.insert(id);
         self
     }
     pub fn with_hash(mut self, hash: String) -> Self {
@@ -58,12 +54,12 @@ impl RefreshToken {
 }
 
 // FIXME: remove serializer
-fn serialize_object_id<S>(id: &Option<ObjectId>, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    match id {
-        Some(id) => serializer.serialize_str(&id.to_string()),
-        None => serializer.serialize_none(),
-    }
-}
+// fn serialize_object_id<S>(id: &Option<ObjectId>, serializer: S) -> Result<S::Ok, S::Error>
+// where
+//     S: serde::Serializer,
+// {
+//     match id {
+//         Some(id) => serializer.serialize_str(&id.to_string()),
+//         None => serializer.serialize_none(),
+//     }
+// }

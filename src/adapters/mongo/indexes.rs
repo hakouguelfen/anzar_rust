@@ -1,6 +1,6 @@
 use mongodb::{Database, IndexModel, bson::doc, options::IndexOptions};
 
-use crate::scopes::{auth::model::PasswordResetTokens, user::User};
+use crate::scopes::{auth::model::PasswordResetToken, user::User};
 
 pub struct MongodbIndexes {
     pub db: Database,
@@ -34,7 +34,7 @@ impl MongodbIndexes {
             .build();
 
         self.db
-            .collection::<PasswordResetTokens>("password_reset_token")
+            .collection::<PasswordResetToken>("password_reset_token")
             .create_index(model)
             .await?;
 

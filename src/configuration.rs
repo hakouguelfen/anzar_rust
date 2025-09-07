@@ -1,8 +1,17 @@
-use std::sync::{LazyLock, Mutex};
-
 use secrecy::SecretString;
 
-use crate::scopes::config::Configuration;
+// use crate::scopes::config::Configuration;
+// use std::sync::{LazyLock, Mutex};
+// static APP_CONFIG: LazyLock<Mutex<Configuration>> =
+//     LazyLock::new(|| Mutex::new(Configuration::default()));
+//
+// pub fn update_app_config(config: Configuration) {
+//     *APP_CONFIG.lock().unwrap() = config;
+// }
+// pub fn get_app_config() -> Configuration {
+//     let s = APP_CONFIG.lock().unwrap();
+//     s.clone()
+// }
 
 #[derive(serde::Deserialize)]
 pub struct Settings {
@@ -37,17 +46,6 @@ impl DatabaseSettings {
             self.host, self.port, self.database_name
         )
     }
-}
-
-static APP_CONFIG: LazyLock<Mutex<Configuration>> =
-    LazyLock::new(|| Mutex::new(Configuration::default()));
-
-pub fn update_app_config(config: Configuration) {
-    *APP_CONFIG.lock().unwrap() = config;
-}
-pub fn get_app_config() -> Configuration {
-    let s = APP_CONFIG.lock().unwrap();
-    s.clone()
 }
 
 pub fn get_configuration() -> Result<Settings, config::ConfigError> {

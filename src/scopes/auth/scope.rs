@@ -16,7 +16,7 @@ use crate::{
 use crate::{core::rate_limiter::RateLimiter, scopes::auth::service::JwtServiceTrait};
 
 use super::error::Result;
-use super::reset_password::model::PasswordResetTokens;
+use super::reset_password::model::PasswordResetToken;
 use super::user::User;
 use super::{
     email::manager::Email,
@@ -70,13 +70,15 @@ async fn refresh_token(
     authenticated_user: AuthenticatedUser,
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
 ) -> Result<HttpResponse> {
-    let user_id = authenticated_user.0.id.unwrap_or_default();
+    let user: User = authenticated_user.0;
+
+    let user_id = user.id.as_slice().concat();
     auth_service
         .validate_jwt(payload, user_id.to_string())
         .await?;
 
     auth_service
-        .issue_and_save_tokens(&authenticated_user.0)
+        .issue_and_save_tokens(&user)
         .await
         .map(|tokens| Ok(HttpResponse::Ok().json(tokens)))?
 }
@@ -110,7 +112,7 @@ async fn forgot_password(
      */
     // 2. Check if email exists
     if let Ok(user) = auth_service.find_user_by_email(&email).await {
-        let user_id = user.id.unwrap_or_default();
+        let user_id = user.id.as_slice().concat();
 
         // Check rate limiting
         rate_limiter.check_rate_limit(&user)?;
@@ -126,7 +128,7 @@ async fn forgot_password(
         let hashed_token = Utils::hash_token(&token);
 
         // 5. If exists: store token record
-        let otp = PasswordResetTokens::default()
+        let otp = PasswordResetToken::default()
             .with_user_id(user_id)
             .with_token_hash(hashed_token);
         auth_service.insert_password_reset_token(otp).await?;

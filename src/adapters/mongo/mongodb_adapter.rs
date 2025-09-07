@@ -3,7 +3,7 @@ use mongodb::{Collection, Database, options::ReturnDocument};
 use serde::{Serialize, de::DeserializeOwned};
 
 use crate::{
-    adapters::{database_adapter::DatabaseAdapter, mongo::objectid_parser::ParsedObjectId},
+    adapters::database_adapter::{DatabaseAdapter, Document},
     scopes::auth::Error,
 };
 
@@ -35,16 +35,12 @@ where
         Ok(id.to_string())
     }
 
-    async fn find_one(&self, ParsedObjectId(filter): ParsedObjectId) -> Option<T> {
+    async fn find_one(&self, filter: Document) -> Option<T> {
         let mongo_filter = mongodb::bson::to_document(&filter).unwrap();
         self.collection.find_one(mongo_filter).await.ok()?
     }
 
-    async fn find_one_and_update(
-        &self,
-        ParsedObjectId(filter): ParsedObjectId,
-        ParsedObjectId(update): ParsedObjectId,
-    ) -> Option<T> {
+    async fn find_one_and_update(&self, filter: Document, update: Document) -> Option<T> {
         let mongo_filter = mongodb::bson::to_document(&filter).unwrap();
         let mongo_update = mongodb::bson::to_document(&update).unwrap();
         self.collection
@@ -54,11 +50,7 @@ where
             .ok()?
     }
 
-    async fn update_many(
-        &self,
-        ParsedObjectId(filter): ParsedObjectId,
-        ParsedObjectId(update): ParsedObjectId,
-    ) -> Result<(), Error> {
+    async fn update_many(&self, filter: Document, update: Document) -> Result<(), Error> {
         let mongo_filter = mongodb::bson::to_document(&filter).unwrap();
         let mongo_update = mongodb::bson::to_document(&update).unwrap();
 

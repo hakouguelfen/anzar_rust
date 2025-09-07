@@ -1,21 +1,21 @@
 use chrono::{DateTime, Utc};
-use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
+use sqlx::FromRow;
 use validator::Validate;
 
 use crate::scopes::auth::Error;
 
-#[derive(Default, Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone, PartialEq, Eq, sqlx::Type)]
 pub enum Role {
     #[default]
     User,
     Admin,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Validate)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Validate, FromRow)]
 pub struct User {
-    #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
-    pub id: Option<ObjectId>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
 
     #[validate(length(min = 4, message = "username must be at least 4 characters"))]
     pub username: String,
@@ -24,24 +24,30 @@ pub struct User {
     #[validate(length(min = 8, message = "password must be at least 8 characters"))]
     pub password: String,
 
+    #[sqlx(rename = "passwordResetCount")] // Map database column to struct field
     #[serde(default, rename = "passwordResetCount")]
     pub password_reset_count: u32,
 
+    #[sqlx(rename = "lastPasswordReset")] // Map database column to struct field
     #[serde(default, rename = "lastPasswordReset")]
     pub last_password_reset: Option<DateTime<Utc>>,
 
+    #[sqlx(rename = "passwordResetWindowStart")] // Map database column to struct field
     #[serde(default, rename = "passwordResetWindowStart")]
     pub password_reset_window_start: Option<DateTime<Utc>>,
 
     #[serde(default)]
     pub role: Role,
 
+    #[sqlx(rename = "isPremium")] // Map database column to struct field
     #[serde(default, rename = "isPremium")]
     pub is_premium: bool,
 
+    #[sqlx(rename = "accountLocked")] // Map database column to struct field
     #[serde(default, rename = "accountLocked")]
     pub account_locked: bool,
 
+    #[sqlx(rename = "failedResetAttempts")] // Map database column to struct field
     #[serde(default, rename = "failedResetAttempts")]
     pub failed_reset_attempts: u32,
 }
@@ -52,8 +58,7 @@ impl User {
     }
 
     pub fn set_id(&mut self, id: String) {
-        let user_id = ObjectId::parse_str(id).unwrap_or_default();
-        self.id = Some(user_id);
+        self.id = Some(id);
     }
 
     pub fn with_password(mut self, password: String) -> Self {
@@ -71,7 +76,6 @@ impl User {
 
 #[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct UserResponse {
-    #[serde(rename = "_id")]
     pub id: String,
 
     #[validate(length(min = 4, message = "username must be at least 4 characters"))]

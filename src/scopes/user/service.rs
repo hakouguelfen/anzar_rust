@@ -5,6 +5,7 @@ use serde_json::json;
 
 use crate::{
     adapters::database_adapter::DatabaseAdapter,
+    parser::{AdapterType, Parser},
     scopes::{
         auth::{Error, Result},
         user::User,
@@ -14,15 +15,19 @@ use crate::{
 #[derive(Clone)]
 pub struct UserService {
     adapter: Arc<dyn DatabaseAdapter<User>>,
+    adapter_type: AdapterType,
 }
 
 impl UserService {
-    pub fn new(adapter: Arc<dyn DatabaseAdapter<User>>) -> Self {
-        Self { adapter }
+    pub fn new(adapter: Arc<dyn DatabaseAdapter<User>>, adapter_type: AdapterType) -> Self {
+        Self {
+            adapter,
+            adapter_type,
+        }
     }
 
     pub async fn find(&self, user_id: String) -> Result<User> {
-        let filter = json!({"_id": user_id}).try_into()?;
+        let filter = Parser::mode(self.adapter_type).convert(json!({"id": user_id}));
 
         self.adapter.find_one(filter).await.ok_or_else(|| {
             tracing::error!("Failed to find user by id: {}", user_id);
@@ -31,7 +36,7 @@ impl UserService {
     }
 
     pub async fn find_by_email(&self, email: &str) -> Result<User> {
-        let filter = json!( {"email": email}).try_into()?;
+        let filter = Parser::mode(self.adapter_type).convert(json!( {"email": email}));
 
         self.adapter.find_one(filter).await.ok_or_else(|| {
             tracing::error!("Failed to find user by email");
@@ -49,8 +54,9 @@ impl UserService {
     }
 
     pub async fn update_password(&self, user_id: String, password: String) -> Result<User> {
-        let filter = json!({"_id": user_id}).try_into()?;
-        let update = json!({ "$set": json!({"password": password}) }).try_into()?;
+        let filter = Parser::mode(self.adapter_type).convert(json!({"id": user_id}));
+        let update = json!({ "$set": json!({"password": password}) });
+        let update = Parser::mode(self.adapter_type).convert(update);
 
         let user = self
             .adapter
@@ -62,13 +68,13 @@ impl UserService {
     }
 
     pub async fn update_reset_window(&self, user_id: String) -> Result<()> {
-        let filter = json!( {"_id": user_id}).try_into()?;
+        let filter = Parser::mode(self.adapter_type).convert(json!({"id": user_id}));
         let update = json!({
             "$set": json!({
                 "passwordResetWindowStart": Utc::now().to_rfc3339()
             })
-        })
-        .try_into()?;
+        });
+        let update = Parser::mode(self.adapter_type).convert(update);
 
         self.adapter
             .find_one_and_update(filter, update)
@@ -79,8 +85,9 @@ impl UserService {
     }
 
     pub async fn increment_reset_count(&self, user_id: String) -> Result<User> {
-        let filter = json!( {"_id": user_id}).try_into()?;
-        let update = json!( { "$inc": json!({"passwordResetCount": 1}) }).try_into()?;
+        let filter = Parser::mode(self.adapter_type).convert(json!({"id": user_id}));
+        let update = json!( { "$inc": json!({"passwordResetCount": 1}) });
+        let update = Parser::mode(self.adapter_type).convert(update);
 
         self.adapter
             .find_one_and_update(filter, update)
@@ -89,15 +96,15 @@ impl UserService {
     }
 
     pub async fn reset_password_state(&self, user_id: String) -> Result<User> {
-        let filter = json!({"_id": user_id}).try_into()?;
+        let filter = Parser::mode(self.adapter_type).convert(json!({"id": user_id}));
         let update = json!({
             "$set": json! ({
                 "lastPasswordReset": Utc::now().to_rfc3339(),
                 "passwordResetCount": 0,
                 "failedResetAttempts": 0
             })
-        })
-        .try_into()?;
+        });
+        let update = Parser::mode(self.adapter_type).convert(update);
 
         self.adapter
             .find_one_and_update(filter, update)

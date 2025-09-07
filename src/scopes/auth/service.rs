@@ -1,12 +1,12 @@
-use std::sync::Arc;
-
 use chrono::{Duration, Utc};
 
-use crate::adapters::database_adapter::DatabaseAdapter;
-use crate::adapters::mongo::{MongoDB, MongodbAdapter};
+use crate::adapters::adapter_factory::DatabaseAdapters;
+use crate::adapters::mongo::MongoDB;
+use crate::adapters::sqlite::SQLite;
 use crate::core::extractors::AuthPayload;
+use crate::parser::AdapterType;
 use crate::scopes::auth::jwt::model::RefreshToken;
-use crate::scopes::auth::model::PasswordResetTokens;
+use crate::scopes::auth::model::PasswordResetToken;
 use crate::scopes::auth::tokens::JwtEncoderBuilder;
 use crate::scopes::auth::{JWTService, PasswordResetTokenService};
 use crate::scopes::user::service::UserService;
@@ -25,24 +25,42 @@ pub struct AuthService {
 }
 
 impl AuthService {
-    pub async fn new(connection_string: String) -> Self {
-        // Decide which DatabaseAdapter here
-        let db = MongoDB::start(connection_string).await;
+    pub async fn create(adapter_type: AdapterType, conn: String) -> Self {
+        match adapter_type {
+            AdapterType::Sqlite => Self::create_sqlite(conn).await,
+            AdapterType::MongoDB => Self::create_mongo(conn).await,
+            AdapterType::PostgreSql => todo!(),
+        }
+    }
+    async fn create_mongo(conn: String) -> Self {
+        let adapter_type = AdapterType::MongoDB;
+        let db = MongoDB::start(conn).await;
 
-        let user_adapter: Arc<dyn DatabaseAdapter<User>> =
-            Arc::new(MongodbAdapter::<User>::new(&db, "user"));
-
-        let jwt_adapter: Arc<dyn DatabaseAdapter<RefreshToken>> =
-            Arc::new(MongodbAdapter::<RefreshToken>::new(&db, "refresh-token"));
-
-        let reset_token_adapter: Arc<dyn DatabaseAdapter<PasswordResetTokens>> = Arc::new(
-            MongodbAdapter::<PasswordResetTokens>::new(&db, "password_reset_token"),
-        );
+        let adapters = DatabaseAdapters::create_mongodb(&db);
 
         Self {
-            user_service: UserService::new(user_adapter),
-            jwt_service: JWTService::new(jwt_adapter),
-            password_reset_token_service: PasswordResetTokenService::new(reset_token_adapter),
+            user_service: UserService::new(adapters.user_adapter, adapter_type),
+            jwt_service: JWTService::new(adapters.jwt_adapter, adapter_type),
+            password_reset_token_service: PasswordResetTokenService::new(
+                adapters.reset_token_adapter,
+                adapter_type,
+            ),
+        }
+    }
+
+    async fn create_sqlite(conn: String) -> Self {
+        let adapter_type = AdapterType::Sqlite;
+        let db = SQLite::start(&conn).await;
+
+        let adapters = DatabaseAdapters::create_sqlite(&db);
+
+        Self {
+            user_service: UserService::new(adapters.user_adapter, adapter_type),
+            jwt_service: JWTService::new(adapters.jwt_adapter, adapter_type),
+            password_reset_token_service: PasswordResetTokenService::new(
+                adapters.reset_token_adapter,
+                adapter_type,
+            ),
         }
     }
 }
@@ -71,6 +89,7 @@ impl UserServiceTrait for AuthService {
             .find_by_email(email)
             .await
             .map_err(|_| Error::InvalidCredentials)?;
+
         match Utils::verify_password(password, &user.password) {
             true => Ok(user),
             false => {
@@ -138,10 +157,10 @@ impl JwtServiceTrait for AuthService {
         Ok(())
     }
     async fn issue_and_save_tokens(&self, user: &User) -> Result<Tokens> {
-        let user_id = user.id.unwrap_or_default().to_string();
+        let user_id = user.id.as_slice().concat();
 
         let tokens: Tokens = JwtEncoderBuilder::default()
-            .with_user_id(user_id.clone())
+            .with_user_id(&user_id)
             .build()
             .inspect_err(|e| {
                 tracing::error!("Failed to generate authentication tokens: {:?}", e)
@@ -150,7 +169,7 @@ impl JwtServiceTrait for AuthService {
         let hashed_refresh_token = Utils::hash_token(&tokens.refresh_token);
 
         let refresh_token = RefreshToken::default()
-            .with_user_id(user_id)
+            .with_user_id(user_id.to_owned())
             .with_hash(hashed_refresh_token)
             .with_jti(&tokens.refresh_token_jti)
             .with_issued_at(Utc::now())
@@ -179,24 +198,24 @@ pub trait PasswordResetTokenServiceTrait {
     fn validate_reset_password_token(
         &self,
         token: &str,
-    ) -> impl std::future::Future<Output = Result<PasswordResetTokens>>;
+    ) -> impl std::future::Future<Output = Result<PasswordResetToken>>;
     fn process_reset_request(&self, user: User) -> impl std::future::Future<Output = Result<User>>;
 
     fn invalidate_password_reset_token(
         &self,
         id: String,
-    ) -> impl std::future::Future<Output = Result<PasswordResetTokens>>;
+    ) -> impl std::future::Future<Output = Result<PasswordResetToken>>;
     fn revoke_password_reset_token(
         &self,
         user_id: String,
     ) -> impl std::future::Future<Output = Result<()>>;
     fn insert_password_reset_token(
         &self,
-        otp: PasswordResetTokens,
+        otp: PasswordResetToken,
     ) -> impl std::future::Future<Output = Result<()>>;
 }
 impl PasswordResetTokenServiceTrait for AuthService {
-    async fn validate_reset_password_token(&self, token: &str) -> Result<PasswordResetTokens> {
+    async fn validate_reset_password_token(&self, token: &str) -> Result<PasswordResetToken> {
         let hash = Utils::hash_token(token);
 
         // 2. Checks the database for a matching token
@@ -237,13 +256,13 @@ impl PasswordResetTokenServiceTrait for AuthService {
         Ok(user)
     }
 
-    async fn invalidate_password_reset_token(&self, id: String) -> Result<PasswordResetTokens> {
+    async fn invalidate_password_reset_token(&self, id: String) -> Result<PasswordResetToken> {
         self.password_reset_token_service.invalidate(id).await
     }
     async fn revoke_password_reset_token(&self, user_id: String) -> Result<()> {
         self.password_reset_token_service.revoke(user_id).await
     }
-    async fn insert_password_reset_token(&self, otp: PasswordResetTokens) -> Result<()> {
+    async fn insert_password_reset_token(&self, otp: PasswordResetToken) -> Result<()> {
         self.password_reset_token_service.insert(otp).await
     }
 }

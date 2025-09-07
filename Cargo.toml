@@ -48,6 +48,7 @@ tracing-actix-web = "0.7.14"
 rand = "0.9.1"
 resend-rs = "0.15.0"
 validator = { version = "0.20.0", features = ["derive"] }
+sqlx = { version = "0.8.6", features = ["sqlite", "runtime-async-std", "tls-native-tls", "uuid", "chrono", "json"] }
 
 [dev-dependencies]
 reqwest = { version = "0.12.8", features = ["json"] }

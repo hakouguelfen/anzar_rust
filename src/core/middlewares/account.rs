@@ -8,17 +8,14 @@ use actix_web::{
 };
 use serde_json::{Value, json};
 
-use crate::startup::AppState;
-use crate::{
-    configuration::get_app_config,
-    scopes::{
-        auth::{
-            service::{AuthService, JwtServiceTrait, UserServiceTrait},
-            tokens::JwtDecoderBuilder,
-        },
-        user::User,
+use crate::scopes::{
+    auth::{
+        service::{JwtServiceTrait, UserServiceTrait},
+        tokens::JwtDecoderBuilder,
     },
+    user::User,
 };
+use crate::startup::AppState;
 use crate::{
     core::extractors::{AuthPayload, Claims, TokenType},
     scopes::auth::Error as AuthError,
@@ -93,44 +90,20 @@ async fn check_user_account(req: &ServiceRequest, user_id: &str) -> Result<(), E
     Ok(())
 }
 
-async fn init_db(req: &ServiceRequest) -> Result<(), Error> {
-    // save config
-    let app_state = req.app_data::<web::Data<AppState>>().ok_or_else(|| {
-        actix_web::error::ErrorInternalServerError(AuthError::InternalServerError)
-    })?;
-
-    let connection_string = {
-        let configuration = get_app_config();
-        configuration.database.to_string()
-    };
-
-    let auth_service = AuthService::new(connection_string).await;
-
-    let mut service = app_state.auth_service.lock().unwrap();
-    *service = Some(auth_service);
-
-    Ok(())
-}
-
 pub async fn auth_middleware(
     req: ServiceRequest,
     next: Next<impl MessageBody>,
 ) -> Result<ServiceResponse<impl MessageBody>, Error> {
     if [
         "/health_check",
-        "/configuration/register_context",
         "/auth/login",
         "/auth/register",
+        "/configuration/register_context",
     ]
     .contains(&req.path())
     {
-        if &req.path().to_string() != "/configuration/register_context" {
-            init_db(&req).await?;
-        }
         return next.call(req).await;
     }
-
-    //
 
     // pre-processing
     let access_token = extract_token_from_header(&req, header::AUTHORIZATION.to_string());

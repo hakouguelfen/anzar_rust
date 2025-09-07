@@ -7,6 +7,7 @@ use serde_json::json;
 use crate::{
     adapters::database_adapter::DatabaseAdapter,
     core::extractors::AuthPayload,
+    parser::{AdapterType, Parser},
     scopes::auth::{
         Error, Result,
         jwt::model::RefreshToken,
@@ -17,11 +18,15 @@ use crate::{
 #[derive(Clone)]
 pub struct JWTService {
     adapter: Arc<dyn DatabaseAdapter<RefreshToken>>,
+    adapter_type: AdapterType,
 }
 
 impl JWTService {
-    pub fn new(adapter: Arc<dyn DatabaseAdapter<RefreshToken>>) -> Self {
-        Self { adapter }
+    pub fn new(adapter: Arc<dyn DatabaseAdapter<RefreshToken>>, adapter_type: AdapterType) -> Self {
+        Self {
+            adapter,
+            adapter_type,
+        }
     }
 
     pub async fn insert(&self, refresh_token: RefreshToken) -> Result<()> {
@@ -39,35 +44,32 @@ impl JWTService {
             "userId": &payload.user_id,
             "hash": Utils::hash_token(&payload.refresh_token),
             "valid": true
-        })
-        .try_into()
-        .ok()?;
+        });
+        let filter = Parser::mode(self.adapter_type).convert(filter);
 
         let update = json! ({
             "$set": json! ({
                 "valid": false,
-                "usedAt": Utc::now().to_string()
+                "usedAt": Utc::now()
             })
-        })
-        .try_into()
-        .ok()?;
+        });
+        let update = Parser::mode(self.adapter_type).convert(update);
 
         self.adapter.find_one_and_update(filter, update).await
     }
 
     pub async fn find_by_jti(&self, jti: &str) -> Option<RefreshToken> {
-        let filter = json! ({"jti": jti});
-        let filter = filter.try_into().ok()?;
+        let filter = Parser::mode(self.adapter_type).convert(json!({"jti": jti}));
 
         self.adapter.find_one(filter).await
     }
 
     pub async fn invalidate(&self, jti: String) -> Result<RefreshToken> {
-        let filter = json! ({"jti": jti}).try_into()?;
-        let update =
-            json! ({ "$set": json! ({ "valid": false, "usedAt": Utc::now().to_string() }) })
-                .try_into()?;
+        let filter = Parser::mode(self.adapter_type).convert(json!({"jti": jti}));
+        let update = json! ({ "$set": json! ({ "valid": false, "usedAt": Utc::now() }) });
+        let update = Parser::mode(self.adapter_type).convert(update);
 
+        // let res = self.adapter.find_one_and_update(filter, update).await;
         self.adapter
             .find_one_and_update(filter, update)
             .await
@@ -77,8 +79,9 @@ impl JWTService {
             })
     }
     pub async fn revoke(&self, user_id: String) -> Result<()> {
-        let filter = json! ({"userId": user_id}).try_into()?;
-        let update = json! ({ "$set": doc! {"valid": false} }).try_into()?;
+        let filter = Parser::mode(self.adapter_type).convert(json!({"userId": user_id}));
+        let update = json! ({ "$set": doc! {"valid": false} });
+        let update = Parser::mode(self.adapter_type).convert(update);
 
         self.adapter
             .update_many(filter, update)
