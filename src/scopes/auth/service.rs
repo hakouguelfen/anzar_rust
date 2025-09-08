@@ -32,11 +32,20 @@ impl AuthService {
             AdapterType::PostgreSQL => todo!(),
         }
     }
-    async fn create_mongo(conn: String) -> Self {
-        let adapter_type = AdapterType::MongoDB;
-        let db = MongoDB::start(conn).await;
 
-        let adapters = DatabaseAdapters::create_mongodb(&db);
+    async fn create_sqlite(conn: String) -> Self {
+        let adapter_type = AdapterType::SQLite;
+        let db = SQLite::start(&conn).await;
+
+        // NOTE: this is for running testing only
+        if &conn == "sqlite::memory:" {
+            sqlx::migrate!("./migrations")
+                .run(&db)
+                .await
+                .expect("migrations to run");
+        }
+
+        let adapters = DatabaseAdapters::create_sqlite(&db);
 
         Self {
             user_service: UserService::new(adapters.user_adapter, adapter_type),
@@ -48,11 +57,11 @@ impl AuthService {
         }
     }
 
-    async fn create_sqlite(conn: String) -> Self {
-        let adapter_type = AdapterType::SQLite;
-        let db = SQLite::start(&conn).await;
+    async fn create_mongo(conn: String) -> Self {
+        let adapter_type = AdapterType::MongoDB;
+        let db = MongoDB::start(conn).await;
 
-        let adapters = DatabaseAdapters::create_sqlite(&db);
+        let adapters = DatabaseAdapters::create_mongodb(&db);
 
         Self {
             user_service: UserService::new(adapters.user_adapter, adapter_type),

@@ -1,42 +1,29 @@
 mod shared;
-use shared::{Common, Helpers, InvalidTestCases};
-
-use uuid::Uuid;
-
-use crate::shared::register_context;
+use shared::{Helpers, InvalidTestCases};
 
 #[actix_web::test]
 async fn test_login_success() {
-    let db_name = Uuid::new_v4().to_string();
-    let address = Common::spawn_app(db_name.clone()).await;
-    let _client = reqwest::Client::new();
-
-    let db = format!("mongodb://localhost:27017/{db_name}");
-    register_context(&address.address, db).await;
+    let test_app = Helpers::init_config().await;
 
     // Create User
-    let response = Helpers::create_user(&address).await;
+    let response = Helpers::create_user(&test_app).await;
     assert!(response.status().is_success());
 
     // Login
-    let response = Helpers::login(&address).await;
+    let response = Helpers::login(&test_app).await;
     assert!(response.status().is_success());
 }
 
 #[actix_web::test]
 async fn test_login_failure() {
     // Arrange
-    let db_name = Uuid::new_v4().to_string();
-    let address = Common::spawn_app(db_name.clone()).await;
+    let test_app = Helpers::init_config().await;
     let client = reqwest::Client::new();
-
-    let db = format!("mongodb://localhost:27017/{db_name}");
-    register_context(&address.address, db).await;
 
     for (body, message, code) in InvalidTestCases::login_credentials().into_iter() {
         // Act
         let response = client
-            .post(format!("{address}/auth/login"))
+            .post(format!("{test_app}/auth/login"))
             .json(&body)
             .send()
             .await

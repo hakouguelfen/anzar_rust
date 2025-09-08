@@ -5,6 +5,7 @@ use anzar::{
 };
 use jsonwebtoken::errors::Error;
 use reqwest::Response;
+use uuid::Uuid;
 
 type Result<T> = core::result::Result<T, Error>;
 
@@ -15,6 +16,15 @@ use super::test_cases::ValidTestCases;
 
 pub struct Helpers;
 impl Helpers {
+    pub async fn init_config() -> TestApp {
+        let address = Common::spawn_app().await;
+
+        let db_name = Uuid::new_v4().to_string();
+        register_context(&address.address, db_name).await;
+
+        address
+    }
+
     pub async fn login(address: &TestApp) -> Response {
         let client = reqwest::Client::new();
         let body = ValidTestCases::login_data();

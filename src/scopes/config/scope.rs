@@ -26,10 +26,7 @@ async fn register_context(
 }
 
 async fn _init_db(app_state: Data<AppState>, database: Database) {
-    // FIXME
-    // Alaways propagate the error whithout changin it in the middle of the road
-    // let connection_string = "sqlite::memory:".to_string();
-    // let connection_string = "anzar.db".to_string();
+    // FIXME: Alaways propagate the error whithout changin it in the middle of the road
 
     let auth_service = AuthService::create(database.db_type, database.connection_string).await;
     let mut service = app_state.auth_service.lock().unwrap();

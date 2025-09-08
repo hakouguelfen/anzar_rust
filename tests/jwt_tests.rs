@@ -1,26 +1,18 @@
 mod shared;
-use shared::{Common, Helpers, InvalidTestCases};
+use shared::{Helpers, InvalidTestCases};
 
 use anzar::{core::extractors::TokenType, scopes::auth::AuthResponse};
-use uuid::Uuid;
-
-use crate::shared::register_context;
 
 #[actix_web::test]
 async fn test_jwt_contains_correct_claims() {
-    let db_name = Uuid::new_v4().to_string();
-    let address = Common::spawn_app(db_name.clone()).await;
-    let _client = reqwest::Client::new();
-
-    let db = format!("mongodb://localhost:27017/{db_name}");
-    register_context(&address.address, db).await;
+    let test_app = Helpers::init_config().await;
 
     // Create User
-    let response = Helpers::create_user(&address).await;
+    let response = Helpers::create_user(&test_app).await;
     assert!(response.status().is_success());
 
     // Login
-    let response = Helpers::login(&address).await;
+    let response = Helpers::login(&test_app).await;
     assert!(response.status().is_success());
 
     let auth_response: AuthResponse = response.json().await.unwrap();
@@ -40,26 +32,22 @@ async fn test_jwt_contains_correct_claims() {
 
 #[actix_web::test]
 async fn test_protected_route_with_valid_jwt() {
-    let db_name = Uuid::new_v4().to_string();
-    let address = Common::spawn_app(db_name.clone()).await;
+    let test_app = Helpers::init_config().await;
     let client = reqwest::Client::new();
 
-    let db = format!("mongodb://localhost:27017/{db_name}");
-    register_context(&address.address, db).await;
-
     // Create User
-    let response = Helpers::create_user(&address).await;
+    let response = Helpers::create_user(&test_app).await;
     assert!(response.status().is_success());
 
     // Login
-    let response = Helpers::login(&address).await;
+    let response = Helpers::login(&test_app).await;
     assert!(response.status().is_success());
 
     let auth_response: AuthResponse = response.json().await.unwrap();
     let access_token: &str = &auth_response.access_token;
 
     let response = client
-        .get(format!("{address}/user"))
+        .get(format!("{test_app}/user"))
         .bearer_auth(access_token)
         .send()
         .await
@@ -69,19 +57,15 @@ async fn test_protected_route_with_valid_jwt() {
 
 #[actix_web::test]
 async fn test_protected_route_with_invalid_jwt() {
-    let db_name = Uuid::new_v4().to_string();
-    let address = Common::spawn_app(db_name.clone()).await;
+    let test_app = Helpers::init_config().await;
     let client = reqwest::Client::new();
 
-    let db = format!("mongodb://localhost:27017/{db_name}");
-    register_context(&address.address, db).await;
-
     // Create User
-    let response = Helpers::create_user(&address).await;
+    let response = Helpers::create_user(&test_app).await;
     assert!(response.status().is_success());
 
     // Login
-    let response = Helpers::login(&address).await;
+    let response = Helpers::login(&test_app).await;
     assert!(response.status().is_success());
 
     let auth_response: AuthResponse = response.json().await.unwrap();
@@ -89,7 +73,7 @@ async fn test_protected_route_with_invalid_jwt() {
 
     for (token, err_msg, status_code) in InvalidTestCases::jwt_tokens(valid_token) {
         let response = client
-            .get(format!("{address}/user"))
+            .get(format!("{test_app}/user"))
             .header("authorization", token)
             .send()
             .await

@@ -1,28 +1,20 @@
 mod shared;
 use anzar::scopes::auth::AuthResponse;
-use shared::{Common, Helpers};
-
-use uuid::Uuid;
-
-use crate::shared::register_context;
+use shared::Helpers;
 
 const X_REFRESH_TOKEN: &str = "x-refresh-token";
 
 #[actix_web::test]
 async fn test_logout_success() {
-    let db_name = Uuid::new_v4().to_string();
-    let address = Common::spawn_app(db_name.clone()).await;
+    let test_app = Helpers::init_config().await;
     let client = reqwest::Client::new();
 
-    let db = format!("mongodb://localhost:27017/{db_name}");
-    register_context(&address.address, db).await;
-
     // Create User
-    let response = Helpers::create_user(&address).await;
+    let response = Helpers::create_user(&test_app).await;
     assert!(response.status().is_success());
 
     // Login
-    let response = Helpers::login(&address).await;
+    let response = Helpers::login(&test_app).await;
     assert!(response.status().is_success());
 
     let auth_response: AuthResponse = response.json().await.unwrap();
@@ -30,7 +22,7 @@ async fn test_logout_success() {
 
     // Logout
     let response = client
-        .post(format!("{address}/auth/logout"))
+        .post(format!("{test_app}/auth/logout"))
         .header(X_REFRESH_TOKEN, format!("Bearer {refresh_token}"))
         .send()
         .await
@@ -40,26 +32,22 @@ async fn test_logout_success() {
 
 #[actix_web::test]
 async fn test_logout_with_invalid_token() {
-    let db_name = Uuid::new_v4().to_string();
-    let address = Common::spawn_app(db_name.clone()).await;
+    let test_app = Helpers::init_config().await;
     let client = reqwest::Client::new();
 
-    let db = format!("mongodb://localhost:27017/{db_name}");
-    register_context(&address.address, db).await;
-
     // Create User
-    let response = Helpers::create_user(&address).await;
+    let response = Helpers::create_user(&test_app).await;
     assert!(response.status().is_success());
 
     // Login
-    let response = Helpers::login(&address).await;
+    let response = Helpers::login(&test_app).await;
     assert!(response.status().is_success());
 
     let auth_response: AuthResponse = response.json().await.unwrap();
     let access_token: &str = &auth_response.access_token;
 
     let response = client
-        .post(format!("{address}/auth/logout"))
+        .post(format!("{test_app}/auth/logout"))
         .header(X_REFRESH_TOKEN, format!("Bearer {access_token}"))
         .send()
         .await
@@ -72,7 +60,7 @@ async fn test_logout_with_invalid_token() {
     );
 
     let response = client
-        .post(format!("{address}/auth/logout"))
+        .post(format!("{test_app}/auth/logout"))
         .send()
         .await
         .expect("Failed to execute request.");

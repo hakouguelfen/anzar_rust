@@ -28,43 +28,40 @@ pub struct TestApp {
 
 pub struct Common;
 impl Common {
-    pub async fn spawn_app(db_name: String) -> TestApp {
+    pub async fn spawn_app() -> TestApp {
         LazyLock::force(&TRACING);
 
         let listener = TcpListener::bind("localhost:0").expect("Failed to random port");
         let port = listener.local_addr().unwrap().port();
         let address = format!("http://localhost:{port}");
 
-        // use test database
-        let mut configuration = get_configuration().expect("Failed to read configuration");
-        configuration.database.database_name = db_name;
-        let _connection_string = configuration.database.connection_string();
-
         let server = anzar::startup::run(listener).expect("Failed to bind address");
 
         actix_web::rt::spawn(server);
-
-        // let app_config = get_app_config();
-        // if app_config.id.is_none() {
-        //     register_context(&address, connection_string).await;
-        // }
-
         TestApp { address }
     }
 }
 
-pub async fn register_context(address: &String, db: String) -> Response {
+pub async fn register_context(address: &String, db_name: String) -> Response {
     let client = reqwest::Client::new();
+
+    let mut configuration = get_configuration().expect("Failed to read configuration");
+    if configuration.database.db_type == AdapterType::MongoDB {
+        configuration.database.database_name = db_name;
+    }
+
+    let connection_string = configuration.database.connection_string();
 
     let body = Configuration {
         id: None,
         api_url: address.clone(),
         database: Database {
-            connection_string: db,
-            db_type: AdapterType::MongoDB,
+            connection_string,
+            db_type: configuration.database.db_type,
         },
         email_and_password: EmailAndPassword { enable: true },
     };
+
     client
         .post(format!("{address}/configuration/register_context"))
         .json(&body)

@@ -17,8 +17,9 @@ if user failed more then 5 times: Lock account -> [ERROR::AcountLocked]
 Limit user from changing password 3 times in 1h -> [ERROR::RateLimitExceeded]
 
 ## TOADD:
-- validator
+- validator [DONE]
 - tests for return type 
+- Listen to kill app on syscall SIGTERM
 
 
 ## APIGATEWAY:

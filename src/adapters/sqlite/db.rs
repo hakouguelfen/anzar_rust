@@ -9,7 +9,7 @@ impl SQLite {
             .await
             .expect("Failed to connect to sqlite");
 
-        dbg!("connected to sqlite");
+        dbg!("SQLite is starting ...");
         db
     }
 }

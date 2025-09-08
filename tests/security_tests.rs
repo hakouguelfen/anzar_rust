@@ -1,38 +1,31 @@
 mod shared;
-use shared::{Common, Helpers};
+use shared::Helpers;
 
 use anzar::{
     core::extractors::TokenType,
     scopes::auth::{AuthResponse, tokens::Tokens},
 };
-use uuid::Uuid;
-
-use crate::shared::register_context;
 
 const X_REFRESH_TOKEN: &str = "x-refresh-token";
 #[actix_web::test]
 async fn test_password_not_returned_in_responses() {
-    let db_name = Uuid::new_v4().to_string();
-    let address = Common::spawn_app(db_name.clone()).await;
+    let test_app = Helpers::init_config().await;
     let client = reqwest::Client::new();
 
-    let db = format!("mongodb://localhost:27017/{db_name}");
-    register_context(&address.address, db).await;
-
     // Create User
-    let response = Helpers::create_user(&address).await;
+    let response = Helpers::create_user(&test_app).await;
     assert!(response.status().is_success());
     let auth_response = response.json::<AuthResponse>().await;
     assert!(auth_response.is_ok());
 
     // Login
-    let response = Helpers::login(&address).await;
+    let response = Helpers::login(&test_app).await;
     assert!(response.status().is_success());
     let auth_response = response.json::<AuthResponse>().await;
     assert!(auth_response.is_ok());
 
     // Login
-    let response = Helpers::login(&address).await;
+    let response = Helpers::login(&test_app).await;
     assert!(response.status().is_success());
 
     let auth_response: AuthResponse = response.json().await.unwrap();
@@ -40,7 +33,7 @@ async fn test_password_not_returned_in_responses() {
 
     // Logout
     let response = client
-        .post(format!("{address}/auth/logout"))
+        .post(format!("{test_app}/auth/logout"))
         .header(X_REFRESH_TOKEN, format!("Bearer {refresh_token}"))
         .send()
         .await
@@ -53,19 +46,15 @@ async fn test_password_not_returned_in_responses() {
 
 #[actix_web::test]
 async fn test_complete_auth_flow() {
-    let db_name = Uuid::new_v4().to_string();
-    let address = Common::spawn_app(db_name.clone()).await;
+    let test_app = Helpers::init_config().await;
     let client = reqwest::Client::new();
 
-    let db = format!("mongodb://localhost:27017/{db_name}");
-    register_context(&address.address, db).await;
-
     // [1] Create User
-    let response = Helpers::create_user(&address).await;
+    let response = Helpers::create_user(&test_app).await;
     assert!(response.status().is_success());
 
     // [2] Login
-    let response = Helpers::login(&address).await;
+    let response = Helpers::login(&test_app).await;
     assert!(response.status().is_success());
 
     let auth_response: AuthResponse = response.json().await.unwrap();
@@ -74,7 +63,7 @@ async fn test_complete_auth_flow() {
 
     // [3] Refresh access token
     let response = client
-        .post(format!("{address}/auth/refreshToken"))
+        .post(format!("{test_app}/auth/refreshToken"))
         .header(X_REFRESH_TOKEN, format!("Bearer {refresh_token}"))
         .send()
         .await
@@ -101,7 +90,7 @@ async fn test_complete_auth_flow() {
 
     // [5] Access protected route with valid token
     let response = client
-        .get(format!("{address}/user"))
+        .get(format!("{test_app}/user"))
         .bearer_auth(content.access_token)
         .send()
         .await
@@ -110,7 +99,7 @@ async fn test_complete_auth_flow() {
 
     // [6] Logout with invalid refreshToken
     let response = client
-        .post(format!("{address}/auth/logout"))
+        .post(format!("{test_app}/auth/logout"))
         .header(X_REFRESH_TOKEN, format!("Bearer {refresh_token}"))
         .send()
         .await
@@ -124,7 +113,7 @@ async fn test_complete_auth_flow() {
 
     // [7] Logout with valid refreshToken
     let response = client
-        .post(format!("{address}/auth/logout"))
+        .post(format!("{test_app}/auth/logout"))
         .header(X_REFRESH_TOKEN, format!("Bearer {}", content.refresh_token))
         .send()
         .await
