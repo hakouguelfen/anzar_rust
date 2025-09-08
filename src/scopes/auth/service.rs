@@ -27,9 +27,9 @@ pub struct AuthService {
 impl AuthService {
     pub async fn create(adapter_type: AdapterType, conn: String) -> Self {
         match adapter_type {
-            AdapterType::Sqlite => Self::create_sqlite(conn).await,
+            AdapterType::SQLite => Self::create_sqlite(conn).await,
             AdapterType::MongoDB => Self::create_mongo(conn).await,
-            AdapterType::PostgreSql => todo!(),
+            AdapterType::PostgreSQL => todo!(),
         }
     }
     async fn create_mongo(conn: String) -> Self {
@@ -49,7 +49,7 @@ impl AuthService {
     }
 
     async fn create_sqlite(conn: String) -> Self {
-        let adapter_type = AdapterType::Sqlite;
+        let adapter_type = AdapterType::SQLite;
         let db = SQLite::start(&conn).await;
 
         let adapters = DatabaseAdapters::create_sqlite(&db);

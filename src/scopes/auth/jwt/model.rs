@@ -1,16 +1,26 @@
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use mongodb::bson::oid::ObjectId;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use sqlx::prelude::FromRow;
 
 #[derive(Default, Clone, Debug, PartialEq, Eq, Deserialize, Serialize, FromRow)]
 pub struct RefreshToken {
-    // #[serde(serialize_with = "serialize_object_id")]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "_id",
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "deserialize_object_id_as_string"
+    )]
     pub id: Option<String>,
 
     #[sqlx(rename = "userId")]
-    #[serde(rename = "userId")]
-    pub user_id: Option<String>,
+    #[serde(
+        rename = "userId",
+        default,
+        serialize_with = "serialize_object_id_as_string",
+        deserialize_with = "deserialize_object_id"
+    )]
+    pub user_id: String,
 
     #[sqlx(rename = "issuedAt")]
     #[serde(rename = "issuedAt")]
@@ -27,11 +37,9 @@ pub struct RefreshToken {
     pub valid: bool,
 }
 
-// Add build function
-
 impl RefreshToken {
     pub fn with_user_id(mut self, id: String) -> Self {
-        let _ = self.user_id.insert(id);
+        self.user_id = id;
         self
     }
     pub fn with_hash(mut self, hash: String) -> Self {
@@ -53,13 +61,38 @@ impl RefreshToken {
     }
 }
 
-// FIXME: remove serializer
-// fn serialize_object_id<S>(id: &Option<ObjectId>, serializer: S) -> Result<S::Ok, S::Error>
-// where
-//     S: serde::Serializer,
-// {
-//     match id {
-//         Some(id) => serializer.serialize_str(&id.to_string()),
-//         None => serializer.serialize_none(),
-//     }
-// }
+fn serialize_object_id_as_string<S>(id: &String, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    if let Ok(oid) = ObjectId::parse_str(id) {
+        serializer.serialize_some(&oid)
+    } else {
+        serializer.serialize_some(id)
+    }
+}
+
+fn deserialize_object_id_as_string<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let oid: Option<ObjectId> = Option::deserialize(deserializer)?;
+    Ok(oid.map(|o| o.to_hex()))
+}
+
+fn deserialize_object_id<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let oid: ObjectId = ObjectId::deserialize(deserializer)?;
+    Ok(oid.to_hex())
+    // let bson: Bson = Bson::deserialize(deserializer)?;
+    // match bson {
+    //     Bson::ObjectId(oid) => Ok(oid.to_hex()),
+    //     Bson::String(s) => Ok(s),
+    //     other => Err(serde::de::Error::custom(format!(
+    //         "unexpected _id type: {:?}",
+    //         other
+    //     ))),
+    // }
+}

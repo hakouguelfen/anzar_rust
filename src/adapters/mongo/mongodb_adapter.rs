@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use async_trait::async_trait;
 use mongodb::{Collection, Database, options::ReturnDocument};
 use serde::{Serialize, de::DeserializeOwned};
@@ -8,11 +10,11 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
-pub struct MongodbAdapter<T: Send + Sync> {
+pub struct MongodbAdapter<T: Send + Sync + Debug> {
     collection: Collection<T>,
 }
 
-impl<T: Send + Sync> MongodbAdapter<T> {
+impl<T: Send + Sync + Debug> MongodbAdapter<T> {
     pub fn new(db: &Database, name: &str) -> Self {
         MongodbAdapter {
             collection: db.collection::<T>(name),
@@ -23,7 +25,7 @@ impl<T: Send + Sync> MongodbAdapter<T> {
 #[async_trait]
 impl<T> DatabaseAdapter<T> for MongodbAdapter<T>
 where
-    T: Send + Sync + Serialize + DeserializeOwned + 'static,
+    T: Debug + Send + Sync + Serialize + DeserializeOwned + 'static,
 {
     async fn insert(&self, data: T) -> Result<String, Error> {
         let doc = self
@@ -36,13 +38,18 @@ where
     }
 
     async fn find_one(&self, filter: Document) -> Option<T> {
-        let mongo_filter = mongodb::bson::to_document(&filter).unwrap();
+        let mut mongo_filter = mongodb::bson::to_document(&filter).unwrap();
+        if let Some(id_value) = mongo_filter.remove("id") {
+            mongo_filter.insert("_id", id_value);
+        }
+
         self.collection.find_one(mongo_filter).await.ok()?
     }
 
     async fn find_one_and_update(&self, filter: Document, update: Document) -> Option<T> {
         let mongo_filter = mongodb::bson::to_document(&filter).unwrap();
         let mongo_update = mongodb::bson::to_document(&update).unwrap();
+
         self.collection
             .find_one_and_update(mongo_filter, mongo_update)
             .return_document(ReturnDocument::After)

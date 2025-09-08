@@ -1,8 +1,9 @@
 use std::net::TcpListener;
 use std::sync::LazyLock;
 
-use anzar::configuration::{get_app_config, get_configuration, update_app_config};
-use anzar::scopes::config::{Configuration, EmailAndPassword};
+use anzar::configuration::get_configuration;
+use anzar::parser::AdapterType;
+use anzar::scopes::config::{Configuration, Database, EmailAndPassword};
 use anzar::telemetry::{get_subscriber, init_subscriber};
 use derive_more::derive::Display;
 use reqwest::Response;
@@ -58,7 +59,10 @@ pub async fn register_context(address: &String, db: String) -> Response {
     let body = Configuration {
         id: None,
         api_url: address.clone(),
-        database: db,
+        database: Database {
+            connection_string: db,
+            db_type: AdapterType::MongoDB,
+        },
         email_and_password: EmailAndPassword { enable: true },
     };
     client

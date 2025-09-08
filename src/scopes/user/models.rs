@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::FromRow;
 use validator::Validate;
 
@@ -14,7 +14,12 @@ pub enum Role {
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Validate, FromRow)]
 pub struct User {
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "_id",
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "deserialize_id"
+    )]
     pub id: Option<String>,
 
     #[validate(length(min = 4, message = "username must be at least 4 characters"))]
@@ -100,5 +105,22 @@ impl From<User> for UserResponse {
             is_premium: user.is_premium,
             account_locked: user.account_locked,
         }
+    }
+}
+
+fn deserialize_id<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::de::Error;
+
+    let value: Option<serde_json::Value> = Option::deserialize(deserializer)?;
+    match value {
+        Some(serde_json::Value::String(s)) => Ok(Some(s)),
+        Some(val) if val.get("$oid").is_some() => {
+            Ok(Some(val["$oid"].as_str().unwrap().to_string()))
+        }
+        None => Ok(None),
+        _ => Err(D::Error::custom("invalid id format")),
     }
 }

@@ -1,4 +1,5 @@
 use mongodb::bson::oid::ObjectId;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::adapters::database_adapter::Document;
@@ -7,11 +8,11 @@ pub struct Parser {
     adapter_type: AdapterType,
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum AdapterType {
     #[default]
-    Sqlite,
-    PostgreSql,
+    SQLite,
+    PostgreSQL,
     MongoDB,
 }
 
@@ -23,8 +24,8 @@ impl Parser {
     pub fn convert(&self, data: Document) -> Document {
         match &self.adapter_type {
             AdapterType::MongoDB => self.mongo_convert(data),
-            AdapterType::Sqlite => self.sqlite_convert(data),
-            AdapterType::PostgreSql => self.sqlite_convert(data),
+            AdapterType::SQLite => self.sqlite_convert(data),
+            AdapterType::PostgreSQL => self.sqlite_convert(data),
         }
     }
 
@@ -69,7 +70,7 @@ mod tests {
     #[test]
     fn test_basic() {
         let input = json!({"id": "123AZEDJ"});
-        let output = Parser::mode(AdapterType::Sqlite).convert(input.clone());
+        let output = Parser::mode(AdapterType::SQLite).convert(input.clone());
 
         let expected = json!({"id": "123AZEDJ"});
 
@@ -79,7 +80,7 @@ mod tests {
     #[test]
     fn test_single_val() {
         let input = json!({ "$set": json!({"password": "password"}) });
-        let output = Parser::mode(AdapterType::Sqlite).convert(input.clone());
+        let output = Parser::mode(AdapterType::SQLite).convert(input.clone());
 
         let expected = json!({"password": "password"});
 
@@ -95,7 +96,7 @@ mod tests {
                 "failedResetAttempts": 0
             })
         });
-        let output = Parser::mode(AdapterType::Sqlite).convert(input.clone());
+        let output = Parser::mode(AdapterType::SQLite).convert(input.clone());
 
         let expected = json! ({
             "lastPasswordReset": "time",
