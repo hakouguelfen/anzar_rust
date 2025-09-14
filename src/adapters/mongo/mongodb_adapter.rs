@@ -47,8 +47,12 @@ where
     }
 
     async fn find_one_and_update(&self, filter: Document, update: Document) -> Option<T> {
-        let mongo_filter = mongodb::bson::to_document(&filter).unwrap();
+        let mut mongo_filter = mongodb::bson::to_document(&filter).unwrap();
         let mongo_update = mongodb::bson::to_document(&update).unwrap();
+
+        if let Some(id_value) = mongo_filter.remove("id") {
+            mongo_filter.insert("_id", id_value);
+        }
 
         self.collection
             .find_one_and_update(mongo_filter, mongo_update)
@@ -58,8 +62,12 @@ where
     }
 
     async fn update_many(&self, filter: Document, update: Document) -> Result<(), Error> {
-        let mongo_filter = mongodb::bson::to_document(&filter).unwrap();
+        let mut mongo_filter = mongodb::bson::to_document(&filter).unwrap();
         let mongo_update = mongodb::bson::to_document(&update).unwrap();
+
+        if let Some(id_value) = mongo_filter.remove("id") {
+            mongo_filter.insert("_id", id_value);
+        }
 
         self.collection
             .update_many(mongo_filter, mongo_update)

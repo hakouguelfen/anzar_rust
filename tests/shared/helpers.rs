@@ -67,6 +67,15 @@ impl Helpers {
             .await
             .expect("Failed to execute request.")
     }
+    pub async fn get_user(address: &TestApp, token: String) -> Response {
+        let client = reqwest::Client::new();
+        client
+            .get(format!("{address}/user"))
+            .bearer_auth(token)
+            .send()
+            .await
+            .expect("Failed to execute request.")
+    }
 
     pub fn decode_token(token: &str, token_type: TokenType) -> Result<Claims> {
         JwtDecoderBuilder::new()

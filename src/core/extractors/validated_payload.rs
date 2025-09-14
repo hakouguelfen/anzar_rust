@@ -22,7 +22,9 @@ where
         let fut = Json::<T>::from_request(req, payload);
 
         Box::pin(async move {
-            let json = fut.await.map_err(|_| Error::InternalServerError)?;
+            let json = fut
+                .await
+                .map_err(|e| Error::InternalServerError(e.to_string()))?;
             json.validate()
                 .map_err(|e| Error::BadRequest(e.to_string()))?;
 
@@ -45,7 +47,9 @@ where
         let fut = Query::<T>::from_request(req, payload);
 
         Box::pin(async move {
-            let json = fut.await.map_err(|_| Error::InternalServerError)?;
+            let json = fut
+                .await
+                .map_err(|e| Error::InternalServerError(e.to_string()))?;
             json.validate()
                 .map_err(|e| Error::BadRequest(e.to_string()))?;
 

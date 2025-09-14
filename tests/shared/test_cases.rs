@@ -1,7 +1,12 @@
 #![allow(dead_code)]
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize)]
+pub struct EmailRequest {
+    pub email: String,
+}
+
+#[derive(Serialize)]
 pub struct LoginRequest {
     pub email: String,
     pub password: String,

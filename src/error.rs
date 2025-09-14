@@ -10,7 +10,7 @@ pub type Result<T> = core::result::Result<T, Error>;
 #[derive(Debug, Display)]
 pub enum Error {
     #[display("An internal error occurred. Please try again later.")]
-    _InternalError,
+    InternalError,
 
     #[display("Something has occured while proccessing this request")]
     BadRequest,
@@ -28,7 +28,7 @@ impl ResponseError for Error {
 
     fn status_code(&self) -> StatusCode {
         match self {
-            Error::_InternalError => StatusCode::INTERNAL_SERVER_ERROR,
+            Error::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
             Error::BadRequest => StatusCode::BAD_REQUEST,
             Error::NotFound => StatusCode::NOT_FOUND,
         }

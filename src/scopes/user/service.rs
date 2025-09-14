@@ -45,12 +45,7 @@ impl UserService {
     }
 
     pub async fn insert(&self, user: &User) -> Result<String> {
-        let id = self.adapter.insert(user.to_owned()).await.map_err(|e| {
-            tracing::error!("Failed to insert new user to Database: {:?}", e);
-            Error::UserCreationFailure
-        })?;
-
-        Ok(id)
+        self.adapter.insert(user.to_owned()).await
     }
 
     pub async fn update_password(&self, user_id: String, password: String) -> Result<User> {

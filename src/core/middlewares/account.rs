@@ -48,7 +48,7 @@ async fn validate_refresh_token(req: &ServiceRequest, jti: &str) -> Result<(), E
         .and_then(|state| state.auth_service.lock().ok())
         .and_then(|guard| guard.as_ref().map(|sm| sm.clone()))
         .ok_or(actix_web::error::ErrorInternalServerError(parse_error(
-            AuthError::InternalServerError,
+            AuthError::InternalServerError("".into()),
         )))?;
 
     let refresh_token = auth_service
@@ -71,7 +71,7 @@ async fn check_user_account(req: &ServiceRequest, user_id: &str) -> Result<(), E
         .and_then(|state| state.auth_service.lock().ok())
         .and_then(|guard| guard.as_ref().map(|sm| sm.clone()))
         .ok_or(actix_web::error::ErrorInternalServerError(parse_error(
-            AuthError::InternalServerError,
+            AuthError::InternalServerError("".into()),
         )))?;
 
     let user: User = auth_service
@@ -123,10 +123,10 @@ pub async fn auth_middleware(
         req.extensions_mut().insert::<AuthPayload>(payload);
     }
 
-    if access_token.is_none() && refresh_token.is_none() {
-        let err = actix_web::error::ErrorUnauthorized(parse_error(AuthError::InvalidToken));
-        return Err(err);
-    }
+    // if access_token.is_none() && refresh_token.is_none() {
+    //     let err = actix_web::error::ErrorUnauthorized(parse_error(AuthError::InvalidToken));
+    //     return Err(err);
+    // }
 
     next.call(req).await
     // post-processing

@@ -141,8 +141,9 @@ async fn forgot_password(
         );
         Email::default().to(to).send(&body).await?;
 
-        // 7. Increment user's reset attempt count
-        //    Limit reset password requests
+        // 7. [FIXME] function name is not good
+        // Increment user's reset attempt count
+        // Limit reset password requests
         auth_service.process_reset_request(user).await?;
     }
 

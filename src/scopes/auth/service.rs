@@ -25,17 +25,17 @@ pub struct AuthService {
 }
 
 impl AuthService {
-    pub async fn create(adapter_type: AdapterType, conn: String) -> Self {
+    pub async fn create(adapter_type: AdapterType, conn: String) -> Result<Self> {
         match adapter_type {
-            AdapterType::SQLite => Self::create_sqlite(conn).await,
-            AdapterType::MongoDB => Self::create_mongo(conn).await,
+            AdapterType::SQLite => Ok(Self::create_sqlite(conn).await?),
+            AdapterType::MongoDB => Ok(Self::create_mongo(conn).await?),
             AdapterType::PostgreSQL => todo!(),
         }
     }
 
-    async fn create_sqlite(conn: String) -> Self {
+    async fn create_sqlite(conn: String) -> Result<Self> {
         let adapter_type = AdapterType::SQLite;
-        let db = SQLite::start(&conn).await;
+        let db = SQLite::start(&conn).await?;
 
         // NOTE: this is for running testing only
         if &conn == "sqlite::memory:" {
@@ -47,30 +47,30 @@ impl AuthService {
 
         let adapters = DatabaseAdapters::create_sqlite(&db);
 
-        Self {
+        Ok(Self {
             user_service: UserService::new(adapters.user_adapter, adapter_type),
             jwt_service: JWTService::new(adapters.jwt_adapter, adapter_type),
             password_reset_token_service: PasswordResetTokenService::new(
                 adapters.reset_token_adapter,
                 adapter_type,
             ),
-        }
+        })
     }
 
-    async fn create_mongo(conn: String) -> Self {
+    async fn create_mongo(conn: String) -> Result<Self> {
         let adapter_type = AdapterType::MongoDB;
-        let db = MongoDB::start(conn).await;
+        let db = MongoDB::start(conn).await?;
 
         let adapters = DatabaseAdapters::create_mongodb(&db);
 
-        Self {
+        Ok(Self {
             user_service: UserService::new(adapters.user_adapter, adapter_type),
             jwt_service: JWTService::new(adapters.jwt_adapter, adapter_type),
             password_reset_token_service: PasswordResetTokenService::new(
                 adapters.reset_token_adapter,
                 adapter_type,
             ),
-        }
+        })
     }
 }
 

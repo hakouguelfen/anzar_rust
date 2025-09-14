@@ -19,7 +19,7 @@ impl FromRequest for AuthServiceExtractor {
             .and_then(|state| state.auth_service.lock().ok())
             .and_then(|guard| guard.as_ref().map(|sm| sm.clone()))
             .map(|sm| AuthServiceExtractor(sm.clone()))
-            .ok_or(Error::InternalServerError);
+            .ok_or(Error::InternalServerError("".into()));
 
         ready(result)
     }

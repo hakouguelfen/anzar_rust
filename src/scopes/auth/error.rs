@@ -67,8 +67,8 @@ pub enum Error {
     #[display("Failed to revoke tokens")]
     TokenRevocationFailed,
 
-    #[display("Internal server error")]
-    InternalServerError,
+    #[display("Internal server error: {_0}")]
+    InternalServerError(String),
 }
 
 impl ResponseError for Error {
@@ -99,7 +99,7 @@ impl ResponseError for Error {
             | Error::EmailSendFailed
             | Error::PasswordUpdateFailed
             | Error::TokenRevocationFailed
-            | Error::InternalServerError => StatusCode::INTERNAL_SERVER_ERROR,
+            | Error::InternalServerError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }
