@@ -33,7 +33,7 @@ impl Email {
 
         self.mail.emails.send(email).await.map_err(|e| {
             tracing::error!("Failed to send password reset email: {:?}", e);
-            Error::EmailSendFailed
+            Error::EmailSendFailed { to: self.reciever }
         })?;
 
         Ok("Email sent successfully!".to_string())

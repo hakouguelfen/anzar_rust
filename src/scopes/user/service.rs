@@ -29,7 +29,10 @@ impl UserService {
 
         self.adapter.find_one(filter).await.ok_or_else(|| {
             tracing::error!("Failed to find user by id: {}", user_id);
-            Error::UserNotFound
+            Error::UserNotFound {
+                user_id: Some(user_id),
+                email: None,
+            }
         })
     }
 
@@ -38,7 +41,10 @@ impl UserService {
 
         self.adapter.find_one(filter).await.ok_or_else(|| {
             tracing::error!("Failed to find user by email");
-            Error::UserNotFound
+            Error::UserNotFound {
+                user_id: None,
+                email: Some(email.into()),
+            }
         })
     }
 

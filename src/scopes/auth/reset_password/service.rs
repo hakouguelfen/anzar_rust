@@ -37,7 +37,9 @@ impl PasswordResetTokenService {
             .await
             .map_err(|e| {
                 tracing::error!("Failed to revoke password tokens: {:?}", e);
-                Error::TokenRevocationFailed
+                Error::TokenRevocationFailed {
+                    token_id: "".into(),
+                }
             })?;
 
         Ok(())
@@ -46,7 +48,9 @@ impl PasswordResetTokenService {
     pub async fn insert(&self, otp: PasswordResetToken) -> Result<()> {
         self.adapter.insert(otp).await.map(|_| ()).map_err(|e| {
             tracing::error!("Failed to insert password reset token to database: {:?}", e);
-            Error::TokenCreationFailed
+            Error::TokenCreationFailed {
+                token_type: crate::error::TokenErrorType::PasswordResetToken,
+            }
         })
     }
 
@@ -55,7 +59,7 @@ impl PasswordResetTokenService {
 
         self.adapter.find_one(filter).await.ok_or({
             tracing::error!("Password reset token not found");
-            Error::TokenNotFound
+            Error::TokenNotFound { token_id: hash }
         })
     }
 

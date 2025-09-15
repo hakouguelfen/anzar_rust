@@ -3,13 +3,11 @@ use anzar::{
     core::extractors::{Claims, TokenType},
     scopes::auth::tokens::JwtDecoderBuilder,
 };
-use jsonwebtoken::errors::Error;
 use reqwest::Response;
 use uuid::Uuid;
 
-type Result<T> = core::result::Result<T, Error>;
-
 use crate::shared::{TestApp, register_context};
+use anzar::error::Result;
 
 use super::common::Common;
 use super::test_cases::ValidTestCases;

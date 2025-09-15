@@ -30,7 +30,10 @@ impl FromRequest for AuthPayload {
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
         match req.extensions().get::<AuthPayload>() {
             Some(payload) => ready(Ok(payload.clone())),
-            None => ready(Err(Error::InvalidToken)),
+            None => ready(Err(Error::InvalidToken {
+                token_type: crate::error::TokenErrorType::RefreshToken,
+                reason: crate::error::InvalidTokenReason::SignatureMismatch,
+            })),
         }
     }
 }

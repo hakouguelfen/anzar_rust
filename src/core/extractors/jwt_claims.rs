@@ -8,16 +8,11 @@ use validator::Validate;
 use crate::core::validators::validate_objectid;
 use crate::error::Error;
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
 pub enum TokenType {
+    #[default]
     AccessToken,
     RefreshToken,
-}
-
-impl Default for TokenType {
-    fn default() -> Self {
-        Self::AccessToken
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
@@ -50,7 +45,10 @@ impl FromRequest for Claims {
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
         match req.extensions().get::<Claims>() {
             Some(claims) => ready(Ok(claims.clone())),
-            None => ready(Err(Error::InvalidToken)),
+            None => ready(Err(Error::InvalidToken {
+                token_type: crate::error::TokenErrorType::AccessToken,
+                reason: crate::error::InvalidTokenReason::SignatureMismatch,
+            })),
         }
     }
 }

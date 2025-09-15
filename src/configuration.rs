@@ -76,7 +76,7 @@ pub fn get_configuration() -> Result<Settings, config::ConfigError> {
         .expect("Failed to parse APP_ENV");
 
     let environment_database: EnvironmentDatabase = std::env::var("APP_DB")
-        .unwrap_or_else(|_| EnvironmentDatabase::MongoDB.as_str().into())
+        .unwrap_or_else(|_| EnvironmentDatabase::SQLite.as_str().into())
         .try_into()
         .expect("Failed to parse APP_DB");
 

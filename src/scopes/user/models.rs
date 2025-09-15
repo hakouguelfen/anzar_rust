@@ -72,8 +72,15 @@ impl User {
     }
 
     pub fn validate(&self) -> Result<(), Error> {
-        if self.email.is_empty() || self.password.is_empty() {
-            return Err(Error::MissingCredentials);
+        if self.email.is_empty() {
+            return Err(Error::MissingCredentials {
+                field: crate::error::CredentialField::Email,
+            });
+        }
+        if self.password.is_empty() {
+            return Err(Error::MissingCredentials {
+                field: crate::error::CredentialField::Password,
+            });
         }
         Ok(())
     }

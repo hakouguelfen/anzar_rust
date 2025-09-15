@@ -6,7 +6,7 @@ use crate::scopes::user::User;
 pub struct RateLimiter {
     max_requests_per_hour: u32,
     _max_requests_per_day: u32,
-    _lockout_duration: chrono::Duration,
+    lockout_duration: chrono::Duration,
 }
 
 impl Default for RateLimiter {
@@ -14,7 +14,7 @@ impl Default for RateLimiter {
         RateLimiter {
             max_requests_per_hour: 3,
             _max_requests_per_day: 5,
-            _lockout_duration: chrono::Duration::hours(24),
+            lockout_duration: chrono::Duration::hours(24),
         }
     }
 }
@@ -23,7 +23,9 @@ impl RateLimiter {
     pub fn check_rate_limit(&self, user: &User) -> Result<(), Error> {
         if user.failed_reset_attempts >= 5 {
             // TODO: update user.accountBlocked = true
-            return Err(Error::AccountSuspended);
+            return Err(Error::AccountSuspended {
+                user_id: user.clone().id.unwrap_or_default(),
+            });
         }
 
         // Check if user has exceeded daily limit
@@ -32,7 +34,10 @@ impl RateLimiter {
             if time_since_reset < chrono::Duration::hours(1)
                 && user.password_reset_count >= self.max_requests_per_hour
             {
-                return Err(Error::RateLimitExceeded);
+                return Err(Error::RateLimitExceeded {
+                    limit: self.max_requests_per_hour,
+                    window: self.lockout_duration,
+                });
             }
         }
 

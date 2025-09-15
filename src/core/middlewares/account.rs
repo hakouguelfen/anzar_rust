@@ -8,17 +8,20 @@ use actix_web::{
 };
 use serde_json::{Value, json};
 
-use crate::scopes::{
-    auth::{
-        service::{JwtServiceTrait, UserServiceTrait},
-        tokens::JwtDecoderBuilder,
-    },
-    user::User,
-};
-use crate::startup::AppState;
 use crate::{
     core::extractors::{AuthPayload, Claims, TokenType},
     error::Error as AuthError,
+};
+use crate::{error::InvalidTokenReason, startup::AppState};
+use crate::{
+    error::TokenErrorType,
+    scopes::{
+        auth::{
+            service::{JwtServiceTrait, UserServiceTrait},
+            tokens::JwtDecoderBuilder,
+        },
+        user::User,
+    },
 };
 
 const X_REFRESH_TOKEN: &str = "x-refresh-token";
@@ -37,9 +40,18 @@ fn extract_token_from_header(req: &ServiceRequest, key: String) -> Option<&str> 
 fn decode_claims(token: &str, token_type: TokenType) -> Result<Claims, Error> {
     JwtDecoderBuilder::new()
         .with_token(token)
-        .with_token_type(token_type)
+        .with_token_type(token_type.clone())
         .build()
-        .map_err(|_| actix_web::error::ErrorUnauthorized(parse_error(AuthError::InvalidToken)))
+        .map_err(|_| {
+            actix_web::error::ErrorUnauthorized(parse_error(AuthError::InvalidToken {
+                token_type: if token_type == TokenType::AccessToken {
+                    TokenErrorType::AccessToken
+                } else {
+                    TokenErrorType::RefreshToken
+                },
+                reason: InvalidTokenReason::SignatureMismatch,
+            }))
+        })
 }
 
 async fn validate_refresh_token(req: &ServiceRequest, jti: &str) -> Result<(), Error> {
@@ -51,14 +63,19 @@ async fn validate_refresh_token(req: &ServiceRequest, jti: &str) -> Result<(), E
             AuthError::InternalServerError("".into()),
         )))?;
 
-    let refresh_token = auth_service
-        .find_jwt_by_jti(jti)
-        .await
-        .ok_or_else(|| actix_web::error::ErrorUnauthorized(parse_error(AuthError::InvalidToken)))?;
+    let refresh_token = auth_service.find_jwt_by_jti(jti).await.ok_or_else(|| {
+        actix_web::error::ErrorUnauthorized(parse_error(AuthError::InvalidToken {
+            token_type: TokenErrorType::RefreshToken,
+            reason: InvalidTokenReason::NotFound,
+        }))
+    })?;
 
     if !refresh_token.valid {
         return Err(actix_web::error::ErrorUnauthorized(parse_error(
-            AuthError::InvalidToken,
+            AuthError::InvalidToken {
+                token_type: TokenErrorType::RefreshToken,
+                reason: InvalidTokenReason::Expired,
+            },
         )));
     }
 
@@ -77,11 +94,18 @@ async fn check_user_account(req: &ServiceRequest, user_id: &str) -> Result<(), E
     let user: User = auth_service
         .find_user(user_id.to_string())
         .await
-        .map_err(|_| actix_web::error::ErrorNotFound(parse_error(AuthError::UserNotFound)))?;
+        .map_err(|_| {
+            actix_web::error::ErrorNotFound(parse_error(AuthError::UserNotFound {
+                user_id: Some(user_id.into()),
+                email: None,
+            }))
+        })?;
 
     if user.account_locked {
         return Err(actix_web::error::ErrorForbidden(parse_error(
-            AuthError::AccountSuspended,
+            AuthError::AccountSuspended {
+                user_id: user_id.into(),
+            },
         )));
     }
 

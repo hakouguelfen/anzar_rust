@@ -4,10 +4,9 @@ use actix_web::{
 };
 use serde_json::json;
 
-use crate::scopes::auth::{models::AuthResponse, service::PasswordResetTokenServiceTrait};
 use crate::{
     core::extractors::AuthServiceExtractor,
-    error::{Error, Result},
+    error::{CredentialField, Error, Result},
     scopes::auth::models::ResetPasswordRequest,
 };
 use crate::{
@@ -15,6 +14,10 @@ use crate::{
     scopes::auth::service::UserServiceTrait,
 };
 use crate::{core::rate_limiter::RateLimiter, scopes::auth::service::JwtServiceTrait};
+use crate::{
+    error::FailureReason,
+    scopes::auth::{models::AuthResponse, service::PasswordResetTokenServiceTrait},
+};
 
 use super::reset_password::model::PasswordResetToken;
 use super::user::User;
@@ -174,14 +177,17 @@ async fn update_password(
     let user_id = reset_token.user_id;
     let user = auth_service.find_user(user_id.to_string()).await?;
     if user.account_locked {
-        return Err(Error::AccountSuspended);
+        return Err(Error::AccountSuspended { user_id });
     }
     if Utils::verify_password(&request.password, &user.password) {
         tracing::warn!(
             "Current password is similair to previous password, user: {}",
             user_id
         );
-        return Err(Error::InvalidCredentials);
+        return Err(Error::InvalidCredentials {
+            field: CredentialField::Password,
+            reason: FailureReason::HashMismatch,
+        });
     }
 
     // 3. Hash new password using argon2

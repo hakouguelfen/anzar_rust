@@ -1,4 +1,4 @@
-use super::error::{Error, Result};
+use crate::error::{Error, Result};
 use argon2::{
     Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
     password_hash::{SaltString, rand_core::OsRng},

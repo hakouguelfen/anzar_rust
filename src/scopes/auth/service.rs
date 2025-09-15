@@ -4,7 +4,9 @@ use crate::adapters::adapter_factory::DatabaseAdapters;
 use crate::adapters::mongo::MongoDB;
 use crate::adapters::sqlite::SQLite;
 use crate::core::extractors::AuthPayload;
-use crate::error::{Error, Result};
+use crate::error::{
+    CredentialField, Error, FailureReason, InvalidTokenReason, Result, TokenErrorType,
+};
 use crate::parser::AdapterType;
 use crate::scopes::auth::jwt::model::RefreshToken;
 use crate::scopes::auth::model::PasswordResetToken;
@@ -92,17 +94,21 @@ pub trait UserServiceTrait {
 }
 impl UserServiceTrait for AuthService {
     async fn authenticate_user(&self, email: &str, password: &str) -> Result<User> {
-        let user: User = self
-            .user_service
-            .find_by_email(email)
-            .await
-            .map_err(|_| Error::InvalidCredentials)?;
+        let user: User = self.user_service.find_by_email(email).await.map_err(|_| {
+            Error::InvalidCredentials {
+                field: CredentialField::Email,
+                reason: FailureReason::NotFound,
+            }
+        })?;
 
         match Utils::verify_password(password, &user.password) {
             true => Ok(user),
             false => {
                 tracing::error!("Failed to verify password");
-                Err(Error::InvalidCredentials)
+                Err(Error::InvalidCredentials {
+                    field: CredentialField::Password,
+                    reason: FailureReason::HashMismatch,
+                })
             }
         }
     }
@@ -159,7 +165,10 @@ impl JwtServiceTrait for AuthService {
             // will fail then self.jwt_service.revoke(user_id).await? will be excuted
             // [NOT RECOMMENDED]
             self.jwt_service.revoke(user_id).await?;
-            return Err(Error::InvalidToken);
+            return Err(Error::InvalidToken {
+                token_type: TokenErrorType::RefreshToken,
+                reason: InvalidTokenReason::NotFound,
+            });
         }
 
         Ok(())
@@ -231,14 +240,19 @@ impl PasswordResetTokenServiceTrait for AuthService {
 
         // 3. Verify token isn't expired or already used
         if !reset_token.valid {
-            return Err(Error::TokenAlreadyUsed);
+            return Err(Error::TokenAlreadyUsed {
+                token_id: reset_token.id.unwrap_or_default(),
+            });
         }
         if Utc::now() > reset_token.expired_at {
             let token_id = reset_token.id.unwrap_or_default().to_string();
             self.password_reset_token_service
                 .invalidate(token_id)
                 .await?;
-            return Err(Error::TokenExpired);
+            return Err(Error::TokenExpired {
+                token_type: TokenErrorType::PasswordResetToken,
+                expired_at: reset_token.expired_at,
+            });
         }
 
         Ok(reset_token)

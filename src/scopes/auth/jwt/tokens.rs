@@ -1,21 +1,13 @@
 use chrono::Duration;
 use jsonwebtoken::{EncodingKey, Validation, decode};
-use jsonwebtoken::{Header, encode, errors::Error};
+use jsonwebtoken::{Header, encode};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::core::extractors::{Claims, TokenType};
-use crate::error;
+use crate::error::Result;
 
 use super::keys::KEYS;
-
-pub type Result<T> = core::result::Result<T, Error>;
-
-impl From<jsonwebtoken::errors::Error> for error::Error {
-    fn from(_: jsonwebtoken::errors::Error) -> Self {
-        Self::TokenCreationFailed
-    }
-}
 
 #[derive(Default)]
 pub struct JwtDecoderBuilder {
@@ -102,7 +94,9 @@ impl JwtEncoderBuilder {
         jti: &String,
     ) -> Result<String> {
         let claims = Claims::new(sub, token_type, duration, jti);
-        encode(&Header::default(), &claims, key)
+        let token = encode(&Header::default(), &claims, key)?;
+
+        Ok(token)
     }
 }
 

@@ -7,7 +7,7 @@ use serde_json::json;
 use crate::{
     adapters::database_adapter::DatabaseAdapter,
     core::extractors::AuthPayload,
-    error::{Error, Result},
+    error::{Error, Result, TokenErrorType},
     parser::{AdapterType, Parser},
     scopes::auth::{
         jwt::model::RefreshToken,
@@ -32,7 +32,9 @@ impl JWTService {
     pub async fn insert(&self, refresh_token: RefreshToken) -> Result<()> {
         self.adapter.insert(refresh_token).await.map_err(|e| {
             tracing::error!("Failed to insert refreshToken to database: {:?}", e);
-            Error::TokenCreationFailed
+            Error::TokenCreationFailed {
+                token_type: TokenErrorType::RefreshToken,
+            }
         })?;
 
         Ok(())
@@ -75,7 +77,10 @@ impl JWTService {
             .await
             .ok_or_else(|| {
                 tracing::error!("failed to invalidate token");
-                Error::InvalidToken
+                Error::InvalidToken {
+                    token_type: TokenErrorType::RefreshToken,
+                    reason: crate::error::InvalidTokenReason::Malformed,
+                }
             })
     }
     pub async fn revoke(&self, user_id: String) -> Result<()> {
@@ -88,7 +93,9 @@ impl JWTService {
             .await
             .map_err(|e| {
                 tracing::error!("Failed to revoke tokens after security breach: {:?}", e);
-                Error::TokenRevocationFailed
+                Error::TokenRevocationFailed {
+                    token_id: "".into(),
+                }
             })?;
 
         Ok(())
