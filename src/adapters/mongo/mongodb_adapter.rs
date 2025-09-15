@@ -6,7 +6,7 @@ use serde::{Serialize, de::DeserializeOwned};
 
 use crate::{
     adapters::database_adapter::{DatabaseAdapter, Document},
-    scopes::auth::Error,
+    error::Error,
 };
 
 #[derive(Debug, Clone)]

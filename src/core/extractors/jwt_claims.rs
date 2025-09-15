@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use validator::Validate;
 
 use crate::core::validators::validate_objectid;
-use crate::scopes::auth::Error;
+use crate::error::Error;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum TokenType {

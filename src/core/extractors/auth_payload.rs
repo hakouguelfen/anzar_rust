@@ -1,7 +1,7 @@
 use std::future::{Ready, ready};
 
 use crate::core::validators::validate_objectid;
-use crate::scopes::auth::Error;
+use crate::error::Error;
 
 use actix_web::{FromRequest, HttpMessage, HttpRequest, dev::Payload};
 use serde::Deserialize;

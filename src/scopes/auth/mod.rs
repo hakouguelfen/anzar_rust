@@ -1,4 +1,3 @@
-mod error;
 mod jwt;
 mod models;
 mod reset_password;
@@ -9,7 +8,6 @@ pub mod email;
 pub mod service;
 
 pub use crate::scopes::user;
-pub use error::*;
 pub use jwt::*;
 pub use models::AuthResponse;
 pub use reset_password::{PasswordResetTokenService, model};

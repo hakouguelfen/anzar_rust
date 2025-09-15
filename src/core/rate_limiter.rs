@@ -1,6 +1,7 @@
 use chrono::Utc;
 
-use crate::scopes::{auth::Error, user::User};
+use crate::error::Error;
+use crate::scopes::user::User;
 
 pub struct RateLimiter {
     max_requests_per_hour: u32,

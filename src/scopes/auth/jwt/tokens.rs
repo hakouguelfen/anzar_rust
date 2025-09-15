@@ -5,13 +5,13 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::core::extractors::{Claims, TokenType};
-use crate::scopes::auth;
+use crate::error;
 
 use super::keys::KEYS;
 
 pub type Result<T> = core::result::Result<T, Error>;
 
-impl From<jsonwebtoken::errors::Error> for auth::Error {
+impl From<jsonwebtoken::errors::Error> for error::Error {
     fn from(_: jsonwebtoken::errors::Error) -> Self {
         Self::TokenCreationFailed
     }

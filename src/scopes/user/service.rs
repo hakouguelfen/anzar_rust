@@ -5,11 +5,9 @@ use serde_json::json;
 
 use crate::{
     adapters::database_adapter::DatabaseAdapter,
+    error::{Error, Result},
     parser::{AdapterType, Parser},
-    scopes::{
-        auth::{Error, Result},
-        user::User,
-    },
+    scopes::user::User,
 };
 
 #[derive(Clone)]

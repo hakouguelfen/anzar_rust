@@ -7,7 +7,7 @@ use sqlx::{FromRow, Pool, Sqlite, query::QueryAs, sqlite::SqliteArguments};
 
 use crate::{
     adapters::database_adapter::{DatabaseAdapter, Document},
-    scopes::auth::Error,
+    error::Error,
 };
 
 #[derive(sqlx::FromRow)]

@@ -1,6 +1,6 @@
 use sqlx::{Pool, Sqlite, sqlite::SqlitePoolOptions};
 
-use crate::scopes::auth::Error;
+use crate::error::Error;
 
 pub struct SQLite {}
 impl SQLite {

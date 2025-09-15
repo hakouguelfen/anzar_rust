@@ -1,7 +1,8 @@
 use actix_web::{FromRequest, HttpMessage, HttpRequest, dev::Payload};
 use std::future::{Ready, ready};
 
-use crate::scopes::{auth::Error, user::User};
+use crate::error::Error;
+use crate::scopes::user::User;
 
 pub struct AuthenticatedUser(pub User);
 

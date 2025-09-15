@@ -1,4 +1,4 @@
-use crate::scopes::auth::Error;
+use crate::error::Error;
 use actix_web::{
     FromRequest, HttpRequest,
     dev::Payload,

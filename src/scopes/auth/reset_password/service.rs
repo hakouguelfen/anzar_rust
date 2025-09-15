@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use crate::{
     adapters::database_adapter::DatabaseAdapter,
+    error::{Error, Result},
     parser::{AdapterType, Parser},
-    scopes::auth::{Error, Result},
 };
 
 use super::model::PasswordResetToken;

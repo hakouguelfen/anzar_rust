@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use serde::{Serialize, de::DeserializeOwned};
 
-use crate::scopes::auth::Error;
+use crate::error::Error;
 
 pub type Document = serde_json::Value;
 

@@ -5,7 +5,7 @@ use actix_web::{
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::scopes::auth::Result;
+use crate::error::Result;
 use crate::scopes::{auth::service::AuthService, config::models::Database};
 use crate::{scopes::config::models::Configuration, startup::AppState};
 

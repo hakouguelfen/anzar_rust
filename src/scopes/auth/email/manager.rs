@@ -1,6 +1,6 @@
 use resend_rs::{Resend, types::CreateEmailBaseOptions};
 
-use crate::scopes::auth::{Error, Result};
+use crate::error::{Error, Result};
 
 pub struct Email {
     reciever: String,

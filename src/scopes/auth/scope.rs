@@ -7,7 +7,8 @@ use serde_json::json;
 use crate::scopes::auth::{models::AuthResponse, service::PasswordResetTokenServiceTrait};
 use crate::{
     core::extractors::AuthServiceExtractor,
-    scopes::auth::{Error, models::ResetPasswordRequest},
+    error::{Error, Result},
+    scopes::auth::models::ResetPasswordRequest,
 };
 use crate::{
     core::extractors::{AuthPayload, AuthenticatedUser, ValidatedPayload, ValidatedQuery},
@@ -15,7 +16,6 @@ use crate::{
 };
 use crate::{core::rate_limiter::RateLimiter, scopes::auth::service::JwtServiceTrait};
 
-use super::error::Result;
 use super::reset_password::model::PasswordResetToken;
 use super::user::User;
 use super::{
@@ -37,6 +37,8 @@ async fn login(
         .authenticate_user(&req.email, &req.password)
         .await?;
 
+    // NOTE
+    // choose either jwtTokens or session
     auth_service
         .issue_and_save_tokens(&user)
         .await

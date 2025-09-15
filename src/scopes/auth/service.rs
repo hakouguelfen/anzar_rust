@@ -4,6 +4,7 @@ use crate::adapters::adapter_factory::DatabaseAdapters;
 use crate::adapters::mongo::MongoDB;
 use crate::adapters::sqlite::SQLite;
 use crate::core::extractors::AuthPayload;
+use crate::error::{Error, Result};
 use crate::parser::AdapterType;
 use crate::scopes::auth::jwt::model::RefreshToken;
 use crate::scopes::auth::model::PasswordResetToken;
@@ -11,10 +12,8 @@ use crate::scopes::auth::tokens::JwtEncoderBuilder;
 use crate::scopes::auth::{JWTService, PasswordResetTokenService};
 use crate::scopes::user::service::UserService;
 
-use super::error::{Error, Result};
 use super::tokens::Tokens;
 use super::user::User;
-
 use super::utils::{AuthenticationHasher, Utils};
 
 #[derive(Clone)]

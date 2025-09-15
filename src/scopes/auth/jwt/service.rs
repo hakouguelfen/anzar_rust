@@ -7,9 +7,9 @@ use serde_json::json;
 use crate::{
     adapters::database_adapter::DatabaseAdapter,
     core::extractors::AuthPayload,
+    error::{Error, Result},
     parser::{AdapterType, Parser},
     scopes::auth::{
-        Error, Result,
         jwt::model::RefreshToken,
         utils::{AuthenticationHasher, Utils},
     },

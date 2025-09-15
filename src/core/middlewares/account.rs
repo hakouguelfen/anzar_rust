@@ -18,7 +18,7 @@ use crate::scopes::{
 use crate::startup::AppState;
 use crate::{
     core::extractors::{AuthPayload, Claims, TokenType},
-    scopes::auth::Error as AuthError,
+    error::Error as AuthError,
 };
 
 const X_REFRESH_TOKEN: &str = "x-refresh-token";

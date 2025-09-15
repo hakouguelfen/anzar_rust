@@ -25,7 +25,7 @@ impl Parser {
         match &self.adapter_type {
             AdapterType::MongoDB => self.mongo_convert(data),
             AdapterType::SQLite => self.sqlite_convert(data),
-            AdapterType::PostgreSQL => self.sqlite_convert(data),
+            AdapterType::PostgreSQL => todo!(),
         }
     }
 

@@ -1,6 +1,6 @@
 use mongodb::Database;
 
-use crate::{adapters::mongo::indexes::MongodbIndexes, scopes::auth::Error};
+use crate::{adapters::mongo::indexes::MongodbIndexes, error::Error};
 
 pub struct MongoDB {}
 impl MongoDB {

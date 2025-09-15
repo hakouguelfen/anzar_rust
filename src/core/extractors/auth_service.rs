@@ -2,10 +2,7 @@ use std::future::{Ready, ready};
 
 use actix_web::{FromRequest, HttpRequest, dev::Payload, web::Data};
 
-use crate::{
-    scopes::auth::{Error, service::AuthService},
-    startup::AppState,
-};
+use crate::{error::Error, scopes::auth::service::AuthService, startup::AppState};
 
 pub struct AuthServiceExtractor(pub AuthService);
 

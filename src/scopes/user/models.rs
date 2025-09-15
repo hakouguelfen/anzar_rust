@@ -3,7 +3,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::FromRow;
 use validator::Validate;
 
-use crate::scopes::auth::Error;
+use crate::error::Error;
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone, PartialEq, Eq, sqlx::Type)]
 pub enum Role {
