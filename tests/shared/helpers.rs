@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use anzar::{
-    core::extractors::{Claims, TokenType},
-    scopes::auth::tokens::JwtDecoderBuilder,
+    extractors::{Claims, TokenType},
+    services::jwt::JwtDecoderBuilder,
 };
 use reqwest::Response;
 use uuid::Uuid;

@@ -15,10 +15,9 @@ name = "anzar"
 
 [dependencies]
 actix-cors = "0.7.0"
-actix-web = "4.9.0"
+actix-web = "4.11.0"
 chrono = { version = "0.4.37", features = ["serde"] }
-# TODO: remove display
-derive_more = { version = "1.0", features = ["display", "from"] }
+derive_more = { version = "2.0.1", features = ["from"] }
 
 # Json
 jsonwebtoken = "9.3.0"
@@ -29,10 +28,10 @@ serde_json = "1.0.115"
 sqlx = { version = "0.8.6", features = ["sqlite", "runtime-async-std", "tls-native-tls", "uuid", "chrono", "json"] }
 mongodb = "3.1.0"
 
-futures = "0.3.30"
-uuid = "1.10.0"
-dotenvy = "0.15.7"
+uuid = "1.18.1"
 config = "0.14.0"
+# NOTE: it's Deprecated
+dotenvy = "0.15.7"
 
 secrecy = { version = "0.10.3", features = ["serde"] }
 

@@ -1,3 +1,0 @@
-database:
-  host: "db"
-  database_name: "prod"

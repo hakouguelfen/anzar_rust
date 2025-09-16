@@ -1,7 +1,7 @@
 mod shared;
 use shared::{Helpers, InvalidTestCases};
 
-use anzar::{core::extractors::TokenType, scopes::auth::AuthResponse};
+use anzar::{extractors::TokenType, scopes::auth::AuthResponse};
 
 #[actix_web::test]
 async fn test_jwt_contains_correct_claims() {

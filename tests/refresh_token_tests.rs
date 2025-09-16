@@ -1,10 +1,7 @@
 mod shared;
 use shared::{Helpers, InvalidTestCases};
 
-use anzar::{
-    core::extractors::TokenType,
-    scopes::auth::{AuthResponse, tokens::Tokens},
-};
+use anzar::{extractors::TokenType, scopes::auth::AuthResponse, services::jwt::Tokens};
 
 const X_REFRESH_TOKEN: &str = "x-refresh-token";
 

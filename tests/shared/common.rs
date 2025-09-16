@@ -1,8 +1,8 @@
 use std::net::TcpListener;
 use std::sync::LazyLock;
 
-use anzar::configuration::get_configuration;
-use anzar::parser::AdapterType;
+use anzar::config::AdapterType;
+use anzar::config::AppConfig;
 use anzar::scopes::config::{Configuration, Database, EmailAndPassword};
 use anzar::telemetry::{get_subscriber, init_subscriber};
 use derive_more::derive::Display;
@@ -45,8 +45,9 @@ impl Common {
 pub async fn register_context(address: &String, db_name: String) -> Response {
     let client = reqwest::Client::new();
 
-    let mut configuration = get_configuration().expect("Failed to read configuration");
-    if configuration.database.db_type == AdapterType::MongoDB {
+    let mut configuration = AppConfig::from_env().expect("Failed to read configuration");
+
+    if configuration.database.is_nosql() {
         configuration.database.database_name = db_name;
     }
 

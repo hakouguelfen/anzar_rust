@@ -1,4 +1,0 @@
-database:
-  host: "sqlite3"
-  database_name: "./anzar.db"
-
