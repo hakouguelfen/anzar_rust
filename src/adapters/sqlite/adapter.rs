@@ -6,7 +6,7 @@ use serde_json::{Map, Value};
 use sqlx::{FromRow, Pool, Sqlite, query::QueryAs, sqlite::SqliteArguments};
 
 use crate::{
-    adapters::database_adapter::{DatabaseAdapter, Document},
+    adapters::traits::{DatabaseAdapter, Document},
     error::Error,
 };
 

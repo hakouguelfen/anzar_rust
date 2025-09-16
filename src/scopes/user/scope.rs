@@ -4,7 +4,7 @@ use actix_web::{
 };
 
 use crate::scopes::user::{User, UserResponse};
-use crate::{core::extractors::AuthenticatedUser, error::Result};
+use crate::{error::Result, extractors::AuthenticatedUser};
 
 #[tracing::instrument(name = "Find user", skip(user))]
 async fn find_user(user: AuthenticatedUser) -> Result<HttpResponse> {

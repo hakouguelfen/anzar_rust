@@ -1,8 +1,10 @@
 pub mod adapters;
-pub mod configuration;
-pub mod core;
+pub mod config;
 pub mod error;
-pub mod parser;
+pub mod extractors;
+pub mod middlewares;
 pub mod scopes;
+pub mod services;
 pub mod startup;
 pub mod telemetry;
+pub mod utils;

@@ -1,22 +1,21 @@
 use chrono::{Duration, Utc};
 
-use crate::adapters::adapter_factory::DatabaseAdapters;
-use crate::adapters::mongo::MongoDB;
-use crate::adapters::sqlite::SQLite;
-use crate::core::extractors::AuthPayload;
+use crate::adapters::factory::DatabaseAdapters;
+use crate::adapters::{mongodb::MongoDB, sqlite::SQLite};
+
+use crate::config::AdapterType;
 use crate::error::{
     CredentialField, Error, FailureReason, InvalidTokenReason, Result, TokenErrorType,
 };
-use crate::parser::AdapterType;
-use crate::scopes::auth::jwt::model::RefreshToken;
+use crate::extractors::AuthPayload;
+use crate::scopes::auth::PasswordResetTokenService;
 use crate::scopes::auth::model::PasswordResetToken;
-use crate::scopes::auth::tokens::JwtEncoderBuilder;
-use crate::scopes::auth::{JWTService, PasswordResetTokenService};
 use crate::scopes::user::service::UserService;
 
-use super::tokens::Tokens;
+use crate::services::jwt::{JWTService, JwtEncoderBuilder, RefreshToken, Tokens};
+use crate::utils::{AuthenticationHasher, Utils};
+
 use super::user::User;
-use super::utils::{AuthenticationHasher, Utils};
 
 #[derive(Clone)]
 pub struct AuthService {

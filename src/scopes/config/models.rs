@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::parser::AdapterType;
+use crate::config::AdapterType;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 pub struct EmailAndPassword {

@@ -1,5 +1,5 @@
 mod adapter;
-mod db;
+mod repository;
 
 pub use adapter::SQLiteAdapter;
-pub use db::SQLite;
+pub use repository::SQLite;

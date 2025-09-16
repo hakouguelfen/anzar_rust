@@ -1,0 +1,101 @@
+use std::sync::Arc;
+
+use chrono::Utc;
+use mongodb::bson::doc;
+use serde_json::json;
+
+use crate::{
+    adapters::DatabaseAdapter,
+    config::AdapterType,
+    error::{Error, Result, TokenErrorType},
+    extractors::AuthPayload,
+    services::jwt::RefreshToken,
+    utils::{AuthenticationHasher, Utils, parser::Parser},
+};
+
+#[derive(Clone)]
+pub struct JWTService {
+    adapter: Arc<dyn DatabaseAdapter<RefreshToken>>,
+    adapter_type: AdapterType,
+}
+
+impl JWTService {
+    pub fn new(adapter: Arc<dyn DatabaseAdapter<RefreshToken>>, adapter_type: AdapterType) -> Self {
+        Self {
+            adapter,
+            adapter_type,
+        }
+    }
+
+    pub async fn insert(&self, refresh_token: RefreshToken) -> Result<()> {
+        self.adapter.insert(refresh_token).await.map_err(|e| {
+            tracing::error!("Failed to insert refreshToken to database: {:?}", e);
+            Error::TokenCreationFailed {
+                token_type: TokenErrorType::RefreshToken,
+            }
+        })?;
+
+        Ok(())
+    }
+
+    pub async fn find(&self, payload: AuthPayload) -> Option<RefreshToken> {
+        let filter = json! ({
+            "jti": payload.jti,
+            "userId": &payload.user_id,
+            "hash": Utils::hash_token(&payload.refresh_token),
+            "valid": true
+        });
+        let filter = Parser::mode(self.adapter_type).convert(filter);
+
+        let update = json! ({
+            "$set": json! ({
+                "valid": false,
+                "usedAt": Utc::now()
+            })
+        });
+        let update = Parser::mode(self.adapter_type).convert(update);
+
+        self.adapter.find_one_and_update(filter, update).await
+    }
+
+    pub async fn find_by_jti(&self, jti: &str) -> Option<RefreshToken> {
+        let filter = Parser::mode(self.adapter_type).convert(json!({"jti": jti}));
+
+        self.adapter.find_one(filter).await
+    }
+
+    pub async fn invalidate(&self, jti: String) -> Result<RefreshToken> {
+        let filter = Parser::mode(self.adapter_type).convert(json!({"jti": jti}));
+        let update = json! ({ "$set": json! ({ "valid": false, "usedAt": Utc::now() }) });
+        let update = Parser::mode(self.adapter_type).convert(update);
+
+        // let res = self.adapter.find_one_and_update(filter, update).await;
+        self.adapter
+            .find_one_and_update(filter, update)
+            .await
+            .ok_or_else(|| {
+                tracing::error!("failed to invalidate token");
+                Error::InvalidToken {
+                    token_type: TokenErrorType::RefreshToken,
+                    reason: crate::error::InvalidTokenReason::Malformed,
+                }
+            })
+    }
+    pub async fn revoke(&self, user_id: String) -> Result<()> {
+        let filter = Parser::mode(self.adapter_type).convert(json!({"userId": user_id}));
+        let update = json! ({ "$set": doc! {"valid": false} });
+        let update = Parser::mode(self.adapter_type).convert(update);
+
+        self.adapter
+            .update_many(filter, update)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to revoke tokens after security breach: {:?}", e);
+                Error::TokenRevocationFailed {
+                    token_id: "".into(),
+                }
+            })?;
+
+        Ok(())
+    }
+}

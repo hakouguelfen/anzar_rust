@@ -9,8 +9,8 @@ use tracing_actix_web::TracingLogger;
 use std::net::TcpListener;
 use std::sync::{Arc, Mutex};
 
-use crate::core::middlewares::account::auth_middleware;
-use crate::core::rate_limiter::RateLimiter;
+use crate::middlewares::account::auth_middleware;
+use crate::middlewares::rate_limit::RateLimiter;
 use crate::scopes::auth::service::AuthService;
 use crate::scopes::{auth, config, user};
 

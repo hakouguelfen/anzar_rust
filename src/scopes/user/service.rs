@@ -4,10 +4,11 @@ use chrono::Utc;
 use serde_json::json;
 
 use crate::{
-    adapters::database_adapter::DatabaseAdapter,
+    adapters::DatabaseAdapter,
+    config::AdapterType,
     error::{Error, Result},
-    parser::{AdapterType, Parser},
     scopes::user::User,
+    utils::parser::Parser,
 };
 
 #[derive(Clone)]
@@ -49,7 +50,13 @@ impl UserService {
     }
 
     pub async fn insert(&self, user: &User) -> Result<String> {
-        self.adapter.insert(user.to_owned()).await
+        self.adapter
+            .insert(user.to_owned())
+            .await
+            .map_err(|_| Error::InvalidCredentials {
+                field: crate::error::CredentialField::Email,
+                reason: crate::error::FailureReason::UnauthorizedSource,
+            })
     }
 
     pub async fn update_password(&self, user_id: String, password: String) -> Result<User> {

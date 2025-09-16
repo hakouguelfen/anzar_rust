@@ -1,4 +1,7 @@
-pub mod adapter_factory;
-pub mod database_adapter;
-pub mod mongo;
+mod traits;
+
+pub mod factory;
+pub mod mongodb;
 pub mod sqlite;
+
+pub use traits::*;

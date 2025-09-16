@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
 use crate::{
-    adapters::database_adapter::DatabaseAdapter,
+    adapters::DatabaseAdapter,
+    config::AdapterType,
     error::{Error, Result},
-    parser::{AdapterType, Parser},
+    utils::parser::Parser,
 };
 
 use super::model::PasswordResetToken;

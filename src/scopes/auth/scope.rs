@@ -5,27 +5,25 @@ use actix_web::{
 use serde_json::json;
 
 use crate::{
-    core::extractors::AuthServiceExtractor,
+    error::FailureReason,
+    scopes::auth::{models::AuthResponse, service::PasswordResetTokenServiceTrait},
+    services::email::sender::Email,
+    utils::{AuthenticationHasher, Utils},
+};
+use crate::{
     error::{CredentialField, Error, Result},
+    extractors::AuthServiceExtractor,
     scopes::auth::models::ResetPasswordRequest,
 };
 use crate::{
-    core::extractors::{AuthPayload, AuthenticatedUser, ValidatedPayload, ValidatedQuery},
+    extractors::{AuthPayload, AuthenticatedUser, ValidatedPayload, ValidatedQuery},
     scopes::auth::service::UserServiceTrait,
 };
-use crate::{core::rate_limiter::RateLimiter, scopes::auth::service::JwtServiceTrait};
-use crate::{
-    error::FailureReason,
-    scopes::auth::{models::AuthResponse, service::PasswordResetTokenServiceTrait},
-};
+use crate::{middlewares::rate_limit::RateLimiter, scopes::auth::service::JwtServiceTrait};
 
+use super::models::{EmailRequest, LoginRequest, TokenQuery};
 use super::reset_password::model::PasswordResetToken;
 use super::user::User;
-use super::{
-    email::manager::Email,
-    models::{EmailRequest, LoginRequest, TokenQuery},
-    utils::{AuthenticationHasher, Utils},
-};
 
 #[tracing::instrument(
     name = "Login user",
@@ -141,7 +139,7 @@ async fn forgot_password(
         // 6. If exists: send email: exp-> api/reset-password?token=xxxxxxx
         let to = "hakoudev@gmail.com";
         let body = format!(
-            include_str!("email/templates/password_reset.html"),
+            include_str!("../../services/email/templates/password_reset.html"),
             &user.username, &token, &token
         );
         Email::default().to(to).send(&body).await?;

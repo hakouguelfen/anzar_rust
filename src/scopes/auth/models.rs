@@ -1,10 +1,8 @@
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
-use crate::{
-    core::validators::validate_token,
-    scopes::{auth::tokens::Tokens, user::UserResponse},
-};
+use crate::utils::validation::validate_token;
+use crate::{scopes::user::UserResponse, services::jwt::Tokens};
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct LoginRequest {
