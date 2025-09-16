@@ -116,41 +116,19 @@ pub async fn auth_middleware(
     req: ServiceRequest,
     next: Next<impl MessageBody>,
 ) -> Result<ServiceResponse<impl MessageBody>, Error> {
-    if [
-        "/health_check",
-        "/auth/login",
-        "/auth/register",
-        "/configuration/register_context",
-    ]
-    .contains(&req.path())
-    {
-        return next.call(req).await;
-    }
-
     // pre-processing
-    let access_token = extract_token_from_header(&req, header::AUTHORIZATION.to_string());
-    let refresh_token = extract_token_from_header(&req, X_REFRESH_TOKEN.to_string());
-
-    if let Some(token) = access_token {
-        let claims = decode_claims(token, TokenType::AccessToken)?;
+    if let Some(access_token) = extract_token_from_header(&req, header::AUTHORIZATION.to_string()) {
+        let claims = decode_claims(access_token, TokenType::AccessToken)?;
         check_user_account(&req, &claims.sub).await?;
         req.extensions_mut().insert::<Claims>(claims);
     }
-    if let Some(token) = refresh_token {
-        let claims = decode_claims(token, TokenType::RefreshToken)?;
+    if let Some(refresh_token) = extract_token_from_header(&req, X_REFRESH_TOKEN.to_string()) {
+        let claims = decode_claims(refresh_token, TokenType::RefreshToken)?;
         validate_refresh_token(&req, &claims.jti).await?;
 
         check_user_account(&req, &claims.sub).await?;
-        let payload = AuthPayload::from(claims.sub, token, claims.jti);
+        let payload = AuthPayload::from(claims.sub, refresh_token, claims.jti);
         req.extensions_mut().insert::<AuthPayload>(payload);
-    }
-
-    if access_token.is_none() && refresh_token.is_none() {
-        let err = actix_web::error::ErrorUnauthorized(parse_error(AuthError::InvalidToken {
-            token_type: TokenErrorType::RefreshToken,
-            reason: InvalidTokenReason::NotFound,
-        }));
-        return Err(err);
     }
 
     next.call(req).await

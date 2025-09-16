@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::config::AdapterType;
+use crate::config::DatabaseDriver;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 pub struct EmailAndPassword {
@@ -16,7 +16,7 @@ impl Default for EmailAndPassword {
 #[derive(Default, Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Database {
     pub connection_string: String,
-    pub db_type: AdapterType,
+    pub driver: DatabaseDriver,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]

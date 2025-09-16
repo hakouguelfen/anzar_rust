@@ -5,7 +5,7 @@ use serde_json::json;
 
 use crate::{
     adapters::DatabaseAdapter,
-    config::AdapterType,
+    config::DatabaseDriver,
     error::{Error, Result},
     scopes::user::User,
     utils::parser::Parser,
@@ -14,19 +14,19 @@ use crate::{
 #[derive(Clone)]
 pub struct UserService {
     adapter: Arc<dyn DatabaseAdapter<User>>,
-    adapter_type: AdapterType,
+    database_driver: DatabaseDriver,
 }
 
 impl UserService {
-    pub fn new(adapter: Arc<dyn DatabaseAdapter<User>>, adapter_type: AdapterType) -> Self {
+    pub fn new(adapter: Arc<dyn DatabaseAdapter<User>>, database_driver: DatabaseDriver) -> Self {
         Self {
             adapter,
-            adapter_type,
+            database_driver,
         }
     }
 
     pub async fn find(&self, user_id: String) -> Result<User> {
-        let filter = Parser::mode(self.adapter_type).convert(json!({"id": user_id}));
+        let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
 
         self.adapter.find_one(filter).await.ok_or_else(|| {
             tracing::error!("Failed to find user by id: {}", user_id);
@@ -38,7 +38,7 @@ impl UserService {
     }
 
     pub async fn find_by_email(&self, email: &str) -> Result<User> {
-        let filter = Parser::mode(self.adapter_type).convert(json!( {"email": email}));
+        let filter = Parser::mode(self.database_driver).convert(json!( {"email": email}));
 
         self.adapter.find_one(filter).await.ok_or_else(|| {
             tracing::error!("Failed to find user by email");
@@ -55,14 +55,14 @@ impl UserService {
             .await
             .map_err(|_| Error::InvalidCredentials {
                 field: crate::error::CredentialField::Email,
-                reason: crate::error::FailureReason::UnauthorizedSource,
+                reason: crate::error::FailureReason::Malformed,
             })
     }
 
     pub async fn update_password(&self, user_id: String, password: String) -> Result<User> {
-        let filter = Parser::mode(self.adapter_type).convert(json!({"id": user_id}));
+        let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
         let update = json!({ "$set": json!({"password": password}) });
-        let update = Parser::mode(self.adapter_type).convert(update);
+        let update = Parser::mode(self.database_driver).convert(update);
 
         let user = self
             .adapter
@@ -74,13 +74,13 @@ impl UserService {
     }
 
     pub async fn update_reset_window(&self, user_id: String) -> Result<()> {
-        let filter = Parser::mode(self.adapter_type).convert(json!({"id": user_id}));
+        let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
         let update = json!({
             "$set": json!({
                 "passwordResetWindowStart": Utc::now().to_rfc3339()
             })
         });
-        let update = Parser::mode(self.adapter_type).convert(update);
+        let update = Parser::mode(self.database_driver).convert(update);
 
         self.adapter
             .find_one_and_update(filter, update)
@@ -91,9 +91,9 @@ impl UserService {
     }
 
     pub async fn increment_reset_count(&self, user_id: String) -> Result<User> {
-        let filter = Parser::mode(self.adapter_type).convert(json!({"id": user_id}));
+        let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
         let update = json!( { "$inc": json!({"passwordResetCount": 1}) });
-        let update = Parser::mode(self.adapter_type).convert(update);
+        let update = Parser::mode(self.database_driver).convert(update);
 
         self.adapter
             .find_one_and_update(filter, update)
@@ -102,7 +102,7 @@ impl UserService {
     }
 
     pub async fn reset_password_state(&self, user_id: String) -> Result<User> {
-        let filter = Parser::mode(self.adapter_type).convert(json!({"id": user_id}));
+        let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
         let update = json!({
             "$set": json! ({
                 "lastPasswordReset": Utc::now().to_rfc3339(),
@@ -110,7 +110,7 @@ impl UserService {
                 "failedResetAttempts": 0
             })
         });
-        let update = Parser::mode(self.adapter_type).convert(update);
+        let update = Parser::mode(self.database_driver).convert(update);
 
         self.adapter
             .find_one_and_update(filter, update)

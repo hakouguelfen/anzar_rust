@@ -5,10 +5,7 @@ use serde::{Serialize, de::DeserializeOwned};
 use serde_json::{Map, Value};
 use sqlx::{FromRow, Pool, Sqlite, query::QueryAs, sqlite::SqliteArguments};
 
-use crate::{
-    adapters::traits::{DatabaseAdapter, Document},
-    error::Error,
-};
+use crate::{adapters::traits::DatabaseAdapter, error::Error};
 
 #[derive(sqlx::FromRow)]
 struct IdResult {
@@ -70,7 +67,7 @@ where
         Ok(row.id)
     }
 
-    async fn find_one(&self, filter: Document) -> Option<T> {
+    async fn find_one(&self, filter: Value) -> Option<T> {
         let obj = _parse_to_map(filter)?;
         let where_clause = _parse_to_sql(&obj, " AND ");
 
@@ -92,7 +89,7 @@ where
             .flatten()
     }
 
-    async fn find_one_and_update(&self, filter: Document, update: Document) -> Option<T> {
+    async fn find_one_and_update(&self, filter: Value, update: Value) -> Option<T> {
         let obj_update = _parse_to_map(update)?;
         let clause_update = _parse_to_sql(&obj_update, ", ");
 
@@ -122,7 +119,7 @@ where
             .ok()?
     }
 
-    async fn update_many(&self, filter: Document, update: Document) -> Result<(), Error> {
+    async fn update_many(&self, filter: Value, update: Value) -> Result<(), Error> {
         let obj_update = _parse_to_map(update).ok_or(Error::DatabaseError)?;
         let clause_update = _parse_to_sql(&obj_update, ", ");
 

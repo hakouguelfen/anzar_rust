@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     adapters::DatabaseAdapter,
-    config::AdapterType,
+    config::DatabaseDriver,
     error::{Error, Result},
     utils::parser::Parser,
 };
@@ -14,24 +14,24 @@ use serde_json::json;
 #[derive(Clone)]
 pub struct PasswordResetTokenService {
     adapter: Arc<dyn DatabaseAdapter<PasswordResetToken>>,
-    adapter_type: AdapterType,
+    database_driver: DatabaseDriver,
 }
 
 impl PasswordResetTokenService {
     pub fn new(
         adapter: Arc<dyn DatabaseAdapter<PasswordResetToken>>,
-        adapter_type: AdapterType,
+        database_driver: DatabaseDriver,
     ) -> Self {
         Self {
             adapter,
-            adapter_type,
+            database_driver,
         }
     }
 
     pub async fn revoke(&self, user_id: String) -> Result<()> {
-        let filter = Parser::mode(self.adapter_type).convert(json!({"userId": user_id}));
+        let filter = Parser::mode(self.database_driver).convert(json!({"userId": user_id}));
         let update = json! ({ "$set": json! ({"valid": false}) });
-        let update = Parser::mode(self.adapter_type).convert(update);
+        let update = Parser::mode(self.database_driver).convert(update);
 
         self.adapter
             .update_many(filter, update)
@@ -56,7 +56,7 @@ impl PasswordResetTokenService {
     }
 
     pub async fn find(&self, hash: String) -> Result<PasswordResetToken> {
-        let filter = Parser::mode(self.adapter_type).convert(json!({"tokenHash": hash}));
+        let filter = Parser::mode(self.database_driver).convert(json!({"tokenHash": hash}));
 
         self.adapter.find_one(filter).await.ok_or({
             tracing::error!("Password reset token not found");
@@ -65,14 +65,14 @@ impl PasswordResetTokenService {
     }
 
     pub async fn invalidate(&self, id: String) -> Result<PasswordResetToken> {
-        let filter = Parser::mode(self.adapter_type).convert(json!({"id": id}));
+        let filter = Parser::mode(self.database_driver).convert(json!({"id": id}));
         let update = json! ({
             "$set": json! ({
                 "valid": false,
                 "usedAt": Utc::now().to_string()
             })
         });
-        let update = Parser::mode(self.adapter_type).convert(update);
+        let update = Parser::mode(self.database_driver).convert(update);
 
         self.adapter
             .find_one_and_update(filter, update)

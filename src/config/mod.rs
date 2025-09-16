@@ -2,8 +2,8 @@ mod database;
 mod environment;
 mod server;
 
-pub use database::AdapterType;
 use database::DatabaseConfig;
+pub use database::DatabaseDriver;
 use environment::*;
 use server::ServerConfig;
 

@@ -1,8 +1,8 @@
 use std::net::TcpListener;
 use std::sync::LazyLock;
 
-use anzar::config::AdapterType;
 use anzar::config::AppConfig;
+use anzar::config::DatabaseDriver;
 use anzar::scopes::config::{Configuration, Database, EmailAndPassword};
 use anzar::telemetry::{get_subscriber, init_subscriber};
 use derive_more::derive::Display;
@@ -48,7 +48,7 @@ pub async fn register_context(address: &String, db_name: String) -> Response {
     let mut configuration = AppConfig::from_env().expect("Failed to read configuration");
 
     if configuration.database.is_nosql() {
-        configuration.database.database_name = db_name;
+        configuration.database.name = db_name;
     }
 
     let connection_string = configuration.database.connection_string();
@@ -58,7 +58,7 @@ pub async fn register_context(address: &String, db_name: String) -> Response {
         api_url: address.clone(),
         database: Database {
             connection_string,
-            db_type: configuration.database.db_type,
+            driver: configuration.database.driver,
         },
         email_and_password: EmailAndPassword { enable: true },
     };

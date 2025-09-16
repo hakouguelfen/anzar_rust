@@ -1,7 +1,7 @@
 use secrecy::SecretString;
 
 #[derive(Debug, Default, Clone, Copy, serde::Deserialize, serde::Serialize, Eq, PartialEq)]
-pub enum AdapterType {
+pub enum DatabaseDriver {
     #[default]
     SQLite,
     PostgreSQL,
@@ -14,33 +14,33 @@ pub struct DatabaseConfig {
     pub password: SecretString,
     pub port: String,
     pub host: String,
-    pub database_name: String,
-    pub db_type: AdapterType,
+    pub name: String,
+    pub driver: DatabaseDriver,
 }
 
 impl DatabaseConfig {
     pub fn connection_string(&self) -> String {
-        match self.db_type {
-            AdapterType::MongoDB => {
+        match self.driver {
+            DatabaseDriver::MongoDB => {
                 // mongodb+srv://<username>:<password>@<host>:<port>/<db_name>
                 // test: mongodb://localhost:27017/dev
                 // prod: mongodb://db:27017/production
-                format!(
-                    "mongodb://{}:{}/{}",
-                    self.host, self.port, self.database_name
-                )
+                format!("mongodb://{}:{}/{}", self.host, self.port, self.name)
             }
-            AdapterType::SQLite => self.database_name.to_string(),
-            AdapterType::PostgreSQL => todo!(),
+            DatabaseDriver::SQLite => self.name.to_string(),
+            DatabaseDriver::PostgreSQL => todo!(),
         }
     }
 
     pub fn is_sql(&self) -> bool {
-        matches!(self.db_type, AdapterType::SQLite | AdapterType::PostgreSQL)
+        matches!(
+            self.driver,
+            DatabaseDriver::SQLite | DatabaseDriver::PostgreSQL
+        )
     }
 
     pub fn is_nosql(&self) -> bool {
-        matches!(self.db_type, AdapterType::MongoDB)
+        matches!(self.driver, DatabaseDriver::MongoDB)
     }
 }
 

@@ -24,9 +24,8 @@ async fn register_context(
 }
 
 async fn _init_db(app_state: Data<AppState>, database: Database) -> Result<()> {
-    // FIXME: Alaways propagate the error whithout changing it in the middle of the road
-
-    let auth_service = AuthService::create(database.db_type, database.connection_string).await?;
+    let auth_service =
+        AuthService::from_database(database.driver, database.connection_string).await?;
     let mut service = app_state.auth_service.lock().unwrap();
     *service = Some(auth_service);
 

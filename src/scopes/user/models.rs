@@ -58,11 +58,12 @@ pub struct User {
 }
 
 impl User {
-    pub fn from(user: User) -> Self {
+    pub fn from_request(user: User) -> Self {
         user
     }
-
-    pub fn set_id(&mut self, id: String) {
+}
+impl User {
+    pub fn with_id(&mut self, id: String) {
         self.id = Some(id);
     }
 
@@ -70,7 +71,8 @@ impl User {
         self.password = password;
         self
     }
-
+}
+impl User {
     pub fn validate(&self) -> Result<(), Error> {
         if self.email.is_empty() {
             return Err(Error::MissingCredentials {

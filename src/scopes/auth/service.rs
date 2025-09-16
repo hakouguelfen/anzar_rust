@@ -3,7 +3,7 @@ use chrono::{Duration, Utc};
 use crate::adapters::factory::DatabaseAdapters;
 use crate::adapters::{mongodb::MongoDB, sqlite::SQLite};
 
-use crate::config::AdapterType;
+use crate::config::DatabaseDriver;
 use crate::error::{
     CredentialField, Error, FailureReason, InvalidTokenReason, Result, TokenErrorType,
 };
@@ -25,16 +25,16 @@ pub struct AuthService {
 }
 
 impl AuthService {
-    pub async fn create(adapter_type: AdapterType, conn: String) -> Result<Self> {
-        match adapter_type {
-            AdapterType::SQLite => Ok(Self::create_sqlite(conn).await?),
-            AdapterType::MongoDB => Ok(Self::create_mongo(conn).await?),
-            AdapterType::PostgreSQL => todo!(),
+    pub async fn from_database(database_driver: DatabaseDriver, conn: String) -> Result<Self> {
+        match database_driver {
+            DatabaseDriver::SQLite => Ok(Self::from_sqlite(conn).await?),
+            DatabaseDriver::MongoDB => Ok(Self::from_mongo(conn).await?),
+            DatabaseDriver::PostgreSQL => todo!(),
         }
     }
 
-    async fn create_sqlite(conn: String) -> Result<Self> {
-        let adapter_type = AdapterType::SQLite;
+    async fn from_sqlite(conn: String) -> Result<Self> {
+        let driver = DatabaseDriver::SQLite;
         let db = SQLite::start(&conn).await?;
 
         // NOTE: this is for running testing only
@@ -45,30 +45,30 @@ impl AuthService {
                 .expect("migrations to run");
         }
 
-        let adapters = DatabaseAdapters::create_sqlite(&db);
+        let adapters = DatabaseAdapters::sqlite(&db);
 
         Ok(Self {
-            user_service: UserService::new(adapters.user_adapter, adapter_type),
-            jwt_service: JWTService::new(adapters.jwt_adapter, adapter_type),
+            user_service: UserService::new(adapters.user_adapter, driver),
+            jwt_service: JWTService::new(adapters.jwt_adapter, driver),
             password_reset_token_service: PasswordResetTokenService::new(
                 adapters.reset_token_adapter,
-                adapter_type,
+                driver,
             ),
         })
     }
 
-    async fn create_mongo(conn: String) -> Result<Self> {
-        let adapter_type = AdapterType::MongoDB;
+    async fn from_mongo(conn: String) -> Result<Self> {
+        let driver = DatabaseDriver::MongoDB;
         let db = MongoDB::start(conn).await?;
 
-        let adapters = DatabaseAdapters::create_mongodb(&db);
+        let adapters = DatabaseAdapters::mongodb(&db);
 
         Ok(Self {
-            user_service: UserService::new(adapters.user_adapter, adapter_type),
-            jwt_service: JWTService::new(adapters.jwt_adapter, adapter_type),
+            user_service: UserService::new(adapters.user_adapter, driver),
+            jwt_service: JWTService::new(adapters.jwt_adapter, driver),
             password_reset_token_service: PasswordResetTokenService::new(
                 adapters.reset_token_adapter,
-                adapter_type,
+                driver,
             ),
         })
     }
@@ -115,10 +115,10 @@ impl UserServiceTrait for AuthService {
         user_data.validate()?;
 
         let password_hash = Utils::hash_password(&user_data.password)?;
-        let mut user: User = User::from(user_data).with_password(password_hash);
+        let mut user: User = User::from_request(user_data).with_password(password_hash);
 
         let user_id: String = self.user_service.insert(&user).await?;
-        user.set_id(user_id);
+        user.with_id(user_id);
 
         Ok(user)
     }

@@ -58,6 +58,8 @@ impl PasswordResetToken {
             valid: true,
         }
     }
+}
+impl PasswordResetToken {
     pub fn with_user_id(mut self, user_id: String) -> Self {
         self.user_id = user_id;
         self

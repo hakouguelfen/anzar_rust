@@ -21,7 +21,7 @@ pub struct DatabaseAdapters {
 }
 
 impl DatabaseAdapters {
-    pub fn create_mongodb(db: &Database) -> Self {
+    pub fn mongodb(db: &Database) -> Self {
         Self {
             user_adapter: Arc::new(MongodbAdapter::<User>::new(db, USER)),
             jwt_adapter: Arc::new(MongodbAdapter::<RefreshToken>::new(db, REFRESH_TOKEN)),
@@ -32,7 +32,7 @@ impl DatabaseAdapters {
         }
     }
 
-    pub fn create_sqlite(db: &Pool<Sqlite>) -> Self {
+    pub fn sqlite(db: &Pool<Sqlite>) -> Self {
         Self {
             user_adapter: Arc::new(SQLiteAdapter::<User>::new(db, USER)),
             jwt_adapter: Arc::new(SQLiteAdapter::<RefreshToken>::new(db, REFRESH_TOKEN)),
@@ -43,7 +43,7 @@ impl DatabaseAdapters {
         }
     }
 
-    pub fn create_postgresql() -> Self {
+    pub fn postgres() -> Self {
         todo!()
     }
 }

@@ -13,7 +13,10 @@ impl FromRequest for AuthenticatedUser {
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
         match req.extensions().get::<User>() {
             Some(user) => ready(Ok(AuthenticatedUser(user.clone()))),
-            None => ready(Err(Error::InternalServerError("".into()))),
+            None => ready(Err(Error::InvalidCredentials {
+                field: crate::error::CredentialField::Token,
+                reason: crate::error::FailureReason::UnauthorizedSource,
+            })),
         }
     }
 }

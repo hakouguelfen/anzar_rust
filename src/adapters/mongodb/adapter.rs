@@ -3,11 +3,9 @@ use std::fmt::Debug;
 use async_trait::async_trait;
 use mongodb::{Collection, Database, options::ReturnDocument};
 use serde::{Serialize, de::DeserializeOwned};
+use serde_json::Value;
 
-use crate::{
-    adapters::traits::{DatabaseAdapter, Document},
-    error::Error,
-};
+use crate::{adapters::traits::DatabaseAdapter, error::Error};
 
 #[derive(Debug, Clone)]
 pub struct MongodbAdapter<T: Send + Sync + Debug> {
@@ -37,7 +35,7 @@ where
         Ok(id.to_string())
     }
 
-    async fn find_one(&self, filter: Document) -> Option<T> {
+    async fn find_one(&self, filter: Value) -> Option<T> {
         let mut mongo_filter = mongodb::bson::to_document(&filter).unwrap();
         if let Some(id_value) = mongo_filter.remove("id") {
             mongo_filter.insert("_id", id_value);
@@ -46,7 +44,7 @@ where
         self.collection.find_one(mongo_filter).await.ok()?
     }
 
-    async fn find_one_and_update(&self, filter: Document, update: Document) -> Option<T> {
+    async fn find_one_and_update(&self, filter: Value, update: Value) -> Option<T> {
         let mut mongo_filter = mongodb::bson::to_document(&filter).unwrap();
         let mongo_update = mongodb::bson::to_document(&update).unwrap();
 
@@ -61,7 +59,7 @@ where
             .ok()?
     }
 
-    async fn update_many(&self, filter: Document, update: Document) -> Result<(), Error> {
+    async fn update_many(&self, filter: Value, update: Value) -> Result<(), Error> {
         let mut mongo_filter = mongodb::bson::to_document(&filter).unwrap();
         let mongo_update = mongodb::bson::to_document(&update).unwrap();
 

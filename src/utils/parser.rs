@@ -1,26 +1,26 @@
 use mongodb::bson::oid::ObjectId;
 use serde_json::Value;
 
-use crate::{adapters::Document, config::AdapterType};
+use crate::config::DatabaseDriver;
 
 pub struct Parser {
-    adapter_type: AdapterType,
+    database_driver: DatabaseDriver,
 }
 
 impl Parser {
-    pub fn mode(adapter_type: AdapterType) -> Self {
-        Self { adapter_type }
+    pub fn mode(database_driver: DatabaseDriver) -> Self {
+        Self { database_driver }
     }
 
-    pub fn convert(&self, data: Document) -> Document {
-        match &self.adapter_type {
-            AdapterType::MongoDB => self.mongo_convert(data),
-            AdapterType::SQLite => self.sqlite_convert(data),
-            AdapterType::PostgreSQL => todo!(),
+    pub fn convert(&self, data: Value) -> Value {
+        match &self.database_driver {
+            DatabaseDriver::MongoDB => self.mongo_convert(data),
+            DatabaseDriver::SQLite => self.sqlite_convert(data),
+            DatabaseDriver::PostgreSQL => todo!(),
         }
     }
 
-    fn mongo_convert(&self, mut doc: Document) -> Document {
+    fn mongo_convert(&self, mut doc: Value) -> Value {
         const IDS: [&str; 4] = ["id", "_id", "user_id", "userId"];
         if let Value::Object(map) = &mut doc {
             for (key, value) in map.iter_mut() {
@@ -36,7 +36,7 @@ impl Parser {
         doc
     }
 
-    fn sqlite_convert(&self, doc: Document) -> Document {
+    fn sqlite_convert(&self, doc: Value) -> Value {
         const MONGO_KEYWORDS: [&str; 3] = ["$set", "$inc", "$unset"];
         if let Value::Object(map) = doc.clone() {
             for (key, value) in map {
@@ -61,7 +61,7 @@ mod tests {
     #[test]
     fn test_basic() {
         let input = json!({"id": "123AZEDJ"});
-        let output = Parser::mode(AdapterType::SQLite).convert(input.clone());
+        let output = Parser::mode(DatabaseDriver::SQLite).convert(input.clone());
 
         let expected = json!({"id": "123AZEDJ"});
 
@@ -71,7 +71,7 @@ mod tests {
     #[test]
     fn test_single_val() {
         let input = json!({ "$set": json!({"password": "password"}) });
-        let output = Parser::mode(AdapterType::SQLite).convert(input.clone());
+        let output = Parser::mode(DatabaseDriver::SQLite).convert(input.clone());
 
         let expected = json!({"password": "password"});
 
@@ -87,7 +87,7 @@ mod tests {
                 "failedResetAttempts": 0
             })
         });
-        let output = Parser::mode(AdapterType::SQLite).convert(input.clone());
+        let output = Parser::mode(DatabaseDriver::SQLite).convert(input.clone());
 
         let expected = json! ({
             "lastPasswordReset": "time",
