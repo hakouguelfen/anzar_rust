@@ -48,7 +48,7 @@ impl AppConfig {
             .add_source(config::File::from(config_dir.join("base.yaml")).required(true))
             .add_source(config::File::from(config_dir.join(environment_filename)))
             .add_source(config::File::from(config_dir.join(database_filename)))
-            .set_override("database.db_type", db_type)? // <-- add new setting here
+            .set_override("database.driver", db_type)?
             .build()?;
 
         settings.try_deserialize::<AppConfig>()

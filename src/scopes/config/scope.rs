@@ -6,7 +6,7 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::error::Result;
-use crate::scopes::{auth::service::AuthService, config::models::Database};
+use crate::scopes::auth::service::AuthService;
 use crate::{scopes::config::models::Configuration, startup::AppState};
 
 async fn register_context(
@@ -14,20 +14,26 @@ async fn register_context(
     app_state: Data<AppState>,
 ) -> Result<HttpResponse> {
     let context_id = Uuid::new_v4().to_string();
-    let context = ctx.into_inner().with_id(context_id);
-    let database = context.database;
+    let configuration = ctx.into_inner().with_id(context_id.clone());
 
     // update_app_config(context.clone());
 
-    _init_db(app_state, database).await?;
-    Ok(HttpResponse::Ok().json(json!({"context_id":context.id})))
+    _init_db(app_state, configuration).await?;
+    Ok(HttpResponse::Ok().json(json!({"context_id":context_id})))
 }
 
-async fn _init_db(app_state: Data<AppState>, database: Database) -> Result<()> {
+async fn _init_db(app_state: Data<AppState>, configuration: Configuration) -> Result<()> {
+    dbg!(&configuration);
+    let database = configuration.clone().database;
+
     let auth_service =
         AuthService::from_database(database.driver, database.connection_string).await?;
-    let mut service = app_state.auth_service.lock().unwrap();
-    *service = Some(auth_service);
+
+    let mut auth_service_mutex = app_state.auth_service.lock().unwrap();
+    let mut configuration_mutex = app_state.configuration.lock().unwrap();
+
+    *auth_service_mutex = Some(auth_service);
+    *configuration_mutex = Some(configuration);
 
     Ok(())
 }

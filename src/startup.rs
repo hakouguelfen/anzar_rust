@@ -1,7 +1,11 @@
 use actix_cors::Cors;
+
+use actix_session::{SessionMiddleware, storage::CookieSessionStore};
+use actix_web::cookie::Key;
+
 use actix_web::dev::Server;
 use actix_web::middleware::from_fn;
-use actix_web::{HttpResponse, http, web};
+use actix_web::{http, web};
 
 use actix_web::{App, HttpServer};
 use tracing_actix_web::TracingLogger;
@@ -12,20 +16,19 @@ use std::sync::{Arc, Mutex};
 use crate::middlewares::account::auth_middleware;
 use crate::middlewares::rate_limit::RateLimiter;
 use crate::scopes::auth::service::AuthService;
-use crate::scopes::{auth, config, user};
-
-async fn health_check() -> HttpResponse {
-    HttpResponse::Ok().finish()
-}
+use crate::scopes::config::Configuration;
+use crate::scopes::{auth, config, health, user};
 
 #[derive(Clone)]
 pub struct AppState {
     pub auth_service: Arc<Mutex<Option<AuthService>>>,
+    pub configuration: Arc<Mutex<Option<Configuration>>>,
 }
 
 pub fn run(listener: TcpListener) -> Result<Server, std::io::Error> {
     let app_state = AppState {
         auth_service: Arc::new(Mutex::new(None)),
+        configuration: Arc::new(Mutex::new(None)),
     };
     let rate_limitter = web::Data::new(RateLimiter::default());
 
@@ -41,16 +44,27 @@ pub fn run(listener: TcpListener) -> Result<Server, std::io::Error> {
             .supports_credentials()
             .max_age(3600);
 
+        let session =
+            SessionMiddleware::builder(CookieSessionStore::default(), Key::from(&[0; 64]))
+                // NOTE: make this true for running https
+                // TODO
+                // Set appropriate Domain and Path
+                .cookie_secure(false)
+                .cookie_same_site(actix_web::cookie::SameSite::Strict)
+                .cookie_http_only(true)
+                .build();
+
         App::new()
             .wrap(TracingLogger::default())
             .wrap(cors)
             .wrap(from_fn(auth_middleware))
+            .wrap(session)
             .app_data(web::Data::new(app_state.clone()))
             .app_data(rate_limitter.clone())
             .service(config::config_scope())
             .service(auth::auth_scope())
             .service(user::user_scope())
-            .route("/health_check", web::get().to(health_check))
+            .service(health::health_scope())
     })
     .listen(listener)?
     .run();

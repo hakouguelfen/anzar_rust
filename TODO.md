@@ -44,3 +44,4 @@ Logout:
 NOT SURE:
 when accessToken is used, check existence of valid refreshToken in DB using jti.
 - if not valid, user should be loggedout.
+

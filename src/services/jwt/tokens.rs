@@ -77,7 +77,7 @@ impl JwtEncoderBuilder {
             &refresh_token_jti,
         )?;
 
-        let tokens: Tokens = Tokens::new()
+        let tokens: Tokens = Tokens::default()
             .with_access_token(&access_token)
             .with_refresh_token(&refresh_token)
             .with_jti(&refresh_token_jti);
@@ -112,10 +112,6 @@ pub struct Tokens {
     pub refresh_token_jti: String,
 }
 impl Tokens {
-    pub fn new() -> Self {
-        Tokens::default()
-    }
-
     pub fn with_access_token(mut self, access_token: &String) -> Self {
         self.access_token = access_token.to_string();
         self

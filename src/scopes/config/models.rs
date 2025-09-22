@@ -13,6 +13,17 @@ impl Default for EmailAndPassword {
     }
 }
 
+#[derive(Debug, Default, Clone, Copy, serde::Deserialize, serde::Serialize, Eq, PartialEq)]
+pub enum AuthStrategy {
+    #[default]
+    Session,
+    Jwt,
+}
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+pub struct Authentication {
+    pub strategy: AuthStrategy,
+}
+
 #[derive(Default, Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Database {
     pub connection_string: String,
@@ -25,6 +36,7 @@ pub struct Configuration {
     pub id: Option<String>,
     pub api_url: String,
     pub database: Database,
+    pub auth: Authentication,
     #[serde(default, rename = "emailAndPassword")]
     pub email_and_password: EmailAndPassword,
 }

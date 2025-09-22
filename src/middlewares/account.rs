@@ -1,3 +1,4 @@
+use actix_session::SessionExt;
 use actix_web::{
     Error, HttpMessage,
     body::MessageBody,
@@ -11,6 +12,11 @@ use serde_json::{Value, json};
 use crate::{
     error::Error as AuthError,
     extractors::{AuthPayload, Claims, TokenType},
+    scopes::{
+        auth::service::{AuthService, SessionServiceTrait},
+        config::{AuthStrategy, Configuration},
+    },
+    services::session::model::Session,
 };
 use crate::{error::InvalidTokenReason, startup::AppState};
 use crate::{
@@ -25,7 +31,7 @@ use crate::{
 const X_REFRESH_TOKEN: &str = "x-refresh-token";
 
 fn parse_error(error: AuthError) -> Value {
-    json!({"error": error.to_string()})
+    json!({"message": error.to_string()})
 }
 
 fn extract_token_from_header(req: &ServiceRequest, key: String) -> Option<&str> {
@@ -53,13 +59,7 @@ fn decode_claims(token: &str, token_type: TokenType) -> Result<Claims, Error> {
 }
 
 async fn validate_refresh_token(req: &ServiceRequest, jti: &str) -> Result<(), Error> {
-    let auth_service = req
-        .app_data::<web::Data<AppState>>()
-        .and_then(|state| state.auth_service.lock().ok())
-        .and_then(|guard| guard.as_ref().map(|sm| sm.clone()))
-        .ok_or(actix_web::error::ErrorInternalServerError(parse_error(
-            AuthError::InternalServerError("".into()),
-        )))?;
+    let auth_service = extract_auth_service(req)?;
 
     let refresh_token = auth_service.find_jwt_by_jti(jti).await.ok_or_else(|| {
         actix_web::error::ErrorUnauthorized(parse_error(AuthError::InvalidToken {
@@ -81,13 +81,7 @@ async fn validate_refresh_token(req: &ServiceRequest, jti: &str) -> Result<(), E
 }
 
 async fn check_user_account(req: &ServiceRequest, user_id: &str) -> Result<(), Error> {
-    let auth_service = req
-        .app_data::<web::Data<AppState>>()
-        .and_then(|state| state.auth_service.lock().ok())
-        .and_then(|guard| guard.as_ref().map(|sm| sm.clone()))
-        .ok_or(actix_web::error::ErrorInternalServerError(parse_error(
-            AuthError::InternalServerError("".into()),
-        )))?;
+    let auth_service = extract_auth_service(req)?;
 
     let user: User = auth_service
         .find_user(user_id.to_string())
@@ -108,8 +102,37 @@ async fn check_user_account(req: &ServiceRequest, user_id: &str) -> Result<(), E
     }
 
     req.extensions_mut().insert::<User>(user);
-
     Ok(())
+}
+
+async fn find_session(req: &ServiceRequest, session_id: String) -> Result<Session, Error> {
+    let auth_service = extract_auth_service(req)?;
+
+    auth_service
+        .find_session(session_id.clone())
+        .await
+        .ok_or_else(|| {
+            actix_web::error::ErrorNotFound(parse_error(AuthError::TokenNotFound {
+                token_id: session_id,
+            }))
+        })
+}
+
+fn extract_auth_service(req: &ServiceRequest) -> Result<AuthService, Error> {
+    req.app_data::<web::Data<AppState>>()
+        .and_then(|state| state.auth_service.lock().ok())
+        .and_then(|guard| guard.as_ref().map(|sm| sm.clone()))
+        .ok_or(actix_web::error::ErrorInternalServerError(parse_error(
+            AuthError::InternalServerError("extract auth service".into()),
+        )))
+}
+fn extract_configuration_service(req: &ServiceRequest) -> Result<Configuration, Error> {
+    req.app_data::<web::Data<AppState>>()
+        .and_then(|state| state.configuration.lock().ok())
+        .and_then(|guard| guard.as_ref().map(|sm| sm.clone()))
+        .ok_or(actix_web::error::ErrorInternalServerError(parse_error(
+            AuthError::InternalServerError("extract configuraiton".into()),
+        )))
 }
 
 pub async fn auth_middleware(
@@ -117,19 +140,52 @@ pub async fn auth_middleware(
     next: Next<impl MessageBody>,
 ) -> Result<ServiceResponse<impl MessageBody>, Error> {
     // pre-processing
-    if let Some(access_token) = extract_token_from_header(&req, header::AUTHORIZATION.to_string()) {
-        let claims = decode_claims(access_token, TokenType::AccessToken)?;
-        check_user_account(&req, &claims.sub).await?;
-        req.extensions_mut().insert::<Claims>(claims);
+    if ["/configuration/register_context", "/health_check"].contains(&req.path()) {
+        return next.call(req).await;
     }
-    if let Some(refresh_token) = extract_token_from_header(&req, X_REFRESH_TOKEN.to_string()) {
-        let claims = decode_claims(refresh_token, TokenType::RefreshToken)?;
-        validate_refresh_token(&req, &claims.jti).await?;
 
-        check_user_account(&req, &claims.sub).await?;
-        let payload = AuthPayload::from(claims.sub, refresh_token, claims.jti);
-        req.extensions_mut().insert::<AuthPayload>(payload);
-    }
+    let configuration = extract_configuration_service(&req)?;
+
+    match configuration.auth.strategy {
+        AuthStrategy::Session => {
+            let req_session = req.get_session();
+            let data = req_session.get::<String>("SessionID")?;
+            if let Some(session_id) = data {
+                let session = find_session(&req, session_id).await?;
+                if chrono::Utc::now() > session.expires_at {
+                    return Err(actix_web::error::ErrorBadRequest(parse_error(
+                        AuthError::TokenExpired {
+                            token_type: TokenErrorType::SessionToken,
+                            expired_at: session.expires_at,
+                        },
+                    )));
+                }
+                check_user_account(&req, &session.user_id).await?;
+                // HACK
+                let payload =
+                    AuthPayload::from(session.user_id, String::default(), String::default());
+                req.extensions_mut().insert::<AuthPayload>(payload);
+            }
+        }
+        AuthStrategy::Jwt => {
+            let access_token = extract_token_from_header(&req, header::AUTHORIZATION.to_string());
+            if let Some(token) = access_token {
+                let claims = decode_claims(token, TokenType::AccessToken)?;
+                check_user_account(&req, &claims.sub).await?;
+                req.extensions_mut().insert::<Claims>(claims);
+            }
+
+            let refresh_token = extract_token_from_header(&req, X_REFRESH_TOKEN.to_string());
+            if let Some(token) = refresh_token {
+                let claims = decode_claims(token, TokenType::RefreshToken)?;
+                validate_refresh_token(&req, &claims.jti).await?;
+
+                check_user_account(&req, &claims.sub).await?;
+                let payload = AuthPayload::from(claims.sub, token, claims.jti);
+                req.extensions_mut().insert::<AuthPayload>(payload);
+            }
+        }
+    };
 
     next.call(req).await
     // post-processing

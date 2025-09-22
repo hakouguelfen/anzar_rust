@@ -74,4 +74,32 @@ where
 
         Ok(())
     }
+
+    async fn delete_one(&self, filter: Value) -> Result<(), Error> {
+        let mut mongo_filter = mongodb::bson::to_document(&filter).unwrap();
+        if let Some(id_value) = mongo_filter.remove("id") {
+            mongo_filter.insert("_id", id_value);
+        }
+
+        self.collection
+            .delete_one(mongo_filter)
+            .await
+            .map_err(|_| Error::DatabaseError)?;
+
+        Ok(())
+    }
+
+    async fn delete_many(&self, filter: Value) -> Result<(), Error> {
+        let mut mongo_filter = mongodb::bson::to_document(&filter).unwrap();
+        if let Some(id_value) = mongo_filter.remove("id") {
+            mongo_filter.insert("_id", id_value);
+        }
+
+        self.collection
+            .delete_many(mongo_filter)
+            .await
+            .map_err(|_| Error::DatabaseError)?;
+
+        Ok(())
+    }
 }

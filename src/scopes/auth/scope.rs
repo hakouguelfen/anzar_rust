@@ -6,8 +6,15 @@ use serde_json::json;
 
 use crate::{
     error::FailureReason,
-    scopes::auth::{models::AuthResponse, service::PasswordResetTokenServiceTrait},
-    services::email::sender::Email,
+    extractors::ConfigurationExtractor,
+    scopes::{
+        auth::{
+            models::AuthResponse,
+            service::{PasswordResetTokenServiceTrait, SessionServiceTrait},
+        },
+        config::AuthStrategy,
+    },
+    services::{email::sender::Email, jwt::Tokens},
     utils::{AuthenticationHasher, Utils},
 };
 use crate::{
@@ -27,40 +34,56 @@ use super::user::User;
 
 #[tracing::instrument(
     name = "Login user",
-    skip(req, auth_service),
+    skip(req, auth_service, session),
     fields(user_email = %req.email)
 )]
 async fn login(
     ValidatedPayload(req): ValidatedPayload<LoginRequest>,
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
+    ConfigurationExtractor(configuration): ConfigurationExtractor,
+    session: actix_session::Session,
 ) -> Result<HttpResponse> {
     let user: User = auth_service
         .authenticate_user(&req.email, &req.password)
         .await?;
 
-    // NOTE
-    // choose either jwtTokens or session
-    auth_service
-        .issue_and_save_tokens(&user)
-        .await
-        .map(|tokens| Ok(HttpResponse::Ok().json(AuthResponse::from(tokens, user.into()))))?
+    match configuration.auth.strategy {
+        AuthStrategy::Session => auth_service.issue_session(&user).await.map(|token| {
+            session.insert("SessionID", token)?;
+            Ok(HttpResponse::Ok().json(AuthResponse::from(Tokens::default(), user.into())))
+        })?,
+        AuthStrategy::Jwt => auth_service
+            .issue_and_save_tokens(&user)
+            .await
+            .map(|tokens| Ok(HttpResponse::Ok().json(AuthResponse::from(tokens, user.into()))))?,
+    }
 }
 
 #[tracing::instrument(
     name = "Register user",
-    skip(req, auth_service),
+    skip(req, auth_service, session),
     fields(user_email = %req.email, user_name = %req.username)
 )]
 async fn register(
     ValidatedPayload(req): ValidatedPayload<User>,
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
+    ConfigurationExtractor(configuration): ConfigurationExtractor,
+    session: actix_session::Session,
 ) -> Result<HttpResponse> {
     let user: User = auth_service.create_user(req).await?;
 
-    auth_service
-        .issue_and_save_tokens(&user)
-        .await
-        .map(|tokens| Ok(HttpResponse::Created().json(AuthResponse::from(tokens, user.into()))))?
+    match configuration.auth.strategy {
+        AuthStrategy::Session => auth_service.issue_session(&user).await.map(|token| {
+            session.insert("SessionID", token)?;
+            Ok(HttpResponse::Created().json(AuthResponse::from(Tokens::default(), user.into())))
+        })?,
+        AuthStrategy::Jwt => auth_service
+            .issue_and_save_tokens(&user)
+            .await
+            .map(|tokens| {
+                Ok(HttpResponse::Created().json(AuthResponse::from(tokens, user.into())))
+            })?,
+    }
 }
 
 #[tracing::instrument(
@@ -83,22 +106,32 @@ async fn refresh_token(
     auth_service
         .issue_and_save_tokens(&user)
         .await
-        .map(|tokens| Ok(HttpResponse::Ok().json(tokens)))?
+        .map(|tokens| Ok(HttpResponse::Ok().json(AuthResponse::from(tokens, user.into()))))?
 }
 
 #[tracing::instrument(
     name = "Logout user",
-    skip(payload, auth_service),
+    skip(payload, auth_service, session),
     fields(user_id = %payload.user_id)
 )]
 async fn logout(
     payload: AuthPayload,
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
+    ConfigurationExtractor(configuration): ConfigurationExtractor,
+    session: actix_session::Session,
 ) -> Result<HttpResponse> {
-    auth_service
-        .logout(payload)
-        .await
-        .map(|_| Ok(HttpResponse::Ok().json(json!({ "status": "ok" }))))?
+    let data = session.get::<String>("SessionID")?;
+
+    match configuration.auth.strategy {
+        AuthStrategy::Session => auth_service
+            .invalidate_session(data.unwrap())
+            .await
+            .map(|_| Ok(HttpResponse::Ok().json(json!({ "status": "ok" }))))?,
+        AuthStrategy::Jwt => auth_service
+            .invalidate_jwt(payload.jti)
+            .await
+            .map(|_| Ok(HttpResponse::Ok().json(json!({ "status": "ok" }))))?,
+    }
 }
 
 #[tracing::instrument(name = "Forgot password", skip(auth_service, rate_limiter))]

@@ -1,3 +1,4 @@
+use actix_session::{SessionGetError, SessionInsertError};
 use actix_web::{HttpResponse, http::StatusCode};
 use chrono::{DateTime, Duration, Utc};
 use derive_more::From;
@@ -33,6 +34,7 @@ pub enum TokenErrorType {
     AccessToken,
     RefreshToken,
     PasswordResetToken,
+    SessionToken,
 }
 
 #[derive(Debug, From)]
@@ -99,6 +101,11 @@ pub enum Error {
     Actix(actix_web::Error),
 
     #[from]
+    SessionInsert(SessionInsertError),
+    #[from]
+    SessionGet(SessionGetError),
+
+    #[from]
     JWT(jsonwebtoken::errors::Error),
 }
 
@@ -159,8 +166,10 @@ impl actix_web::ResponseError for Error {
             | Error::EmailSendFailed { to: _ }
             | Error::TokenRevocationFailed { token_id: _ }
             | Error::InternalServerError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            Error::Actix(_) => todo!(),
-            Error::JWT(_) => todo!(),
+            Error::Actix(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Error::JWT(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Error::SessionInsert(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Error::SessionGet(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }

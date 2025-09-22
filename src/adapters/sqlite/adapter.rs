@@ -146,6 +146,13 @@ where
 
         Ok(())
     }
+
+    async fn delete_one(&self, _filter: Value) -> Result<(), Error> {
+        Ok(())
+    }
+    async fn delete_many(&self, _filter: Value) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 fn _parse_to_map(data: Value) -> Option<Map<String, Value>> {

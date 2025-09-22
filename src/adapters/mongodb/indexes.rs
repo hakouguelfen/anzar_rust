@@ -14,7 +14,7 @@ impl MongodbIndexes {
             .build();
 
         self.db
-            .collection::<User>("user")
+            .collection::<User>("users")
             .create_index(model)
             .await?;
 
@@ -34,7 +34,7 @@ impl MongodbIndexes {
             .build();
 
         self.db
-            .collection::<PasswordResetToken>("password_reset_token")
+            .collection::<PasswordResetToken>("password_reset_tokens")
             .create_index(model)
             .await?;
 
@@ -54,7 +54,7 @@ impl MongodbIndexes {
     //         .options(options)
     //         .build();
     //
-    //     db.collection::<PasswordResetTokens>("password_reset_token")
+    //     db.collection::<PasswordResetTokens>("password_reset_tokens")
     //         .create_index(model)
     //         .await?;
     //
