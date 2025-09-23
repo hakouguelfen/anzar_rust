@@ -3,6 +3,8 @@ use std::sync::LazyLock;
 
 use anzar::config::AppConfig;
 use anzar::config::DatabaseDriver;
+use anzar::scopes::config::AuthStrategy;
+use anzar::scopes::config::Authentication;
 use anzar::scopes::config::{Configuration, Database, EmailAndPassword};
 use anzar::telemetry::{get_subscriber, init_subscriber};
 use derive_more::derive::Display;
@@ -59,6 +61,9 @@ pub async fn register_context(address: &String, db_name: String) -> Response {
         database: Database {
             connection_string,
             driver: configuration.database.driver,
+        },
+        auth: Authentication {
+            strategy: AuthStrategy::Jwt,
         },
         email_and_password: EmailAndPassword { enable: true },
     };

@@ -23,7 +23,6 @@ async fn register_context(
 }
 
 async fn _init_db(app_state: Data<AppState>, configuration: Configuration) -> Result<()> {
-    dbg!(&configuration);
     let database = configuration.clone().database;
 
     let auth_service =

@@ -1,5 +1,5 @@
 -- Add migration script here
-CREATE TABLE refresh_token (
+CREATE TABLE refresh_tokens (
     id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
     userId TEXT NOT NULL,
     issuedAt DATETIME,

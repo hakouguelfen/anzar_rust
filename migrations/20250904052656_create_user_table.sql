@@ -1,5 +1,5 @@
 -- Add migration script here
-CREATE TABLE user (
+CREATE TABLE users (
     id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
     username TEXT NOT NULL UNIQUE,
     email TEXT NOT NULL UNIQUE,

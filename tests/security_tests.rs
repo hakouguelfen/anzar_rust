@@ -1,7 +1,7 @@
 mod shared;
 use shared::Helpers;
 
-use anzar::{extractors::TokenType, scopes::auth::AuthResponse, services::jwt::Tokens};
+use anzar::{extractors::TokenType, scopes::auth::AuthResponse};
 
 const X_REFRESH_TOKEN: &str = "x-refresh-token";
 #[actix_web::test]
@@ -67,15 +67,17 @@ async fn test_complete_auth_flow() {
         .expect("Failed to execute request.");
     assert!(response.status().is_success());
 
-    let content: Tokens = response.json().await.unwrap();
+    let auth_response: AuthResponse = response.json().await.unwrap();
 
     // assert tokens are not empty
-    assert!(!content.access_token.is_empty() && !content.refresh_token.is_empty());
+    assert!(!auth_response.access_token.is_empty() && !auth_response.refresh_token.is_empty());
 
     let access_token_claims =
-        Helpers::decode_token(content.access_token.as_str(), TokenType::AccessToken);
-    let refresh_token_claims =
-        Helpers::decode_token(content.refresh_token.as_str(), TokenType::RefreshToken);
+        Helpers::decode_token(auth_response.access_token.as_str(), TokenType::AccessToken);
+    let refresh_token_claims = Helpers::decode_token(
+        auth_response.refresh_token.as_str(),
+        TokenType::RefreshToken,
+    );
     // assert new tokens are valid
     assert!(access_token_claims.is_ok());
     assert!(refresh_token_claims.is_ok());
@@ -88,7 +90,7 @@ async fn test_complete_auth_flow() {
     // [5] Access protected route with valid token
     let response = client
         .get(format!("{test_app}/user"))
-        .bearer_auth(content.access_token)
+        .bearer_auth(auth_response.access_token)
         .send()
         .await
         .expect("Failed to execute request.");
@@ -111,7 +113,10 @@ async fn test_complete_auth_flow() {
     // [7] Logout with valid refreshToken
     let response = client
         .post(format!("{test_app}/auth/logout"))
-        .header(X_REFRESH_TOKEN, format!("Bearer {}", content.refresh_token))
+        .header(
+            X_REFRESH_TOKEN,
+            format!("Bearer {}", auth_response.refresh_token),
+        )
         .send()
         .await
         .expect("Failed to execute request.");
