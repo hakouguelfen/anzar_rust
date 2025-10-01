@@ -28,25 +28,33 @@ impl UserService {
     pub async fn find(&self, user_id: String) -> Result<User> {
         let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
 
-        self.adapter.find_one(filter).await.ok_or_else(|| {
-            tracing::error!("Failed to find user by id: {}", user_id);
-            Error::UserNotFound {
-                user_id: Some(user_id),
-                email: None,
+        match self.adapter.find_one(filter).await {
+            Ok(Some(user)) => Ok(user),
+            Ok(None) => {
+                tracing::error!("Failed to find user by id: {}", user_id);
+                Err(Error::UserNotFound {
+                    user_id: Some(user_id),
+                    email: None,
+                })
             }
-        })
+            Err(err) => Err(err),
+        }
     }
 
     pub async fn find_by_email(&self, email: &str) -> Result<User> {
         let filter = Parser::mode(self.database_driver).convert(json!( {"email": email}));
 
-        self.adapter.find_one(filter).await.ok_or_else(|| {
-            tracing::error!("Failed to find user by email");
-            Error::UserNotFound {
-                user_id: None,
-                email: Some(email.into()),
+        match self.adapter.find_one(filter).await {
+            Ok(Some(user)) => Ok(user),
+            Ok(None) => {
+                tracing::error!("Failed to find user by email");
+                Err(Error::UserNotFound {
+                    user_id: None,
+                    email: Some(email.into()),
+                })
             }
-        })
+            Err(err) => Err(err),
+        }
     }
 
     pub async fn insert(&self, user: &User) -> Result<String> {
@@ -55,7 +63,7 @@ impl UserService {
             .await
             .map_err(|_| Error::InvalidCredentials {
                 field: crate::error::CredentialField::Email,
-                reason: crate::error::FailureReason::Malformed,
+                reason: crate::error::FailureReason::AlreadyExist,
             })
     }
 
@@ -105,7 +113,7 @@ impl UserService {
         let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
         let update = json!({
             "$set": json! ({
-                "lastPasswordReset": Utc::now().to_rfc3339(),
+                "lastPasswordReset": Utc::now(),
                 "passwordResetCount": 0,
                 "failedResetAttempts": 0
             })
@@ -121,5 +129,5 @@ impl UserService {
 
 fn db_error(msg: &str, user_id: String) -> Error {
     tracing::error!("Failed to {} for user: {}", msg, user_id);
-    Error::DatabaseError
+    Error::DatabaseError(msg.into())
 }

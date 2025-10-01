@@ -42,7 +42,7 @@ impl Default for Session {
             id: None,
             user_id: String::default(),
             created_at: Utc::now(),
-            expires_at: Utc::now() + Duration::days(30),
+            expires_at: Utc::now() + Duration::hours(24),
             updated_at: None,
             token: String::default(),
         }

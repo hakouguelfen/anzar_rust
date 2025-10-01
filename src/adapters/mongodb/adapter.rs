@@ -30,18 +30,21 @@ where
             .collection
             .insert_one(data)
             .await
-            .map_err(|_| Error::DatabaseError)?;
+            .map_err(|e| Error::DatabaseError(e.to_string()))?;
         let id = doc.inserted_id.as_object_id().unwrap_or_default();
         Ok(id.to_string())
     }
 
-    async fn find_one(&self, filter: Value) -> Option<T> {
+    async fn find_one(&self, filter: Value) -> Result<Option<T>, Error> {
         let mut mongo_filter = mongodb::bson::to_document(&filter).unwrap();
         if let Some(id_value) = mongo_filter.remove("id") {
             mongo_filter.insert("_id", id_value);
         }
 
-        self.collection.find_one(mongo_filter).await.ok()?
+        self.collection
+            .find_one(mongo_filter)
+            .await
+            .map_err(|e| Error::DatabaseError(e.to_string()))
     }
 
     async fn find_one_and_update(&self, filter: Value, update: Value) -> Option<T> {
@@ -70,7 +73,7 @@ where
         self.collection
             .update_many(mongo_filter, mongo_update)
             .await
-            .map_err(|_| Error::DatabaseError)?;
+            .map_err(|e| Error::DatabaseError(e.to_string()))?;
 
         Ok(())
     }
@@ -84,7 +87,7 @@ where
         self.collection
             .delete_one(mongo_filter)
             .await
-            .map_err(|_| Error::DatabaseError)?;
+            .map_err(|e| Error::DatabaseError(e.to_string()))?;
 
         Ok(())
     }
@@ -98,7 +101,7 @@ where
         self.collection
             .delete_many(mongo_filter)
             .await
-            .map_err(|_| Error::DatabaseError)?;
+            .map_err(|e| Error::DatabaseError(e.to_string()))?;
 
         Ok(())
     }

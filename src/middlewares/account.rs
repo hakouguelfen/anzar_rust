@@ -61,12 +61,7 @@ fn decode_claims(token: &str, token_type: TokenType) -> Result<Claims, Error> {
 async fn validate_refresh_token(req: &ServiceRequest, jti: &str) -> Result<(), Error> {
     let auth_service = extract_auth_service(req)?;
 
-    let refresh_token = auth_service.find_jwt_by_jti(jti).await.ok_or_else(|| {
-        actix_web::error::ErrorUnauthorized(parse_error(AuthError::InvalidToken {
-            token_type: TokenErrorType::RefreshToken,
-            reason: InvalidTokenReason::NotFound,
-        }))
-    })?;
+    let refresh_token = auth_service.find_jwt_by_jti(jti).await?;
 
     if !refresh_token.valid {
         return Err(actix_web::error::ErrorUnauthorized(parse_error(
@@ -111,7 +106,18 @@ async fn find_session(req: &ServiceRequest, session_id: String) -> Result<Sessio
     auth_service
         .find_session(session_id.clone())
         .await
-        .ok_or_else(|| {
+        .map_err(|err| err.into())
+}
+async fn update_session_expiray(
+    req: &ServiceRequest,
+    session_id: String,
+) -> Result<Session, Error> {
+    let auth_service = extract_auth_service(req)?;
+
+    auth_service
+        .extend_timeout(session_id.clone())
+        .await
+        .map_err(|_| {
             actix_web::error::ErrorNotFound(parse_error(AuthError::TokenNotFound {
                 token_id: session_id,
             }))
@@ -140,7 +146,14 @@ pub async fn auth_middleware(
     next: Next<impl MessageBody>,
 ) -> Result<ServiceResponse<impl MessageBody>, Error> {
     // pre-processing
-    if ["/configuration/register_context", "/health_check"].contains(&req.path()) {
+    if [
+        "/configuration/register_context",
+        "/health_check",
+        "/auth/register",
+        "/auth/login",
+    ]
+    .contains(&req.path())
+    {
         return next.call(req).await;
     }
 
@@ -150,8 +163,10 @@ pub async fn auth_middleware(
         AuthStrategy::Session => {
             let req_session = req.get_session();
             let data = req_session.get::<String>("SessionID")?;
+
             if let Some(session_id) = data {
-                let session = find_session(&req, session_id).await?;
+                let session = find_session(&req, session_id.clone()).await?;
+
                 if chrono::Utc::now() > session.expires_at {
                     return Err(actix_web::error::ErrorBadRequest(parse_error(
                         AuthError::TokenExpired {
@@ -160,7 +175,11 @@ pub async fn auth_middleware(
                         },
                     )));
                 }
+
+                // NOTE Only expires after true inactivity period
+                update_session_expiray(&req, session.id.unwrap_or_default()).await?;
                 check_user_account(&req, &session.user_id).await?;
+
                 // HACK
                 let payload =
                     AuthPayload::from(session.user_id, String::default(), String::default());

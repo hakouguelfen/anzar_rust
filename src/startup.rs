@@ -46,7 +46,7 @@ pub fn run(listener: TcpListener) -> Result<Server, std::io::Error> {
 
         let session =
             SessionMiddleware::builder(CookieSessionStore::default(), Key::from(&[0; 64]))
-                // NOTE: make this true for running https
+                // FIXME: make this true for running https
                 // TODO
                 // Set appropriate Domain and Path
                 .cookie_secure(false)

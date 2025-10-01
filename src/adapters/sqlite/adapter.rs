@@ -60,14 +60,14 @@ where
             .fetch_one(&self.pool)
             .await
             .map_err(|e| {
-                dbg!(e);
-                Error::DatabaseError
+                dbg!(&e);
+                Error::DatabaseError(e.to_string())
             })?;
 
         Ok(row.id)
     }
 
-    async fn find_one(&self, filter: Value) -> Option<T> {
+    async fn find_one(&self, filter: Value) -> Result<Option<T>, Error> {
         let obj = _parse_to_map(filter)?;
         let where_clause = _parse_to_sql(&obj, " AND ");
 
@@ -81,15 +81,40 @@ where
         query
             .fetch_optional(&self.pool)
             .await
-            .map_err(|e| {
-                dbg!(e);
-                Error::DatabaseError
-            })
-            .ok()
-            .flatten()
+            .map_err(|e| Error::DatabaseError(e.to_string()))
     }
 
     async fn find_one_and_update(&self, filter: Value, update: Value) -> Option<T> {
+        let obj_update = _parse_to_map(update).ok()?;
+        let clause_update = _parse_to_sql(&obj_update, ", ");
+
+        let obj_filter = _parse_to_map(filter).ok()?;
+        let clause_filter = _parse_to_sql(&obj_filter, " AND ");
+
+        let sql = format!(
+            "UPDATE {} SET {} WHERE {} RETURNING *",
+            self.table, clause_update, clause_filter
+        );
+        let mut query = sqlx::query_as::<_, T>(&sql);
+
+        for (_, v) in obj_update.iter() {
+            query = _bind_value(query, v.to_owned());
+        }
+        for (_, v) in obj_filter.iter() {
+            query = _bind_value(query, v.to_owned());
+        }
+
+        query
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(|e| {
+                dbg!(&e);
+                Error::DatabaseError(e.to_string())
+            })
+            .ok()?
+    }
+
+    async fn update_many(&self, filter: Value, update: Value) -> Result<(), Error> {
         let obj_update = _parse_to_map(update)?;
         let clause_update = _parse_to_sql(&obj_update, ", ");
 
@@ -109,39 +134,9 @@ where
             query = _bind_value(query, v.to_owned());
         }
 
-        query
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(|e| {
-                dbg!(e);
-                Error::DatabaseError
-            })
-            .ok()?
-    }
-
-    async fn update_many(&self, filter: Value, update: Value) -> Result<(), Error> {
-        let obj_update = _parse_to_map(update).ok_or(Error::DatabaseError)?;
-        let clause_update = _parse_to_sql(&obj_update, ", ");
-
-        let obj_filter = _parse_to_map(filter).ok_or(Error::DatabaseError)?;
-        let clause_filter = _parse_to_sql(&obj_filter, " AND ");
-
-        let sql = format!(
-            "UPDATE {} SET {} WHERE {} RETURNING *",
-            self.table, clause_update, clause_filter
-        );
-        let mut query = sqlx::query_as::<_, T>(&sql);
-
-        for (_, v) in obj_update.iter() {
-            query = _bind_value(query, v.to_owned());
-        }
-        for (_, v) in obj_filter.iter() {
-            query = _bind_value(query, v.to_owned());
-        }
-
         query.fetch_optional(&self.pool).await.map_err(|e| {
-            dbg!(e);
-            Error::DatabaseError
+            dbg!(&e);
+            Error::DatabaseError(e.to_string())
         })?;
 
         Ok(())
@@ -155,14 +150,14 @@ where
     }
 }
 
-fn _parse_to_map(data: Value) -> Option<Map<String, Value>> {
+fn _parse_to_map(data: Value) -> Result<Map<String, Value>, Error> {
     let value = serde_json::to_value(data).unwrap();
     let obj = value.as_object().unwrap();
     if obj.is_empty() {
-        return None;
+        return Err(Error::InternalServerError("parsing error".into()));
     }
 
-    Some(obj.to_owned())
+    Ok(obj.to_owned())
 }
 
 fn _parse_to_sql(obj: &Map<String, Value>, join: &str) -> String {

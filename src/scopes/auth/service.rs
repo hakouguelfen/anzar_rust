@@ -147,7 +147,7 @@ pub trait JwtServiceTrait {
     fn invalidate_session(&self, session_id: String) -> impl Future<Output = Result<()>>;
     fn logout(&self, payload: AuthPayload) -> impl Future<Output = Result<()>>;
     fn logout_all(&self, user_id: String) -> impl Future<Output = Result<()>>;
-    fn find_jwt_by_jti(&self, jti: &str) -> impl Future<Output = Option<RefreshToken>>;
+    fn find_jwt_by_jti(&self, jti: &str) -> impl Future<Output = Result<RefreshToken>>;
 }
 impl JwtServiceTrait for AuthService {
     async fn validate_jwt(&self, payload: AuthPayload, user_id: String) -> Result<()> {
@@ -214,7 +214,7 @@ impl JwtServiceTrait for AuthService {
         Ok(())
     }
 
-    async fn find_jwt_by_jti(&self, jti: &str) -> Option<RefreshToken> {
+    async fn find_jwt_by_jti(&self, jti: &str) -> Result<RefreshToken> {
         self.jwt_service.find_by_jti(jti).await
     }
 }
@@ -301,7 +301,8 @@ impl PasswordResetTokenServiceTrait for AuthService {
 // [ SessionTrait ]
 pub trait SessionServiceTrait {
     fn issue_session(&self, user_id: &User) -> impl Future<Output = Result<String>>;
-    fn find_session(&self, session_id: String) -> impl Future<Output = Option<Session>>;
+    fn find_session(&self, session_id: String) -> impl Future<Output = Result<Session>>;
+    fn extend_timeout(&self, session_id: String) -> impl Future<Output = Result<Session>>;
 }
 impl SessionServiceTrait for AuthService {
     async fn issue_session(&self, user: &User) -> Result<String> {
@@ -319,7 +320,10 @@ impl SessionServiceTrait for AuthService {
 
         Ok(token)
     }
-    async fn find_session(&self, session_id: String) -> Option<Session> {
+    async fn find_session(&self, session_id: String) -> Result<Session> {
         self.session_service.find(session_id).await
+    }
+    async fn extend_timeout(&self, session_id: String) -> Result<Session> {
+        self.session_service.extend_timeout(session_id).await
     }
 }

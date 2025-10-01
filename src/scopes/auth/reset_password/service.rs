@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::{
     adapters::DatabaseAdapter,
     config::DatabaseDriver,
-    error::{Error, Result},
+    error::{Error, InvalidTokenReason, Result, TokenErrorType},
     utils::parser::Parser,
 };
 
@@ -58,10 +58,14 @@ impl PasswordResetTokenService {
     pub async fn find(&self, hash: String) -> Result<PasswordResetToken> {
         let filter = Parser::mode(self.database_driver).convert(json!({"tokenHash": hash}));
 
-        self.adapter.find_one(filter).await.ok_or({
-            tracing::error!("Password reset token not found");
-            Error::TokenNotFound { token_id: hash }
-        })
+        match self.adapter.find_one(filter).await {
+            Ok(Some(token)) => Ok(token),
+            Ok(None) => Err(Error::InvalidToken {
+                token_type: TokenErrorType::PasswordResetToken,
+                reason: InvalidTokenReason::NotFound,
+            }),
+            Err(err) => Err(err),
+        }
     }
 
     pub async fn invalidate(&self, id: String) -> Result<PasswordResetToken> {
@@ -79,7 +83,7 @@ impl PasswordResetTokenService {
             .await
             .ok_or({
                 tracing::error!("Failed to invalidate token");
-                Error::DatabaseError
+                Error::DatabaseError("".into())
             })
     }
 }

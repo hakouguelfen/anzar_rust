@@ -7,7 +7,7 @@ use serde_json::json;
 use crate::{
     adapters::DatabaseAdapter,
     config::DatabaseDriver,
-    error::{Error, Result, TokenErrorType},
+    error::{Error, InvalidTokenReason, Result, TokenErrorType},
     extractors::AuthPayload,
     services::jwt::RefreshToken,
     utils::{AuthenticationHasher, Utils, parser::Parser},
@@ -61,10 +61,17 @@ impl JWTService {
         self.adapter.find_one_and_update(filter, update).await
     }
 
-    pub async fn find_by_jti(&self, jti: &str) -> Option<RefreshToken> {
+    pub async fn find_by_jti(&self, jti: &str) -> Result<RefreshToken> {
         let filter = Parser::mode(self.database_driver).convert(json!({"jti": jti}));
 
-        self.adapter.find_one(filter).await
+        match self.adapter.find_one(filter).await {
+            Ok(Some(token)) => Ok(token),
+            Ok(None) => Err(Error::InvalidToken {
+                token_type: TokenErrorType::RefreshToken,
+                reason: InvalidTokenReason::NotFound,
+            }),
+            Err(err) => Err(err),
+        }
     }
 
     pub async fn invalidate(&self, jti: String) -> Result<RefreshToken> {

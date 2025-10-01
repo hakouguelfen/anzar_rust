@@ -9,6 +9,7 @@ pub type Result<T> = core::result::Result<T, Error>;
 #[derive(Debug)]
 pub enum FailureReason {
     NotFound,
+    AlreadyExist,
     Expired,
     Malformed,
     HashMismatch,
@@ -90,7 +91,7 @@ pub enum Error {
 
     HashingFailure,
 
-    DatabaseError,
+    DatabaseError(String),
     InvalidRequest,
 
     BadRequest(String),
@@ -162,7 +163,7 @@ impl actix_web::ResponseError for Error {
 
             Error::TokenCreationFailed { token_type: _ }
             | Error::HashingFailure
-            | Error::DatabaseError
+            | Error::DatabaseError(_)
             | Error::EmailSendFailed { to: _ }
             | Error::TokenRevocationFailed { token_id: _ }
             | Error::InternalServerError(_) => StatusCode::INTERNAL_SERVER_ERROR,

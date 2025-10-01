@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
+use chrono::{Duration, Utc};
 use serde_json::json;
 
-use crate::error::{Error, Result, TokenErrorType};
+use crate::error::{Error, InvalidTokenReason, Result, TokenErrorType};
 use crate::utils::parser::Parser;
 use crate::utils::{AuthenticationHasher, Utils};
 use crate::{adapters::DatabaseAdapter, config::DatabaseDriver, services::session::model::Session};
@@ -37,11 +38,34 @@ impl SessionService {
         Ok(())
     }
 
-    pub async fn find(&self, token: String) -> Option<Session> {
+    pub async fn find(&self, token: String) -> Result<Session> {
         let filter = json! ({"token": Utils::hash_token(&token)});
         let filter = Parser::mode(self.database_driver).convert(filter);
 
-        self.adapter.find_one(filter).await
+        match self.adapter.find_one(filter).await {
+            Ok(Some(session)) => Ok(session),
+            Ok(None) => Err(Error::InvalidToken {
+                token_type: TokenErrorType::SessionToken,
+                reason: InvalidTokenReason::NotFound,
+            }),
+            Err(err) => Err(err),
+        }
+    }
+
+    pub async fn extend_timeout(&self, id: String) -> Result<Session> {
+        let filter = Parser::mode(self.database_driver).convert(json!({"id": id}));
+        let update = json!({
+            "$set": json!({
+                "updatedAt": Utc::now(),
+                "expiresAt": Utc::now() + Duration::hours(24),
+            })
+        });
+        let update = Parser::mode(self.database_driver).convert(update);
+
+        self.adapter
+            .find_one_and_update(filter, update)
+            .await
+            .ok_or_else(|| Error::DatabaseError("".into()))
     }
 
     pub async fn invalidate(&self, token: String) -> Result<()> {

@@ -15,7 +15,7 @@ impl FromRequest for AuthenticatedUser {
             Some(user) => ready(Ok(AuthenticatedUser(user.clone()))),
             None => ready(Err(Error::InvalidCredentials {
                 field: crate::error::CredentialField::Token,
-                reason: crate::error::FailureReason::UnauthorizedSource,
+                reason: crate::error::FailureReason::NotFound,
             })),
         }
     }
