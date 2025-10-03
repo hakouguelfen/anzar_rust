@@ -14,7 +14,7 @@ use crate::{
         },
         config::AuthStrategy,
     },
-    services::{email::sender::Email, jwt::Tokens},
+    services::{email::sender::Email, jwt::Tokens, session::model::Session},
     utils::{AuthenticationHasher, Utils},
 };
 use crate::{
@@ -32,6 +32,10 @@ use super::models::{EmailRequest, LoginRequest, TokenQuery};
 use super::reset_password::model::PasswordResetToken;
 use super::user::User;
 
+// TODO NOTE FIXME HACK
+// user docker envs to pass app config
+// Don't use http post to send configuration from client
+// create a config.yaml then pass it to docker
 #[tracing::instrument(
     name = "Login user",
     skip(req, auth_service, session),
@@ -50,12 +54,14 @@ async fn login(
     match configuration.auth.strategy {
         AuthStrategy::Session => auth_service.issue_session(&user).await.map(|token| {
             session.insert("SessionID", token)?;
-            Ok(HttpResponse::Ok().json(AuthResponse::from(Tokens::default(), user.into())))
+            Ok(HttpResponse::Ok().json(AuthResponse::with_jwt(Tokens::default(), user.into())))
         })?,
         AuthStrategy::Jwt => auth_service
             .issue_and_save_tokens(&user)
             .await
-            .map(|tokens| Ok(HttpResponse::Ok().json(AuthResponse::from(tokens, user.into()))))?,
+            .map(|tokens| {
+                Ok(HttpResponse::Ok().json(AuthResponse::with_jwt(tokens, user.into())))
+            })?,
     }
 }
 
@@ -73,17 +79,25 @@ async fn register(
     let user: User = auth_service.create_user(req).await?;
 
     match configuration.auth.strategy {
-        AuthStrategy::Session => auth_service.issue_session(&user).await.map(|token| {
-            session.insert("SessionID", token)?;
-            Ok(HttpResponse::Created().json(AuthResponse::from(Tokens::default(), user.into())))
-        })?,
+        AuthStrategy::Session => {
+            auth_service.issue_session(&user).await.map(|token| {
+                session.insert("SessionID", token)?;
+                Ok(HttpResponse::Created()
+                    .json(AuthResponse::with_jwt(Tokens::default(), user.into())))
+            })?
+        }
         AuthStrategy::Jwt => auth_service
             .issue_and_save_tokens(&user)
             .await
             .map(|tokens| {
-                Ok(HttpResponse::Created().json(AuthResponse::from(tokens, user.into())))
+                Ok(HttpResponse::Created().json(AuthResponse::with_jwt(tokens, user.into())))
             })?,
     }
+}
+
+#[tracing::instrument(name = "Get user session", skip(session))]
+async fn get_session(session: Session) -> Result<HttpResponse> {
+    Ok(HttpResponse::Ok().json(session))
 }
 
 #[tracing::instrument(
@@ -106,7 +120,7 @@ async fn refresh_token(
     auth_service
         .issue_and_save_tokens(&user)
         .await
-        .map(|tokens| Ok(HttpResponse::Ok().json(AuthResponse::from(tokens, user.into()))))?
+        .map(|tokens| Ok(HttpResponse::Ok().json(AuthResponse::with_jwt(tokens, user.into()))))?
 }
 
 #[tracing::instrument(
@@ -115,16 +129,14 @@ async fn refresh_token(
     fields(user_id = %payload.user_id)
 )]
 async fn logout(
-    payload: AuthPayload,
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
     ConfigurationExtractor(configuration): ConfigurationExtractor,
-    session: actix_session::Session,
+    payload: AuthPayload,
+    session: Session,
 ) -> Result<HttpResponse> {
-    let data = session.get::<String>("SessionID")?;
-
     match configuration.auth.strategy {
         AuthStrategy::Session => auth_service
-            .invalidate_session(data.unwrap())
+            .invalidate_session(session.token)
             .await
             .map(|_| Ok(HttpResponse::Ok().json(json!({ "status": "ok" }))))?,
         AuthStrategy::Jwt => auth_service
@@ -253,6 +265,7 @@ pub fn auth_scope() -> Scope {
     web::scope("/auth")
         .route("/login", web::post().to(login))
         .route("/register", web::post().to(register))
+        .route("/session", web::get().to(get_session))
         .route("/refreshToken", web::post().to(refresh_token))
         .route("/logout", web::post().to(logout))
         .route("/forgot-password", web::post().to(forgot_password))

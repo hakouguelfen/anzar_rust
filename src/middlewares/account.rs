@@ -177,13 +177,13 @@ pub async fn auth_middleware(
                 }
 
                 // NOTE Only expires after true inactivity period
-                update_session_expiray(&req, session.id.unwrap_or_default()).await?;
+                update_session_expiray(&req, session.id.clone().unwrap_or_default()).await?;
                 check_user_account(&req, &session.user_id).await?;
 
                 // HACK
-                let payload =
-                    AuthPayload::from(session.user_id, String::default(), String::default());
-                req.extensions_mut().insert::<AuthPayload>(payload);
+                req.extensions_mut()
+                    .insert::<AuthPayload>(AuthPayload::default());
+                req.extensions_mut().insert::<Session>(session);
             }
         }
         AuthStrategy::Jwt => {
@@ -201,7 +201,10 @@ pub async fn auth_middleware(
 
                 check_user_account(&req, &claims.sub).await?;
                 let payload = AuthPayload::from(claims.sub, token, claims.jti);
+
+                // HACK
                 req.extensions_mut().insert::<AuthPayload>(payload);
+                req.extensions_mut().insert::<Session>(Session::default());
             }
         }
     };

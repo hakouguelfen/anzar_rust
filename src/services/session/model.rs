@@ -1,8 +1,9 @@
-use crate::utils::mongodb_serde::*;
-
+use crate::{error::Error, utils::mongodb_serde::*};
+use actix_web::{FromRequest, HttpMessage, HttpRequest, dev::Payload};
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
+use std::future::{Ready, ready};
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize, FromRow)]
 pub struct Session {
@@ -18,7 +19,7 @@ pub struct Session {
     #[serde(
         rename = "userId",
         default,
-        serialize_with = "serialize_object_id_as_string",
+        // serialize_with = "serialize_object_id_as_string",
         deserialize_with = "deserialize_object_id"
     )]
     pub user_id: String,
@@ -50,6 +51,12 @@ impl Default for Session {
 }
 
 impl Session {
+    pub fn from_request(session: Session) -> Self {
+        session
+    }
+}
+
+impl Session {
     pub fn with_user_id(mut self, user_id: String) -> Self {
         self.user_id = user_id;
         self
@@ -57,5 +64,20 @@ impl Session {
     pub fn with_token(mut self, token: String) -> Self {
         self.token = token;
         self
+    }
+}
+
+impl FromRequest for Session {
+    type Error = Error;
+    type Future = Ready<Result<Self, Error>>;
+
+    fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
+        match req.extensions().get::<Session>() {
+            Some(session) => ready(Ok(session.clone())),
+            None => ready(Err(Error::InvalidToken {
+                token_type: crate::error::TokenErrorType::SessionToken,
+                reason: crate::error::InvalidTokenReason::SignatureMismatch,
+            })),
+        }
     }
 }

@@ -17,5 +17,4 @@ async fn test_health_check() {
 
     // Assert
     assert!(response.status().is_success());
-    assert_eq!(Some(0), response.content_length());
 }

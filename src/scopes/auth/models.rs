@@ -41,7 +41,7 @@ pub struct AuthResponse {
     pub user: UserResponse,
 }
 impl AuthResponse {
-    pub fn from(tokens: Tokens, user_response: UserResponse) -> Self {
+    pub fn with_jwt(tokens: Tokens, user_response: UserResponse) -> Self {
         Self {
             access_token: tokens.access_token,
             refresh_token: tokens.refresh_token,

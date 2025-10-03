@@ -1,11 +1,10 @@
-use actix_web::{
-    HttpResponse, Scope,
-    web::{self},
-};
+use actix_web::web;
+use actix_web::{HttpResponse, Scope};
+use serde_json::json;
 
 #[tracing::instrument(name = "Health Check")]
 async fn health_check() -> HttpResponse {
-    HttpResponse::Ok().finish()
+    HttpResponse::Ok().json(json!({ "status": "ok" }))
 }
 
 pub fn health_scope() -> Scope {
