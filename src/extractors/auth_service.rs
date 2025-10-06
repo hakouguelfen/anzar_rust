@@ -2,7 +2,7 @@ use std::future::{Ready, ready};
 
 use actix_web::{FromRequest, HttpRequest, dev::Payload, web::Data};
 
-use crate::{error::Error, scopes::auth::service::AuthService, startup::AppState};
+use crate::{config::AppState, error::Error, scopes::auth::service::AuthService};
 
 pub struct AuthServiceExtractor(pub AuthService);
 
@@ -13,8 +13,7 @@ impl FromRequest for AuthServiceExtractor {
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
         let result = req
             .app_data::<Data<AppState>>()
-            .and_then(|state| state.auth_service.lock().ok())
-            .and_then(|guard| guard.as_ref().map(|sm| sm.clone()))
+            .map(|state| state.auth_service.clone())
             .map(|sm| AuthServiceExtractor(sm.clone()))
             .ok_or(Error::InternalServerError("AuthServiceExtractor".into()));
 

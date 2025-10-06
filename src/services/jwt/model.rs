@@ -17,7 +17,7 @@ pub struct RefreshToken {
     #[serde(
         rename = "userId",
         default,
-        // serialize_with = "serialize_object_id_as_string",
+        serialize_with = "serialize_object_id_as_string",
         deserialize_with = "deserialize_object_id"
     )]
     pub user_id: String,

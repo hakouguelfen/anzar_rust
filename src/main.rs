@@ -1,27 +1,26 @@
 use std::net::TcpListener;
 use std::sync::LazyLock;
 
-use anzar::config::AppConfig;
+use anzar::config::{AppConfig, AppState};
 use anzar::services::jwt::keys::KEYS;
 use anzar::startup;
 use anzar::telemetry::{get_subscriber, init_subscriber};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    let subscriber = get_subscriber("anzar".into(), "info".into(), std::io::stdout);
+    let app_config = AppConfig::from_env().expect("Failed to read configuration");
+
+    let subscriber = get_subscriber(&app_config.name, "info".into(), std::io::stdout);
     init_subscriber(subscriber);
 
     LazyLock::force(&KEYS);
 
-    let configuration = AppConfig::from_env().expect("Failed to read configuration");
-
-    let address = format!(
-        "{}:{}",
-        configuration.server.host, configuration.server.port
-    );
+    let address = format!("{}:{}", app_config.server.host, app_config.server.port);
     let listener = TcpListener::bind(address)?;
 
-    let server = startup::run(listener)?;
-    drop(configuration);
+    let app_state = AppState::prod(&app_config).await?;
+    let server = startup::run(listener, app_state).await?;
+
+    drop(app_config);
     server.await
 }

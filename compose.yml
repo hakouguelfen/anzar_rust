@@ -2,24 +2,32 @@ name: anzar
 
 services:
   server:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
     ports:
       - 3000:3000
-    depends_on:
-      db:
-        condition: service_healthy
-
-  db:
-    image: mongo:latest
-    ports:
-      - 27017:27017
     volumes:
-      - mongodata:/data/db
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - .:/app
+      - ./anzar.dev.yml:/app/anzar.yml
+      # - /home/hakou/Desktop/something/something/test.db:/app/test.db
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
-volumes:
-  mongodata:
+#     depends_on:
+#       db:
+#         condition: service_healthy
+#   db:
+#     image: mongo:latest
+#     ports:
+#       - 27017:27017
+#     volumes:
+#       - anzardata:/data/db
+#     healthcheck:
+#       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+#       interval: 10s
+#       timeout: 5s
+#       retries: 5
+#
+# volumes:
+#   anzardata:

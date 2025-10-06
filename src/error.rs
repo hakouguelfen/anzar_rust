@@ -100,12 +100,14 @@ pub enum Error {
     // -- Externals
     #[from]
     Actix(actix_web::Error),
-
+    #[from]
+    IO(std::io::Error),
+    #[from]
+    SerdeYaml(serde_yaml::Error),
     #[from]
     SessionInsert(SessionInsertError),
     #[from]
     SessionGet(SessionGetError),
-
     #[from]
     JWT(jsonwebtoken::errors::Error),
 }
@@ -168,6 +170,8 @@ impl actix_web::ResponseError for Error {
             | Error::TokenRevocationFailed { token_id: _ }
             | Error::InternalServerError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::Actix(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Error::IO(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Error::SerdeYaml(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::JWT(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::SessionInsert(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::SessionGet(_) => StatusCode::INTERNAL_SERVER_ERROR,

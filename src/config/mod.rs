@@ -1,7 +1,9 @@
+mod app_state;
 mod database;
 mod environment;
 mod server;
 
+pub use app_state::AppState;
 use database::DatabaseConfig;
 pub use database::DatabaseDriver;
 use environment::*;
@@ -11,6 +13,8 @@ use crate::config::database::get_db_type;
 
 #[derive(serde::Deserialize)]
 pub struct AppConfig {
+    pub name: String,
+    pub config: String,
     pub server: ServerConfig,
     pub database: DatabaseConfig,
 }
@@ -48,6 +52,8 @@ impl AppConfig {
             .add_source(config::File::from(config_dir.join("base.yaml")).required(true))
             .add_source(config::File::from(config_dir.join(environment_filename)))
             .add_source(config::File::from(config_dir.join(database_filename)))
+            .set_override("name", "Anzar")?
+            .set_override("config", "/app/anzar.yml")?
             .set_override("database.driver", db_type)?
             .build()?;
 

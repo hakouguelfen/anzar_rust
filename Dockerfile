@@ -1,5 +1,5 @@
-ARG RUST_VERSION=1.81.0
-ARG ALPINE_VERSION=3.20.3
+ARG RUST_VERSION=1.90
+ARG ALPINE_VERSION=3.22
 ARG APP_NAME=anzar
 
 FROM rust:${RUST_VERSION}-alpine AS build
@@ -7,7 +7,6 @@ ARG APP_NAME
 WORKDIR /app
 
 RUN apk add --no-cache musl-dev
-
 RUN --mount=type=bind,source=src,target=src \
     --mount=type=bind,source=Cargo.toml,target=Cargo.toml \
     --mount=type=bind,source=Cargo.lock,target=Cargo.lock \
@@ -32,8 +31,8 @@ RUN adduser \
 
 USER appuser
 COPY --from=build /bin/server /bin/
-COPY configuration configuration
-ENV APP_ENVIRONMENT=production
+COPY src/config/configuration configuration
+ENV APP_ENV=prod
 
 EXPOSE 3000
 CMD ["/bin/server"]

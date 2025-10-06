@@ -6,7 +6,7 @@ use anzar::{
 use reqwest::Response;
 use uuid::Uuid;
 
-use crate::shared::{TestApp, register_context};
+use crate::shared::TestApp;
 use anzar::error::Result;
 
 use super::common::Common;
@@ -15,12 +15,7 @@ use super::test_cases::ValidTestCases;
 pub struct Helpers;
 impl Helpers {
     pub async fn init_config() -> TestApp {
-        let address = Common::spawn_app().await;
-
-        let db_name = Uuid::new_v4().to_string();
-        register_context(&address.address, db_name).await;
-
-        address
+        Common::spawn_app().await.unwrap()
     }
 
     pub async fn login(address: &TestApp) -> Response {

@@ -1,5 +1,5 @@
 mod models;
-mod scope;
+// mod scope;
 
 pub use models::{AuthStrategy, Authentication, Configuration, Database, EmailAndPassword};
-pub use scope::config_scope;
+// pub use scope::config_scope;

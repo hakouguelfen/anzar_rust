@@ -11,25 +11,13 @@ use actix_web::{App, HttpServer};
 use tracing_actix_web::TracingLogger;
 
 use std::net::TcpListener;
-use std::sync::{Arc, Mutex};
 
+use crate::config::AppState;
 use crate::middlewares::account::auth_middleware;
 use crate::middlewares::rate_limit::RateLimiter;
-use crate::scopes::auth::service::AuthService;
-use crate::scopes::config::Configuration;
-use crate::scopes::{auth, config, health, user};
+use crate::scopes::{auth, health, user};
 
-#[derive(Clone)]
-pub struct AppState {
-    pub auth_service: Arc<Mutex<Option<AuthService>>>,
-    pub configuration: Arc<Mutex<Option<Configuration>>>,
-}
-
-pub fn run(listener: TcpListener) -> Result<Server, std::io::Error> {
-    let app_state = AppState {
-        auth_service: Arc::new(Mutex::new(None)),
-        configuration: Arc::new(Mutex::new(None)),
-    };
+pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, std::io::Error> {
     let rate_limitter = web::Data::new(RateLimiter::default());
 
     let server = HttpServer::new(move || {
@@ -46,9 +34,8 @@ pub fn run(listener: TcpListener) -> Result<Server, std::io::Error> {
 
         let session =
             SessionMiddleware::builder(CookieSessionStore::default(), Key::from(&[0; 64]))
-                // FIXME: make this true for running https
-                // TODO
-                // Set appropriate Domain and Path
+                // FIXME make this true for running https
+                // TODO Set appropriate Domain and Path
                 .cookie_secure(false)
                 .cookie_same_site(actix_web::cookie::SameSite::Strict)
                 .cookie_http_only(true)
@@ -61,7 +48,7 @@ pub fn run(listener: TcpListener) -> Result<Server, std::io::Error> {
             .wrap(session)
             .app_data(web::Data::new(app_state.clone()))
             .app_data(rate_limitter.clone())
-            .service(config::config_scope())
+            // .service(config::config_scope())
             .service(auth::auth_scope())
             .service(user::user_scope())
             .service(health::health_scope())

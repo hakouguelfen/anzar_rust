@@ -8,5 +8,8 @@
 
 target/
 
+migrations/
 TODO.md
 anzar.db
+anzar.dev.yml
+anzar.yml

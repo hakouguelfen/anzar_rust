@@ -9,6 +9,7 @@ use actix_web::{
 };
 use serde_json::{Value, json};
 
+use crate::{config::AppState, error::InvalidTokenReason};
 use crate::{
     error::Error as AuthError,
     extractors::{AuthPayload, Claims, TokenType},
@@ -18,7 +19,6 @@ use crate::{
     },
     services::session::model::Session,
 };
-use crate::{error::InvalidTokenReason, startup::AppState};
 use crate::{
     error::TokenErrorType,
     scopes::{
@@ -126,16 +126,14 @@ async fn update_session_expiray(
 
 fn extract_auth_service(req: &ServiceRequest) -> Result<AuthService, Error> {
     req.app_data::<web::Data<AppState>>()
-        .and_then(|state| state.auth_service.lock().ok())
-        .and_then(|guard| guard.as_ref().map(|sm| sm.clone()))
+        .map(|state| state.auth_service.clone())
         .ok_or(actix_web::error::ErrorInternalServerError(parse_error(
             AuthError::InternalServerError("extract auth service".into()),
         )))
 }
 fn extract_configuration_service(req: &ServiceRequest) -> Result<Configuration, Error> {
     req.app_data::<web::Data<AppState>>()
-        .and_then(|state| state.configuration.lock().ok())
-        .and_then(|guard| guard.as_ref().map(|sm| sm.clone()))
+        .map(|state| state.configuration.clone())
         .ok_or(actix_web::error::ErrorInternalServerError(parse_error(
             AuthError::InternalServerError("extract configuraiton".into()),
         )))
