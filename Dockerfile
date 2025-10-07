@@ -10,6 +10,8 @@ RUN apk add --no-cache musl-dev
 RUN --mount=type=bind,source=src,target=src \
     --mount=type=bind,source=Cargo.toml,target=Cargo.toml \
     --mount=type=bind,source=Cargo.lock,target=Cargo.lock \
+    --mount=type=bind,source=migrations,target=migrations \
+    # --mount=type=bind,source=configuration,target=configuration \
     --mount=type=cache,target=/app/target/ \
     --mount=type=cache,target=/usr/local/cargo/registry/ \
     cargo build --locked --release && \
@@ -31,7 +33,7 @@ RUN adduser \
 
 USER appuser
 COPY --from=build /bin/server /bin/
-COPY src/config/configuration configuration
+COPY configuration configuration
 ENV APP_ENV=prod
 
 EXPOSE 3000

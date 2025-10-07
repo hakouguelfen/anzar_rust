@@ -35,7 +35,7 @@ impl AppConfig {
 
     pub fn from_env() -> Result<AppConfig, config::ConfigError> {
         let base_path = std::env::current_dir().expect("Failed to determine the current directory");
-        let config_dir = base_path.join("src/config/configuration/");
+        let config_dir = base_path.join("configuration/");
 
         let environment: Environment = Self::app_env();
         let environment_filename = format!("{}.yaml", environment.as_str());
