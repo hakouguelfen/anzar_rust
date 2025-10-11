@@ -25,7 +25,7 @@ impl UserService {
         }
     }
 
-    pub async fn find(&self, user_id: String) -> Result<User> {
+    pub async fn find(&self, user_id: &str) -> Result<User> {
         let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
 
         match self.adapter.find_one(filter).await {
@@ -33,7 +33,7 @@ impl UserService {
             Ok(None) => {
                 tracing::error!("Failed to find user by id: {}", user_id);
                 Err(Error::UserNotFound {
-                    user_id: Some(user_id),
+                    user_id: Some(user_id.into()),
                     email: None,
                 })
             }
@@ -67,7 +67,7 @@ impl UserService {
             })
     }
 
-    pub async fn update_password(&self, user_id: String, password: String) -> Result<User> {
+    pub async fn update_password(&self, user_id: &str, password: &str) -> Result<User> {
         let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
         let update = json!({ "$set": json!({"password": password}) });
         let update = Parser::mode(self.database_driver).convert(update);
@@ -81,7 +81,7 @@ impl UserService {
         Ok(user)
     }
 
-    pub async fn update_reset_window(&self, user_id: String) -> Result<()> {
+    pub async fn update_reset_window(&self, user_id: &str) -> Result<()> {
         let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
         let update = json!({
             "$set": json!({
@@ -98,7 +98,7 @@ impl UserService {
         Ok(())
     }
 
-    pub async fn increment_reset_count(&self, user_id: String) -> Result<User> {
+    pub async fn increment_reset_count(&self, user_id: &str) -> Result<User> {
         let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
         let update = json!( { "$inc": json!({"passwordResetCount": 1}) });
         let update = Parser::mode(self.database_driver).convert(update);
@@ -109,7 +109,7 @@ impl UserService {
             .ok_or_else(|| db_error("reset counter", user_id))
     }
 
-    pub async fn reset_password_state(&self, user_id: String) -> Result<User> {
+    pub async fn reset_password_state(&self, user_id: &str) -> Result<User> {
         let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
         let update = json!({
             "$set": json! ({
@@ -127,7 +127,7 @@ impl UserService {
     }
 }
 
-fn db_error(msg: &str, user_id: String) -> Error {
+fn db_error(msg: &str, user_id: &str) -> Error {
     tracing::error!("Failed to {} for user: {}", msg, user_id);
     Error::DatabaseError(msg.into())
 }

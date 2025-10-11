@@ -112,18 +112,18 @@ pub struct Tokens {
     pub refresh_token_jti: String,
 }
 impl Tokens {
-    pub fn with_access_token(mut self, access_token: &String) -> Self {
-        self.access_token = access_token.to_string();
+    pub fn with_access_token(mut self, access_token: &str) -> Self {
+        self.access_token = access_token.into();
         self
     }
 
-    pub fn with_refresh_token(mut self, refresh_token: &String) -> Self {
-        self.refresh_token = refresh_token.to_string();
+    pub fn with_refresh_token(mut self, refresh_token: &str) -> Self {
+        self.refresh_token = refresh_token.into();
         self
     }
 
-    pub fn with_jti(mut self, jti: &String) -> Self {
-        self.refresh_token_jti = jti.to_string();
+    pub fn with_jti(mut self, jti: &str) -> Self {
+        self.refresh_token_jti = jti.into();
         self
     }
 }

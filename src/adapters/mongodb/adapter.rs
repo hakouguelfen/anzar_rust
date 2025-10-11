@@ -31,7 +31,11 @@ where
             .insert_one(data)
             .await
             .map_err(|e| Error::DatabaseError(e.to_string()))?;
-        let id = doc.inserted_id.as_object_id().unwrap_or_default();
+
+        let id = doc.inserted_id.as_object_id().ok_or(Error::MalformedData {
+            field: crate::error::CredentialField::ObjectId,
+        })?;
+
         Ok(id.to_string())
     }
 

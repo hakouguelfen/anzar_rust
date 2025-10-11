@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
-use crate::utils::validation::validate_token;
+// use crate::utils::validation::validate_token;
 use crate::{scopes::user::UserResponse, services::jwt::Tokens};
 
 #[derive(Debug, Deserialize, Validate)]
@@ -14,7 +14,7 @@ pub struct LoginRequest {
 
 #[derive(Debug, Validate, Deserialize)]
 pub struct TokenQuery {
-    #[validate(length(equal = 32), custom(function = "validate_token"))]
+    // #[validate(custom(function = "validate_token"))]
     pub token: String,
 }
 
@@ -24,11 +24,11 @@ pub struct EmailRequest {
     pub email: String,
 }
 
-#[derive(Debug, Validate, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct ResetPasswordRequest {
-    #[validate(length(equal = 32), custom(function = "validate_token"))]
+    // #[validate(custom(function = "validate_token"))]
     pub token: String,
-    #[validate(length(min = 8, message = "password must be at least 8 characters"))]
+    // #[validate(length(min = 8, message = "password must be at least 8 characters"))]
     pub password: String,
 }
 

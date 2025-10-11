@@ -343,6 +343,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "config",
+ "dashmap",
  "derive_more 2.0.1",
  "dotenvy",
  "jsonwebtoken",

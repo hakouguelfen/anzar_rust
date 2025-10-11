@@ -47,7 +47,7 @@ impl RefreshToken {
         self.valid = true;
         self
     }
-    pub fn with_jti(mut self, jti: &String) -> Self {
+    pub fn with_jti(mut self, jti: &str) -> Self {
         self.jti = jti.into();
         self
     }

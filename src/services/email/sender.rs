@@ -25,11 +25,17 @@ impl Email {
         self
     }
 
-    pub async fn send(self, message: &str) -> Result<String> {
+    pub async fn send(self, username: &str, token: &str) -> Result<String> {
         let subject = "Password Reseting";
         let from = "onboarding@resend.dev";
 
-        let email = CreateEmailBaseOptions::new(from, [&self.reciever], subject).with_html(message);
+        let reset_link = format!("http://localhost:3000/auth/password/reset?token={}", &token);
+        let body = format!(
+            include_str!("../../services/email/templates/password_reset.html"),
+            username, &reset_link, &reset_link
+        );
+
+        let email = CreateEmailBaseOptions::new(from, [&self.reciever], subject).with_html(&body);
 
         self.mail.emails.send(email).await.map_err(|e| {
             tracing::error!("Failed to send password reset email: {:?}", e);

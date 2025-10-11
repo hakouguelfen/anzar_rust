@@ -74,7 +74,7 @@ impl JWTService {
         }
     }
 
-    pub async fn invalidate(&self, jti: String) -> Result<RefreshToken> {
+    pub async fn invalidate(&self, jti: &str) -> Result<RefreshToken> {
         let filter = Parser::mode(self.database_driver).convert(json!({"jti": jti}));
         let update = json! ({ "$set": json! ({ "valid": false, "usedAt": Utc::now() }) });
         let update = Parser::mode(self.database_driver).convert(update);
@@ -91,7 +91,7 @@ impl JWTService {
                 }
             })
     }
-    pub async fn revoke(&self, user_id: String) -> Result<()> {
+    pub async fn revoke(&self, user_id: &str) -> Result<()> {
         let filter = Parser::mode(self.database_driver).convert(json!({"userId": user_id}));
         let update = json! ({ "$set": doc! {"valid": false} });
         let update = Parser::mode(self.database_driver).convert(update);

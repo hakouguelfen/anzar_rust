@@ -56,6 +56,7 @@ impl AuthenticationHasher for Utils {
 
     fn generate_token(length: usize) -> String {
         let mut bytes = vec![0u8; length];
+        // FIXME: handle the Result
         let _ = rand::rngs::OsRng.try_fill_bytes(&mut bytes);
         BASE64_URL_SAFE_NO_PAD.encode(&bytes)
     }

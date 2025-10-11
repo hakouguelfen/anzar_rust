@@ -78,15 +78,12 @@ async fn validate_refresh_token(req: &ServiceRequest, jti: &str) -> Result<(), E
 async fn check_user_account(req: &ServiceRequest, user_id: &str) -> Result<(), Error> {
     let auth_service = extract_auth_service(req)?;
 
-    let user: User = auth_service
-        .find_user(user_id.to_string())
-        .await
-        .map_err(|_| {
-            actix_web::error::ErrorNotFound(parse_error(AuthError::UserNotFound {
-                user_id: Some(user_id.into()),
-                email: None,
-            }))
-        })?;
+    let user: User = auth_service.find_user(user_id).await.map_err(|_| {
+        actix_web::error::ErrorNotFound(parse_error(AuthError::UserNotFound {
+            user_id: Some(user_id.into()),
+            email: None,
+        }))
+    })?;
 
     if user.account_locked {
         return Err(actix_web::error::ErrorForbidden(parse_error(
@@ -100,28 +97,22 @@ async fn check_user_account(req: &ServiceRequest, user_id: &str) -> Result<(), E
     Ok(())
 }
 
-async fn find_session(req: &ServiceRequest, session_id: String) -> Result<Session, Error> {
+async fn find_session(req: &ServiceRequest, session_id: &str) -> Result<Session, Error> {
     let auth_service = extract_auth_service(req)?;
 
     auth_service
-        .find_session(session_id.clone())
+        .find_session(session_id)
         .await
         .map_err(|err| err.into())
 }
-async fn update_session_expiray(
-    req: &ServiceRequest,
-    session_id: String,
-) -> Result<Session, Error> {
+async fn update_session_expiray(req: &ServiceRequest, session_id: &str) -> Result<Session, Error> {
     let auth_service = extract_auth_service(req)?;
 
-    auth_service
-        .extend_timeout(session_id.clone())
-        .await
-        .map_err(|_| {
-            actix_web::error::ErrorNotFound(parse_error(AuthError::TokenNotFound {
-                token_id: session_id,
-            }))
-        })
+    auth_service.extend_timeout(session_id).await.map_err(|_| {
+        actix_web::error::ErrorNotFound(parse_error(AuthError::TokenNotFound {
+            token_id: session_id.into(),
+        }))
+    })
 }
 
 fn extract_auth_service(req: &ServiceRequest) -> Result<AuthService, Error> {
@@ -163,7 +154,7 @@ pub async fn auth_middleware(
             let data = req_session.get::<String>("SessionID")?;
 
             if let Some(session_id) = data {
-                let session = find_session(&req, session_id.clone()).await?;
+                let session = find_session(&req, &session_id).await?;
 
                 if chrono::Utc::now() > session.expires_at {
                     return Err(actix_web::error::ErrorBadRequest(parse_error(
@@ -175,7 +166,10 @@ pub async fn auth_middleware(
                 }
 
                 // NOTE Only expires after true inactivity period
-                update_session_expiray(&req, session.id.clone().unwrap_or_default()).await?;
+                let session_id = session.id.as_ref().ok_or(AuthError::MalformedData {
+                    field: crate::error::CredentialField::Token,
+                })?;
+                update_session_expiray(&req, session_id).await?;
                 check_user_account(&req, &session.user_id).await?;
 
                 // HACK

@@ -1,12 +1,14 @@
 use actix_web::{
     HttpResponse, Scope,
-    web::{self, Data},
+    web::{self},
 };
 use serde_json::json;
 
+use crate::scopes::auth::service::JwtServiceTrait;
 use crate::{
     error::FailureReason,
     extractors::ConfigurationExtractor,
+    middlewares::rate_limiting::RATE_LIMITS,
     scopes::{
         auth::{
             models::AuthResponse,
@@ -26,16 +28,11 @@ use crate::{
     extractors::{AuthPayload, AuthenticatedUser, ValidatedPayload, ValidatedQuery},
     scopes::auth::service::UserServiceTrait,
 };
-use crate::{middlewares::rate_limit::RateLimiter, scopes::auth::service::JwtServiceTrait};
 
 use super::models::{EmailRequest, LoginRequest, TokenQuery};
 use super::reset_password::model::PasswordResetToken;
 use super::user::User;
 
-// TODO NOTE FIXME HACK
-// user docker envs to pass app config
-// Don't use http post to send configuration from client
-// create a config.yaml then pass it to docker
 #[tracing::instrument(
     name = "Login user",
     skip(req, auth_service, session),
@@ -113,9 +110,7 @@ async fn refresh_token(
     let user: User = authenticated_user.0;
 
     let user_id = user.id.as_slice().concat();
-    auth_service
-        .validate_jwt(payload, user_id.to_string())
-        .await?;
+    auth_service.validate_jwt(payload, &user_id).await?;
 
     auth_service
         .issue_and_save_tokens(&user)
@@ -134,131 +129,144 @@ async fn logout(
     payload: AuthPayload,
     session: Session,
 ) -> Result<HttpResponse> {
-    match configuration.auth.strategy {
-        AuthStrategy::Session => auth_service
-            .invalidate_session(session.token)
-            .await
-            .map(|_| Ok(HttpResponse::Ok().json(json!({ "status": "ok" }))))?,
-        AuthStrategy::Jwt => auth_service
-            .invalidate_jwt(payload.jti)
-            .await
-            .map(|_| Ok(HttpResponse::Ok().json(json!({ "status": "ok" }))))?,
-    }
+    let result = match configuration.auth.strategy {
+        AuthStrategy::Session => auth_service.invalidate_session(&session.token).await,
+        AuthStrategy::Jwt => auth_service.invalidate_jwt(&payload.jti).await,
+    };
+    result.map(|_| Ok(HttpResponse::Ok().json(json!({ "status": "ok" }))))?
 }
 
-#[tracing::instrument(name = "Forgot password", skip(auth_service, rate_limiter))]
-async fn forgot_password(
+#[tracing::instrument(name = "Forgot password", skip(auth_service))]
+async fn request_password_reset(
     ValidatedPayload(req): ValidatedPayload<EmailRequest>,
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
-    rate_limiter: Data<RateLimiter>,
 ) -> Result<HttpResponse> {
-    // 1. Extract email from payload
+    const TIMING_DELAY_MS: u64 = 800;
+    const RESPONSE_MESSAGE: &str =
+        "If an account exists with this email, a password reset link will be sent";
+    let start = std::time::Instant::now();
+
     let email: String = req.email;
 
-    /*
-     * [ DON'T SEND A NON EXISTENCE EMAIL ERROR MESSAGE ]
-     */
-    // 2. Check if email exists
-    if let Ok(user) = auth_service.find_user_by_email(&email).await {
+    let result = async {
+        let user = auth_service.find_user_by_email(&email).await?;
         let user_id = user.id.as_slice().concat();
 
-        // Check rate limiting
-        rate_limiter.check_rate_limit(&user)?;
+        // 2.
+        let mut bucket = RATE_LIMITS.entry(user_id.clone()).or_default();
+        bucket.run()?;
+        dbg!("ForgotPassword RateLimit");
+        println!("{:?}", *bucket);
 
-        // 3. If exists: invalidate existing tokens
-        auth_service
-            .revoke_password_reset_token(user_id.to_string())
-            .await?;
+        // 3.
+        auth_service.revoke_password_reset_token(&user_id).await?;
 
-        // 4. Generate a new token + hash
-        // try to use something like: Utils::generate_token(32).hash()
-        let token = Utils::generate_token(32);
+        // 4.  try: Utils::generate_token(64).hash()
+        let token = Utils::generate_token(64);
         let hashed_token = Utils::hash_token(&token);
 
-        // 5. If exists: store token record
+        // 5.
         let otp = PasswordResetToken::default()
             .with_user_id(user_id)
             .with_token_hash(hashed_token);
         auth_service.insert_password_reset_token(otp).await?;
 
-        // 6. If exists: send email: exp-> api/reset-password?token=xxxxxxx
-        let to = "hakoudev@gmail.com";
-        let body = format!(
-            include_str!("../../services/email/templates/password_reset.html"),
-            &user.username, &token, &token
-        );
-        Email::default().to(to).send(&body).await?;
+        // 6.
+        Email::default()
+            .to(&email)
+            // .to("hakoudev@gmail.com")
+            .send(&user.username, &token)
+            .await?;
+        tracing::info!("Password reset requested for email: {}", email);
 
-        // 7. [FIXME] function name is not good
-        // Increment user's reset attempt count
-        // Limit reset password requests
-        auth_service.process_reset_request(user).await?;
+        auth_service.increment_reset_attempts(user).await?;
+        Ok::<(), Error>(())
+    }
+    .await;
+
+    if let Err(e) = result {
+        tracing::error!("Password reset failed for email {}: {}", email, e);
     }
 
-    Ok(HttpResponse::Ok().json("if email exists a link will be sent"))
+    let elapsed = start.elapsed().as_millis() as u64;
+    if elapsed < TIMING_DELAY_MS {
+        std::thread::sleep(std::time::Duration::from_millis(TIMING_DELAY_MS - elapsed));
+    }
+
+    Ok(HttpResponse::Ok().json(json!({ "message": RESPONSE_MESSAGE })))
 }
 
-async fn reset_password(
+async fn render_reset_form(
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
     ValidatedQuery(query): ValidatedQuery<TokenQuery>,
 ) -> Result<HttpResponse> {
     let token: &str = &query.token;
     auth_service.validate_reset_password_token(token).await?;
 
-    Ok(HttpResponse::Ok().json("Password reset initiated"))
+    Ok(HttpResponse::Ok()
+        .content_type("text/html; charset=utf-8")
+        .body(include_str!("templates/update_password.html")))
 }
 
-async fn update_password(
+// NOTE FIXME TODO: CSRF protection
+async fn submit_new_password(
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
-    ValidatedQuery(request): ValidatedQuery<ResetPasswordRequest>,
+    request: web::Form<ResetPasswordRequest>,
+    // request: web::Json<ResetPasswordRequest>,
+    // ValidatedQuery(request): ValidatedQuery<ResetPasswordRequest>,
 ) -> Result<HttpResponse> {
+    const RESPONSE_MESSAGE: &str =
+        "Password successfully reset. Please login with your new password.";
+
     // 1. ReValidate token
     let token: &str = &request.token;
     let reset_token = auth_service.validate_reset_password_token(token).await?;
 
-    // 2. Ensure password is different then previous
     let user_id = reset_token.user_id;
-    let user = auth_service.find_user(user_id.to_string()).await?;
+    let reset_token_id = reset_token.id.ok_or(Error::InvalidToken {
+        token_type: crate::error::TokenErrorType::PasswordResetToken,
+        reason: crate::error::InvalidTokenReason::Malformed,
+    })?;
+
+    // 2. Ensure password is different then previous
+    let user = auth_service.find_user(&user_id).await?;
     if user.account_locked {
         return Err(Error::AccountSuspended { user_id });
     }
     if Utils::verify_password(&request.password, &user.password) {
-        tracing::warn!(
-            "Current password is similair to previous password, user: {}",
-            user_id
-        );
+        tracing::warn!("Password reuse attempt for user: {}", user_id);
         return Err(Error::InvalidCredentials {
             field: CredentialField::Password,
-            reason: FailureReason::HashMismatch,
+            reason: FailureReason::AlreadyExist,
         });
     }
 
     // 3. Hash new password using argon2
     let hashed_password = Utils::hash_password(&request.password)?;
     auth_service
-        .update_user_password(user_id.to_string(), hashed_password)
+        .update_user_password(&user_id, &hashed_password)
         .await?;
+    tracing::info!("Password successfully reset for user: {}", user_id);
 
     // 4. Invalidate PasswordResetToken, Mark it as used (used_at = now)
     auth_service
-        .invalidate_password_reset_token(reset_token.id.unwrap_or_default().to_string())
-        .await?;
-
-    // 5. [TODO] invalidate passwordTokens related to user [THIS MAY NOT BE NEEDED]
-    auth_service
-        .revoke_password_reset_token(user_id.to_string())
+        .invalidate_password_reset_token(&reset_token_id)
         .await?;
 
     // 6. Update user.last_password_reset to now(), reset passwordResetCount->0
-    auth_service
-        .reset_password_state(user_id.to_string())
-        .await?;
+    auth_service.reset_password_state(&user_id).await?;
 
     // 7. TODO it may not be neccessary
-    auth_service
-        .logout_all(user_id.to_string())
-        .await
-        .map(|user| Ok(HttpResponse::Ok().json(user)))?
+    auth_service.logout_all(&user_id).await?;
+
+    // 8. Send security notification email
+    // Email::default()
+    //     .to("hakoudev@gmail.com")
+    //     .send(&user.username, &token)
+    //     .await
+    //     .ok();
+
+    Ok(HttpResponse::Ok().json(json!({ "message": RESPONSE_MESSAGE })))
 }
 
 pub fn auth_scope() -> Scope {
@@ -268,7 +276,7 @@ pub fn auth_scope() -> Scope {
         .route("/session", web::get().to(get_session))
         .route("/refreshToken", web::post().to(refresh_token))
         .route("/logout", web::post().to(logout))
-        .route("/forgot-password", web::post().to(forgot_password))
-        .route("/reset-password", web::get().to(reset_password))
-        .route("/update-password", web::put().to(update_password))
+        .route("/password/forgot", web::post().to(request_password_reset))
+        .route("/password/reset", web::get().to(render_reset_form))
+        .route("/password/reset", web::post().to(submit_new_password))
 }

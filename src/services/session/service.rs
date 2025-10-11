@@ -38,8 +38,8 @@ impl SessionService {
         Ok(())
     }
 
-    pub async fn find(&self, token: String) -> Result<Session> {
-        let filter = json! ({"token": Utils::hash_token(&token)});
+    pub async fn find(&self, token: &str) -> Result<Session> {
+        let filter = json! ({"token": Utils::hash_token(token)});
         let filter = Parser::mode(self.database_driver).convert(filter);
 
         match self.adapter.find_one(filter).await {
@@ -52,7 +52,7 @@ impl SessionService {
         }
     }
 
-    pub async fn extend_timeout(&self, id: String) -> Result<Session> {
+    pub async fn extend_timeout(&self, id: &str) -> Result<Session> {
         let filter = Parser::mode(self.database_driver).convert(json!({"id": id}));
         let update = json!({
             "$set": json!({
@@ -68,14 +68,14 @@ impl SessionService {
             .ok_or_else(|| Error::DatabaseError("".into()))
     }
 
-    pub async fn invalidate(&self, token: String) -> Result<()> {
+    pub async fn invalidate(&self, token: &str) -> Result<()> {
         let filter = json! ({"token": Utils::hash_token(&token)});
         let filter = Parser::mode(self.database_driver).convert(filter);
 
         self.adapter.delete_one(filter).await
     }
 
-    pub async fn revoke(&self, user_id: String) -> Result<()> {
+    pub async fn revoke(&self, user_id: &str) -> Result<()> {
         let filter = Parser::mode(self.database_driver).convert(json!({"userId": user_id}));
 
         self.adapter.delete_many(filter).await.map_err(|e| {

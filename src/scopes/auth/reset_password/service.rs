@@ -28,7 +28,7 @@ impl PasswordResetTokenService {
         }
     }
 
-    pub async fn revoke(&self, user_id: String) -> Result<()> {
+    pub async fn revoke(&self, user_id: &str) -> Result<()> {
         let filter = Parser::mode(self.database_driver).convert(json!({"userId": user_id}));
         let update = json! ({ "$set": json! ({"valid": false}) });
         let update = Parser::mode(self.database_driver).convert(update);
@@ -55,7 +55,7 @@ impl PasswordResetTokenService {
         })
     }
 
-    pub async fn find(&self, hash: String) -> Result<PasswordResetToken> {
+    pub async fn find(&self, hash: &str) -> Result<PasswordResetToken> {
         let filter = Parser::mode(self.database_driver).convert(json!({"tokenHash": hash}));
 
         match self.adapter.find_one(filter).await {
@@ -68,7 +68,7 @@ impl PasswordResetTokenService {
         }
     }
 
-    pub async fn invalidate(&self, id: String) -> Result<PasswordResetToken> {
+    pub async fn invalidate(&self, id: &str) -> Result<PasswordResetToken> {
         let filter = Parser::mode(self.database_driver).convert(json!({"id": id}));
         let update = json! ({
             "$set": json! ({

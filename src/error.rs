@@ -29,6 +29,7 @@ pub enum CredentialField {
     Password,
     Token,
     ApiKey,
+    ObjectId,
 }
 #[derive(Debug)]
 pub enum TokenErrorType {
@@ -90,7 +91,9 @@ pub enum Error {
     },
 
     HashingFailure,
-
+    MalformedData {
+        field: CredentialField,
+    },
     DatabaseError(String),
     InvalidRequest,
 
@@ -144,11 +147,13 @@ impl actix_web::ResponseError for Error {
             }
             | Error::MissingCredentials { field: _ } => StatusCode::UNAUTHORIZED,
 
-            Error::AccountSuspended { user_id: _ }
-            | Error::RateLimitExceeded {
+            Error::AccountSuspended { user_id: _ } => StatusCode::FORBIDDEN,
+
+            Error::RateLimitExceeded {
                 limit: _,
                 window: _,
-            } => StatusCode::FORBIDDEN,
+            } => StatusCode::TOO_MANY_REQUESTS,
+
             Error::UserNotFound {
                 user_id: _,
                 email: _,
@@ -161,6 +166,7 @@ impl actix_web::ResponseError for Error {
                 token_type: _,
                 expired_at: _,
             }
+            | Error::MalformedData { field: _ }
             | Error::TokenAlreadyUsed { token_id: _ } => StatusCode::BAD_REQUEST,
 
             Error::TokenCreationFailed { token_type: _ }
