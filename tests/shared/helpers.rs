@@ -71,7 +71,7 @@ impl Helpers {
     }
 
     pub fn decode_token(token: &str, token_type: TokenType) -> Result<Claims> {
-        JwtDecoderBuilder::new()
+        JwtDecoderBuilder::default()
             .with_token(token)
             .with_token_type(token_type)
             .build()

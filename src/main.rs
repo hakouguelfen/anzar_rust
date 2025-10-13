@@ -1,8 +1,6 @@
 use std::net::TcpListener;
-use std::sync::LazyLock;
 
 use anzar::config::{AppConfig, AppState};
-use anzar::services::jwt::keys::KEYS;
 use anzar::startup;
 use anzar::telemetry::{get_subscriber, init_subscriber};
 
@@ -12,8 +10,6 @@ async fn main() -> std::io::Result<()> {
 
     let subscriber = get_subscriber(&app_config.name, "info".into(), std::io::stdout);
     init_subscriber(subscriber);
-
-    LazyLock::force(&KEYS);
 
     let address = format!("{}:{}", app_config.server.host, app_config.server.port);
     let listener = TcpListener::bind(address)?;

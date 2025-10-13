@@ -1,6 +1,5 @@
-use chrono::Duration;
-use jsonwebtoken::{EncodingKey, Validation, decode};
 use jsonwebtoken::{Header, encode};
+use jsonwebtoken::{Validation, decode};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -15,10 +14,6 @@ pub struct JwtDecoderBuilder {
     token_type: TokenType,
 }
 impl JwtDecoderBuilder {
-    pub fn new() -> Self {
-        JwtDecoderBuilder::default()
-    }
-
     pub fn with_token(mut self, token: impl Into<String>) -> Self {
         self.token = token.into();
         self
@@ -27,14 +22,14 @@ impl JwtDecoderBuilder {
         self.token_type = token_type.into();
         self
     }
-
+}
+impl JwtDecoderBuilder {
     pub fn build(&self) -> Result<Claims> {
         match self.token_type {
             TokenType::AccessToken => self.decode_access_token(),
             TokenType::RefreshToken => self.decode_refresh_token(),
         }
     }
-
     fn decode_access_token(&self) -> Result<Claims> {
         let key = &KEYS.decoding_acc_tok;
         let claims = decode::<Claims>(&self.token, key, &Validation::default())?.claims;
@@ -47,35 +42,26 @@ impl JwtDecoderBuilder {
     }
 }
 
-#[derive(Default)]
 pub struct JwtEncoderBuilder {
     user_id: String,
 }
 impl JwtEncoderBuilder {
-    pub fn with_user_id(mut self, user_id: impl Into<String>) -> Self {
-        self.user_id = user_id.into();
-        self
+    pub fn new(user_id: &str) -> Self {
+        Self {
+            user_id: user_id.into(),
+        }
     }
 
     pub fn build(&self) -> Result<Tokens> {
         let access_key = &KEYS.encoding_acc_tok;
         let refresh_key = &KEYS.encoding_ref_tok;
 
-        let access_token = self.encode(
-            &self.user_id,
-            TokenType::AccessToken,
-            access_key,
-            Duration::minutes(15),
-            &Uuid::new_v4().to_string(),
-        )?;
+        let claims = Claims::access_token(&self.user_id);
+        let access_token = encode(&Header::default(), &claims, access_key)?;
+
         let refresh_token_jti = Uuid::new_v4().to_string();
-        let refresh_token = self.encode(
-            &self.user_id,
-            TokenType::RefreshToken,
-            refresh_key,
-            Duration::days(15),
-            &refresh_token_jti,
-        )?;
+        let claims = Claims::refresh_token(&self.user_id, &refresh_token_jti);
+        let refresh_token = encode(&Header::default(), &claims, refresh_key)?;
 
         let tokens: Tokens = Tokens::default()
             .with_access_token(&access_token)
@@ -83,20 +69,6 @@ impl JwtEncoderBuilder {
             .with_jti(&refresh_token_jti);
 
         Ok(tokens)
-    }
-
-    pub fn encode(
-        &self,
-        sub: &String,
-        token_type: TokenType,
-        key: &EncodingKey,
-        duration: Duration,
-        jti: &String,
-    ) -> Result<String> {
-        let claims = Claims::new(sub, token_type, duration, jti);
-        let token = encode(&Header::default(), &claims, key)?;
-
-        Ok(token)
     }
 }
 

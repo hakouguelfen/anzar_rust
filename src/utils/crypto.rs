@@ -7,28 +7,36 @@ use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
 use rand::TryRngCore;
 use sha2::{Digest, Sha256};
 
-pub trait AuthenticationHasher {
-    fn hash_token(token: &str) -> String;
-    fn _verify_token(token: &str, stored_hash: &str) -> bool;
-    fn generate_token(length: usize) -> String;
-    fn hash_password(password: &str) -> Result<String>;
-    fn verify_password(password: &str, hash: &str) -> bool;
+pub trait TokenHasher {
+    fn generate(length: usize) -> String;
+    fn hash(token: &str) -> String;
 }
 
-pub struct Utils;
-impl AuthenticationHasher for Utils {
-    fn hash_token(token: &str) -> String {
+pub struct Token {}
+impl TokenHasher for Token {
+    fn generate(length: usize) -> String {
+        let mut bytes = vec![0u8; length];
+        // FIXME: handle the Result
+        let _ = rand::rngs::OsRng.try_fill_bytes(&mut bytes);
+
+        BASE64_URL_SAFE_NO_PAD.encode(&bytes)
+    }
+
+    fn hash(token: &str) -> String {
         let mut hasher = Sha256::new();
         hasher.update(token.as_bytes());
 
         format!("{:x}", hasher.finalize())
     }
+}
 
-    fn _verify_token(token: &str, stored_hash: &str) -> bool {
-        Self::hash_token(token) == stored_hash
-    }
-
-    fn hash_password(password: &str) -> Result<String> {
+pub trait CustomPasswordHasher {
+    fn hash(password: &str) -> Result<String>;
+    fn verify(password: &str, hash: &str) -> bool;
+}
+pub struct Password;
+impl CustomPasswordHasher for Password {
+    fn hash(password: &str) -> Result<String> {
         let salt = SaltString::generate(&mut OsRng);
         let argon2 = Argon2::default();
         let hash = argon2
@@ -41,7 +49,7 @@ impl AuthenticationHasher for Utils {
         Ok(hash.to_string())
     }
 
-    fn verify_password(password: &str, hash: &str) -> bool {
+    fn verify(password: &str, hash: &str) -> bool {
         let Ok(hash) = PasswordHash::new(hash) else {
             tracing::error!(
                 "Failed to Parse a password hash from a string in the PHC string format."
@@ -52,12 +60,5 @@ impl AuthenticationHasher for Utils {
         Argon2::default()
             .verify_password(password.as_bytes(), &hash)
             .is_ok()
-    }
-
-    fn generate_token(length: usize) -> String {
-        let mut bytes = vec![0u8; length];
-        // FIXME: handle the Result
-        let _ = rand::rngs::OsRng.try_fill_bytes(&mut bytes);
-        BASE64_URL_SAFE_NO_PAD.encode(&bytes)
     }
 }

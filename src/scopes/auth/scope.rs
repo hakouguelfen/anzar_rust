@@ -4,7 +4,6 @@ use actix_web::{
 };
 use serde_json::json;
 
-use crate::scopes::auth::service::JwtServiceTrait;
 use crate::{
     error::FailureReason,
     extractors::ConfigurationExtractor,
@@ -17,7 +16,7 @@ use crate::{
         config::AuthStrategy,
     },
     services::{email::sender::Email, jwt::Tokens, session::model::Session},
-    utils::{AuthenticationHasher, Utils},
+    utils::{CustomPasswordHasher, Password, TokenHasher},
 };
 use crate::{
     error::{CredentialField, Error, Result},
@@ -28,6 +27,7 @@ use crate::{
     extractors::{AuthPayload, AuthenticatedUser, ValidatedPayload, ValidatedQuery},
     scopes::auth::service::UserServiceTrait,
 };
+use crate::{scopes::auth::service::JwtServiceTrait, utils::Token};
 
 use super::models::{EmailRequest, LoginRequest, TokenQuery};
 use super::reset_password::model::PasswordResetToken;
@@ -109,8 +109,10 @@ async fn refresh_token(
 ) -> Result<HttpResponse> {
     let user: User = authenticated_user.0;
 
-    let user_id = user.id.as_slice().concat();
-    auth_service.validate_jwt(payload, &user_id).await?;
+    let user_id = user.id.as_ref().ok_or(Error::MalformedData {
+        field: CredentialField::ObjectId,
+    })?;
+    auth_service.validate_jwt(payload, user_id).await?;
 
     auth_service
         .issue_and_save_tokens(&user)
@@ -147,28 +149,27 @@ async fn request_password_reset(
     let start = std::time::Instant::now();
 
     let email: String = req.email;
-
     let result = async {
         let user = auth_service.find_user_by_email(&email).await?;
-        let user_id = user.id.as_slice().concat();
+        let user_id = user.id.as_ref().ok_or(Error::MalformedData {
+            field: CredentialField::ObjectId,
+        })?;
 
         // 2.
         let mut bucket = RATE_LIMITS.entry(user_id.clone()).or_default();
         bucket.run()?;
-        dbg!("ForgotPassword RateLimit");
-        println!("{:?}", *bucket);
 
         // 3.
-        auth_service.revoke_password_reset_token(&user_id).await?;
+        auth_service.revoke_password_reset_token(user_id).await?;
 
-        // 4.  try: Utils::generate_token(64).hash()
-        let token = Utils::generate_token(64);
-        let hashed_token = Utils::hash_token(&token);
+        // 4.
+        let token = Token::generate(64);
+        let hashed_token = Token::hash(&token);
 
         // 5.
         let otp = PasswordResetToken::default()
             .with_user_id(user_id)
-            .with_token_hash(hashed_token);
+            .with_token_hash(&hashed_token);
         auth_service.insert_password_reset_token(otp).await?;
 
         // 6.
@@ -212,7 +213,6 @@ async fn render_reset_form(
 async fn submit_new_password(
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
     request: web::Form<ResetPasswordRequest>,
-    // request: web::Json<ResetPasswordRequest>,
     // ValidatedQuery(request): ValidatedQuery<ResetPasswordRequest>,
 ) -> Result<HttpResponse> {
     const RESPONSE_MESSAGE: &str =
@@ -233,7 +233,7 @@ async fn submit_new_password(
     if user.account_locked {
         return Err(Error::AccountSuspended { user_id });
     }
-    if Utils::verify_password(&request.password, &user.password) {
+    if Password::verify(&request.password, &user.password) {
         tracing::warn!("Password reuse attempt for user: {}", user_id);
         return Err(Error::InvalidCredentials {
             field: CredentialField::Password,
@@ -241,19 +241,19 @@ async fn submit_new_password(
         });
     }
 
-    // 3. Hash new password using argon2
-    let hashed_password = Utils::hash_password(&request.password)?;
+    // 3.
+    let hashed_password = Password::hash(&request.password)?;
     auth_service
         .update_user_password(&user_id, &hashed_password)
         .await?;
     tracing::info!("Password successfully reset for user: {}", user_id);
 
-    // 4. Invalidate PasswordResetToken, Mark it as used (used_at = now)
+    // 4.
     auth_service
         .invalidate_password_reset_token(&reset_token_id)
         .await?;
 
-    // 6. Update user.last_password_reset to now(), reset passwordResetCount->0
+    // 6.
     auth_service.reset_password_state(&user_id).await?;
 
     // 7. TODO it may not be neccessary

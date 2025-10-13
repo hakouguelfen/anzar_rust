@@ -38,12 +38,12 @@ pub struct RefreshToken {
 }
 
 impl RefreshToken {
-    pub fn with_user_id(mut self, id: String) -> Self {
-        self.user_id = id;
+    pub fn with_user_id(mut self, id: &str) -> Self {
+        self.user_id = id.into();
         self
     }
-    pub fn with_hash(mut self, hash: String) -> Self {
-        self.hash = hash;
+    pub fn with_hash(mut self, hash: &str) -> Self {
+        self.hash = hash.into();
         self.valid = true;
         self
     }

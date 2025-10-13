@@ -57,12 +57,12 @@ impl Session {
 }
 
 impl Session {
-    pub fn with_user_id(mut self, user_id: String) -> Self {
-        self.user_id = user_id;
+    pub fn with_user_id(mut self, user_id: &str) -> Self {
+        self.user_id = user_id.into();
         self
     }
-    pub fn with_token(mut self, token: String) -> Self {
-        self.token = token;
+    pub fn with_token(mut self, token: &str) -> Self {
+        self.token = token.into();
         self
     }
 }

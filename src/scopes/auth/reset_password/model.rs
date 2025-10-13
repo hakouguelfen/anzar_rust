@@ -60,12 +60,12 @@ impl PasswordResetToken {
     }
 }
 impl PasswordResetToken {
-    pub fn with_user_id(mut self, user_id: String) -> Self {
-        self.user_id = user_id;
+    pub fn with_user_id(mut self, user_id: &str) -> Self {
+        self.user_id = user_id.into();
         self
     }
-    pub fn with_token_hash(mut self, hash: String) -> Self {
-        self.token_hash = hash;
+    pub fn with_token_hash(mut self, hash: &str) -> Self {
+        self.token_hash = hash.into();
         self
     }
 }

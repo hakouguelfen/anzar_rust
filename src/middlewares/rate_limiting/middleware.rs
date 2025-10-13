@@ -37,8 +37,5 @@ pub async fn ip_rate_limit_middleware(
     let mut bucket = RATE_LIMITS.entry(ipadd).or_insert_with(TokenBucket::ip);
     bucket.run()?;
 
-    dbg!("IP RateLimit");
-    println!("{:?}", *bucket);
-
     next.call(req).await
 }

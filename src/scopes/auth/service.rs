@@ -15,7 +15,7 @@ use crate::scopes::user::service::UserService;
 
 use crate::services::jwt::{JWTService, JwtEncoderBuilder, RefreshToken, Tokens};
 use crate::services::session::{model::Session, service::SessionService};
-use crate::utils::{AuthenticationHasher, Utils};
+use crate::utils::{CustomPasswordHasher, Password, Token, TokenHasher};
 
 use super::user::User;
 
@@ -81,7 +81,7 @@ impl UserServiceTrait for AuthService {
             }
         })?;
 
-        match Utils::verify_password(password, &user.password) {
+        match Password::verify(password, &user.password) {
             true => Ok(user),
             false => {
                 tracing::error!("Failed to verify password");
@@ -92,11 +92,11 @@ impl UserServiceTrait for AuthService {
             }
         }
     }
-    async fn create_user(&self, user_data: User) -> Result<User> {
-        user_data.validate()?;
+    async fn create_user(&self, user: User) -> Result<User> {
+        user.validate()?;
 
-        let password_hash = Utils::hash_password(&user_data.password)?;
-        let mut user: User = User::from_request(user_data).with_password(password_hash);
+        let password_hash = Password::hash(&user.password)?;
+        let mut user = user.with_password(password_hash);
 
         let user_id: String = self.user_service.insert(&user).await?;
         user.with_id(user_id);
@@ -136,7 +136,7 @@ impl JwtServiceTrait for AuthService {
         if self.jwt_service.find(payload).await.is_none() {
             tracing::error!("Invalid refresh token detected for user: {}", user_id);
 
-            // TODO: send an email
+            // TODO: send an email indicating a breach
             // revoke or invalidate one token ?
             // maybe a user decided to revoke access to one of his devices
             // then he tried to use that devices, token is revoked but trying to validate it
@@ -152,20 +152,19 @@ impl JwtServiceTrait for AuthService {
         Ok(())
     }
     async fn issue_and_save_tokens(&self, user: &User) -> Result<Tokens> {
-        let user_id = user.id.as_slice().concat();
+        let user_id = user.id.as_ref().ok_or(Error::MalformedData {
+            field: CredentialField::ObjectId,
+        })?;
 
-        let tokens: Tokens = JwtEncoderBuilder::default()
-            .with_user_id(&user_id)
-            .build()
-            .inspect_err(|e| {
-                tracing::error!("Failed to generate authentication tokens: {:?}", e)
-            })?;
+        let tokens: Tokens = JwtEncoderBuilder::new(user_id).build().inspect_err(|e| {
+            tracing::error!("Failed to generate authentication tokens: {:?}", e)
+        })?;
 
-        let hashed_refresh_token = Utils::hash_token(&tokens.refresh_token);
+        let hashed_refresh_token = Token::hash(&tokens.refresh_token);
 
         let refresh_token = RefreshToken::default()
-            .with_user_id(user_id.to_owned())
-            .with_hash(hashed_refresh_token)
+            .with_user_id(user_id)
+            .with_hash(&hashed_refresh_token)
             .with_jti(&tokens.refresh_token_jti)
             .with_issued_at(Utc::now())
             .with_expire_at(Utc::now() + Duration::days(30));
@@ -184,7 +183,6 @@ impl JwtServiceTrait for AuthService {
         Ok(())
     }
 
-    // FIXME tobe removed
     async fn logout(&self, payload: AuthPayload) -> Result<()> {
         self.jwt_service.invalidate(&payload.jti).await?;
         self.session_service.revoke(&payload.user_id).await?;
@@ -224,23 +222,23 @@ pub trait PasswordResetTokenServiceTrait {
 }
 impl PasswordResetTokenServiceTrait for AuthService {
     async fn validate_reset_password_token(&self, token: &str) -> Result<PasswordResetToken> {
-        let hash = Utils::hash_token(token);
+        let hash = Token::hash(token);
 
         // 2. Checks the database for a matching token
         let reset_token = self.password_reset_token_service.find(&hash).await?;
-        let reset_token_id = reset_token.id.clone().ok_or(Error::MalformedData {
+        let reset_token_id = reset_token.id.as_ref().ok_or(Error::MalformedData {
             field: CredentialField::ObjectId,
         })?;
 
         // 3. Verify token isn't expired or already used
         if !reset_token.valid {
             return Err(Error::TokenAlreadyUsed {
-                token_id: reset_token_id,
+                token_id: reset_token_id.into(),
             });
         }
         if Utc::now() > reset_token.expired_at {
             self.password_reset_token_service
-                .invalidate(&reset_token_id)
+                .invalidate(reset_token_id)
                 .await?;
             return Err(Error::TokenExpired {
                 token_type: TokenErrorType::PasswordResetToken,
@@ -252,7 +250,7 @@ impl PasswordResetTokenServiceTrait for AuthService {
     }
 
     async fn increment_reset_attempts(&self, user: User) -> Result<User> {
-        let user_id = user.id.clone().ok_or(Error::MalformedData {
+        let user_id = user.id.as_ref().ok_or(Error::MalformedData {
             field: CredentialField::ObjectId,
         })?;
 
@@ -261,10 +259,10 @@ impl PasswordResetTokenServiceTrait for AuthService {
             .is_none_or(|start| Utc::now() - start > Duration::hours(1));
 
         if window_expired {
-            self.user_service.update_reset_window(&user_id).await?;
+            self.user_service.update_reset_window(user_id).await?;
         }
 
-        let user = self.user_service.increment_reset_count(&user_id).await?;
+        let user = self.user_service.increment_reset_count(user_id).await?;
         Ok(user)
     }
 
@@ -287,16 +285,18 @@ pub trait SessionServiceTrait {
 }
 impl SessionServiceTrait for AuthService {
     async fn issue_session(&self, user: &User) -> Result<String> {
-        let user_id = user.id.as_slice().concat();
+        let user_id = user.id.as_ref().ok_or(Error::MalformedData {
+            field: CredentialField::ObjectId,
+        })?;
 
-        self.session_service.revoke(&user_id).await?;
+        self.session_service.revoke(user_id).await?;
 
-        let token = Utils::generate_token(32);
-        let hashed_token = Utils::hash_token(&token);
+        let token = Token::generate(32);
+        let hashed_token = Token::hash(&token);
 
         let session = Session::default()
             .with_user_id(user_id)
-            .with_token(hashed_token);
+            .with_token(&hashed_token);
         self.session_service.insert(session).await?;
 
         Ok(token)

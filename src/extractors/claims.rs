@@ -26,14 +26,31 @@ pub struct Claims {
 }
 
 impl Claims {
-    // FIXME: Fix these str types <&String>
-    pub fn new(sub: &String, token_type: TokenType, duration: Duration, jti: &String) -> Self {
+    pub fn new(sub: &str, token_type: TokenType, duration: Duration, jti: &str) -> Self {
         Claims {
-            sub: sub.to_string(),
+            sub: sub.into(),
             exp: (Local::now() + duration).timestamp() as usize,
             iat: Local::now().timestamp() as usize,
-            jti: jti.to_string(),
+            jti: jti.into(),
             token_type,
+        }
+    }
+    pub fn access_token(sub: &str) -> Self {
+        Claims {
+            sub: sub.into(),
+            exp: (Local::now() + Duration::minutes(15)).timestamp() as usize,
+            iat: Local::now().timestamp() as usize,
+            jti: uuid::Uuid::new_v4().to_string(),
+            token_type: TokenType::AccessToken,
+        }
+    }
+    pub fn refresh_token(sub: &str, jti: &str) -> Self {
+        Claims {
+            sub: sub.into(),
+            exp: (Local::now() + Duration::days(15)).timestamp() as usize,
+            iat: Local::now().timestamp() as usize,
+            jti: jti.into(),
+            token_type: TokenType::RefreshToken,
         }
     }
 }

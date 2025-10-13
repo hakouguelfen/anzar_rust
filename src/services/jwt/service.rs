@@ -10,7 +10,7 @@ use crate::{
     error::{Error, InvalidTokenReason, Result, TokenErrorType},
     extractors::AuthPayload,
     services::jwt::RefreshToken,
-    utils::{AuthenticationHasher, Utils, parser::Parser},
+    utils::{Token, TokenHasher, parser::Parser},
 };
 
 #[derive(Clone)]
@@ -45,7 +45,7 @@ impl JWTService {
         let filter = json! ({
             "jti": payload.jti,
             "userId": &payload.user_id,
-            "hash": Utils::hash_token(&payload.refresh_token),
+            "hash": Token::hash(&payload.refresh_token),
             "valid": true
         });
         let filter = Parser::mode(self.database_driver).convert(filter);

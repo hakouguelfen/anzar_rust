@@ -4,8 +4,7 @@ use chrono::{Duration, Utc};
 use serde_json::json;
 
 use crate::error::{Error, InvalidTokenReason, Result, TokenErrorType};
-use crate::utils::parser::Parser;
-use crate::utils::{AuthenticationHasher, Utils};
+use crate::utils::{Token, TokenHasher, parser::Parser};
 use crate::{adapters::DatabaseAdapter, config::DatabaseDriver, services::session::model::Session};
 
 #[derive(Clone)]
@@ -39,7 +38,7 @@ impl SessionService {
     }
 
     pub async fn find(&self, token: &str) -> Result<Session> {
-        let filter = json! ({"token": Utils::hash_token(token)});
+        let filter = json! ({"token": Token::hash(token)});
         let filter = Parser::mode(self.database_driver).convert(filter);
 
         match self.adapter.find_one(filter).await {
@@ -69,7 +68,7 @@ impl SessionService {
     }
 
     pub async fn invalidate(&self, token: &str) -> Result<()> {
-        let filter = json! ({"token": Utils::hash_token(&token)});
+        let filter = json! ({"token": Token::hash(token)});
         let filter = Parser::mode(self.database_driver).convert(filter);
 
         self.adapter.delete_one(filter).await
