@@ -6,7 +6,7 @@ use actix_web::{FromRequest, HttpMessage, HttpRequest, dev::Payload};
 use serde::Deserialize;
 use validator::Validate;
 
-#[derive(Default, Deserialize, Debug, Clone, Validate)]
+#[derive(Default, Deserialize, Eq, PartialEq, Debug, Clone, Validate)]
 pub struct AuthPayload {
     pub user_id: String,
     pub refresh_token: String,
@@ -28,10 +28,7 @@ impl FromRequest for AuthPayload {
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
         match req.extensions().get::<AuthPayload>() {
             Some(payload) => ready(Ok(payload.clone())),
-            None => ready(Err(Error::InvalidToken {
-                token_type: crate::error::TokenErrorType::RefreshToken,
-                reason: crate::error::InvalidTokenReason::SignatureMismatch,
-            })),
+            None => ready(Ok(AuthPayload::default())),
         }
     }
 }

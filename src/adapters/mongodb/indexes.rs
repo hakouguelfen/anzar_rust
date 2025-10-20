@@ -14,7 +14,7 @@ impl MongodbIndexes {
             .build();
 
         self.db
-            .collection::<User>("users")
+            .collection::<User>("user")
             .create_index(model)
             .await?;
 
@@ -29,19 +29,19 @@ impl MongodbIndexes {
             // .expire_after(Some(Duration::from_secs(60 * 60))) // 30 minutes
             .build();
         let model = IndexModel::builder()
-            .keys(doc! { "tokenHash": 1 })
+            .keys(doc! { "token": 1 })
             .options(options)
             .build();
 
         self.db
-            .collection::<PasswordResetToken>("password_reset_tokens")
+            .collection::<PasswordResetToken>("password_reset_token")
             .create_index(model)
             .await?;
 
         Ok(())
     }
 
-    // db.refresh_tokens.createIndex({ "expireAt": 1 }, { expireAfterSeconds: 0 })
+    // db.refresh_tokens.createIndex({ "expiresAt": 1 }, { expireAfterSeconds: 0 })
     // pub async fn create_token_hash_index(db: &Database) -> Result<(), mongodb::error::Error> {
     //     let options = IndexOptions::builder()
     //         .unique(true)
@@ -50,7 +50,7 @@ impl MongodbIndexes {
     //         // .expire_after(Some(Duration::from_secs(60 * 60))) // 30 minutes
     //         .build();
     //     let model = IndexModel::builder()
-    //         .keys(doc! { "tokenHash": 1 })
+    //         .keys(doc! { "token": 1 })
     //         .options(options)
     //         .build();
     //

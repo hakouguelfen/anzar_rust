@@ -18,52 +18,52 @@ impl Helpers {
         Common::spawn_app().await.unwrap()
     }
 
-    pub async fn login(address: &TestApp) -> Response {
-        let client = reqwest::Client::new();
+    pub async fn login(test_app: &TestApp) -> Response {
         let body = ValidTestCases::login_data();
-        client
-            .post(format!("{address}/auth/login"))
+        test_app
+            .client
+            .post(format!("{}/auth/login", test_app.address))
             .json(&body)
             .send()
             .await
             .expect("Failed to execute request.")
     }
 
-    pub async fn create_user(address: &TestApp) -> Response {
-        let client = reqwest::Client::new();
+    pub async fn create_user(test_app: &TestApp) -> Response {
         let body = ValidTestCases::register_data();
-        client
-            .post(format!("{address}/auth/register"))
+        test_app
+            .client
+            .post(format!("{}/auth/register", test_app.address))
             .json(&body)
             .send()
             .await
             .expect("Failed to execute request.")
     }
 
-    pub async fn create_user2(address: &TestApp) -> Response {
-        let client = reqwest::Client::new();
+    pub async fn create_user2(test_app: &TestApp) -> Response {
         let body = ValidTestCases::register_data2();
-        client
-            .post(format!("{address}/auth/register"))
+        test_app
+            .client
+            .post(format!("{}/auth/register", test_app.address))
             .json(&body)
             .send()
             .await
             .expect("Failed to execute request.")
     }
-    pub async fn create_user_with_account_blocked(address: &TestApp) -> Response {
-        let client = reqwest::Client::new();
+    pub async fn create_user_with_account_blocked(test_app: &TestApp) -> Response {
         let body = ValidTestCases::blocked_account();
-        client
-            .post(format!("{address}/auth/register"))
+        test_app
+            .client
+            .post(format!("{}/auth/register", test_app.address))
             .json(&body)
             .send()
             .await
             .expect("Failed to execute request.")
     }
-    pub async fn get_user(address: &TestApp, token: String) -> Response {
-        let client = reqwest::Client::new();
-        client
-            .get(format!("{address}/user"))
+    pub async fn get_user(test_app: &TestApp, token: String) -> Response {
+        test_app
+            .client
+            .get(format!("{}/user", test_app.address))
             .bearer_auth(token)
             .send()
             .await

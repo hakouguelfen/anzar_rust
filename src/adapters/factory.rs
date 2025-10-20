@@ -5,21 +5,22 @@ use sqlx::{Pool, Sqlite};
 
 use crate::{
     adapters::{mongodb::MongodbAdapter, sqlite::SQLiteAdapter, traits::DatabaseAdapter},
-    scopes::{auth::model::PasswordResetToken, user::User},
+    scopes::{auth::model::PasswordResetToken, email::model::EmailVerificationToken, user::User},
     services::{jwt::RefreshToken, session::model::Session},
 };
 
-// Table names use plural forms (users, refresh_tokens)
-const USER: &str = "users";
-const REFRESH_TOKEN: &str = "refresh_tokens";
-const PASSWORD_RESET_TOKEN: &str = "password_reset_tokens";
-const SESSION: &str = "sessions";
+const USER: &str = "user";
+const REFRESH_TOKEN: &str = "refresh_token";
+const PASSWORD_RESET_TOKEN: &str = "password_reset_token";
+const EMAIL_VERIFICATION_TOKEN: &str = "email_verification_token";
+const SESSION: &str = "session";
 
 pub struct DatabaseAdapters {
     pub user_adapter: Arc<dyn DatabaseAdapter<User>>,
     pub jwt_adapter: Arc<dyn DatabaseAdapter<RefreshToken>>,
     pub session_adapter: Arc<dyn DatabaseAdapter<Session>>,
     pub reset_token_adapter: Arc<dyn DatabaseAdapter<PasswordResetToken>>,
+    pub email_verification_token: Arc<dyn DatabaseAdapter<EmailVerificationToken>>,
 }
 
 impl DatabaseAdapters {
@@ -32,6 +33,10 @@ impl DatabaseAdapters {
                 db,
                 PASSWORD_RESET_TOKEN,
             )),
+            email_verification_token: Arc::new(MongodbAdapter::<EmailVerificationToken>::new(
+                db,
+                EMAIL_VERIFICATION_TOKEN,
+            )),
         }
     }
 
@@ -43,6 +48,10 @@ impl DatabaseAdapters {
             reset_token_adapter: Arc::new(SQLiteAdapter::<PasswordResetToken>::new(
                 db,
                 PASSWORD_RESET_TOKEN,
+            )),
+            email_verification_token: Arc::new(SQLiteAdapter::<EmailVerificationToken>::new(
+                db,
+                EMAIL_VERIFICATION_TOKEN,
             )),
         }
     }

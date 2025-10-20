@@ -22,22 +22,17 @@ pub struct PasswordResetToken {
     )]
     pub user_id: String,
 
-    #[sqlx(rename = "tokenHash")]
-    #[serde(rename = "tokenHash")]
-    pub token_hash: String,
-
-    #[sqlx(rename = "createdAt")]
-    #[serde(rename = "createdAt")]
+    #[sqlx(rename = "issuedAt")]
+    #[serde(rename = "issuedAt")]
     pub issued_at: DateTime<Utc>,
-
-    #[sqlx(rename = "expireAt")]
-    #[serde(rename = "expireAt")]
-    pub expired_at: DateTime<Utc>,
-
+    #[sqlx(rename = "expiresAt")]
+    #[serde(rename = "expiresAt")]
+    pub expires_at: DateTime<Utc>,
     #[sqlx(rename = "usedAt")]
     #[serde(rename = "usedAt")]
     pub used_at: Option<DateTime<Utc>>,
 
+    pub token: String,
     pub valid: bool,
 }
 
@@ -51,9 +46,9 @@ impl PasswordResetToken {
         Self {
             id: None,
             user_id: String::default(),
-            token_hash: String::default(),
+            token: String::default(),
             issued_at: Utc::now(),
-            expired_at: Utc::now() + chrono::Duration::minutes(30),
+            expires_at: Utc::now() + chrono::Duration::seconds(86400),
             used_at: None,
             valid: true,
         }
@@ -65,7 +60,11 @@ impl PasswordResetToken {
         self
     }
     pub fn with_token_hash(mut self, hash: &str) -> Self {
-        self.token_hash = hash.into();
+        self.token = hash.into();
+        self
+    }
+    pub fn with_expiray(mut self, expires_at: chrono::Duration) -> Self {
+        self.expires_at = Utc::now() + expires_at;
         self
     }
 }

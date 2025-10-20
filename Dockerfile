@@ -11,7 +11,6 @@ RUN --mount=type=bind,source=src,target=src \
     --mount=type=bind,source=Cargo.toml,target=Cargo.toml \
     --mount=type=bind,source=Cargo.lock,target=Cargo.lock \
     --mount=type=bind,source=migrations,target=migrations \
-    # --mount=type=bind,source=configuration,target=configuration \
     --mount=type=cache,target=/app/target/ \
     --mount=type=cache,target=/usr/local/cargo/registry/ \
     cargo build --locked --release && \
@@ -30,11 +29,13 @@ RUN adduser \
     --no-create-home \
     --uid "${UID}" \
     appuser
-
 USER appuser
+
 COPY --from=build /bin/server /bin/
 COPY configuration configuration
-ENV APP_ENV=prod
+
+ENV ENV=prod
+ENV RUNTIME=docker
 
 EXPOSE 3000
 CMD ["/bin/server"]

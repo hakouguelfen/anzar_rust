@@ -18,12 +18,12 @@ async fn test_login_success() {
 async fn test_login_failure() {
     // Arrange
     let test_app = Helpers::init_config().await;
-    let client = reqwest::Client::new();
 
     for (body, message, code) in InvalidTestCases::login_credentials().into_iter() {
         // Act
-        let response = client
-            .post(format!("{test_app}/auth/login"))
+        let response = test_app
+            .client
+            .post(format!("{}/auth/login", test_app.address))
             .json(&body)
             .send()
             .await

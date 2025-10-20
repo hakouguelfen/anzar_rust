@@ -36,6 +36,14 @@ impl TokenBucket {
             last_refill: chrono::Utc::now(),
         }
     }
+    pub fn login() -> Self {
+        Self {
+            bucket_size: 10,
+            refill_rate: 10,
+            duration: chrono::Duration::minutes(15),
+            last_refill: chrono::Utc::now(),
+        }
+    }
 }
 impl TokenBucket {
     pub fn with_bucket_size(mut self, bucket_size: u32) -> Self {
@@ -65,10 +73,8 @@ impl TokenBucket {
                 window: self.duration,
             });
         }
+
         self.bucket_size -= 1;
-
-        dbg!(self.bucket_size);
-
         Ok(())
     }
 }

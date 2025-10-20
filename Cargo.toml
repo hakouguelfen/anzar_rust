@@ -1,6 +1,6 @@
 [package]
 name = "anzar"
-version = "0.4.0"
+version = "0.6.1"
 edition = "2024"
 authors = ["Hakou Guelfen <hakoudev@gmail.com>"]
 homepage = "https://gitlab.com/anzar_software/api"
@@ -15,9 +15,10 @@ name = "anzar"
 
 [dependencies]
 actix-cors = "0.7.0"
-actix-web = "4.11.0"
+# NOTE maybe use secure_coockie from actiw-web
+actix-web = { version = "4.11.0", features = ["rustls-0_23"] } 
 actix-session = { version = "0.11.0", features = ["cookie-session"] }
-rustls = "0.23.32"
+rustls = { version = "0.23.32", features = ["ring"] }
 
 chrono = { version = "0.4.37", features = ["serde"] }
 derive_more = { version = "2.0.1", features = ["from"] }
@@ -60,6 +61,8 @@ resend-rs = { version = "0.18.0", default-features = false, features = ["rustls-
 validator = { version = "0.20.0", features = ["derive"] }
 serde_yaml = "0.9.34"
 dashmap = "6.1.0"
+rustls-pemfile = "2.2.0"
+hmac = "0.12.1"
 
 [dev-dependencies]
 reqwest = { version = "0.12.8", default-features = false, features = ["json", "rustls-tls"] }

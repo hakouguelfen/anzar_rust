@@ -48,13 +48,24 @@ pub struct User {
     #[serde(default, rename = "isPremium")]
     pub is_premium: bool,
 
+    #[serde(default)]
+    pub verified: bool,
+
     #[sqlx(rename = "accountLocked")] // Map database column to struct field
     #[serde(default, rename = "accountLocked")]
     pub account_locked: bool,
 
     #[sqlx(rename = "failedResetAttempts")] // Map database column to struct field
     #[serde(default, rename = "failedResetAttempts")]
-    pub failed_reset_attempts: u32,
+    pub failed_reset_attempts: u8,
+
+    #[sqlx(rename = "failedLoginAttempts")] // Map database column to struct field
+    #[serde(default, rename = "failedLoginAttempts")]
+    pub failed_login_attempts: u8,
+
+    #[sqlx(rename = "lockedUntil")]
+    #[serde(default, rename = "lockedUntil")]
+    pub locked_until: Option<DateTime<Utc>>,
 }
 
 impl User {
@@ -63,8 +74,8 @@ impl User {
     }
 }
 impl User {
-    pub fn with_id(&mut self, id: String) {
-        self.id = Some(id);
+    pub fn with_id(&mut self, id: &str) {
+        self.id = Some(id.into());
     }
 
     pub fn with_password(mut self, password: String) -> Self {
@@ -102,6 +113,7 @@ pub struct UserResponse {
     pub is_premium: bool,
     #[serde(rename = "accountLocked")]
     pub account_locked: bool,
+    pub verified: bool,
 }
 
 impl From<User> for UserResponse {
@@ -113,6 +125,7 @@ impl From<User> for UserResponse {
             role: user.role,
             is_premium: user.is_premium,
             account_locked: user.account_locked,
+            verified: user.verified,
         }
     }
 }

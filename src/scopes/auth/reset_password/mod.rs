@@ -1,4 +1,5 @@
-mod service;
+mod repository;
 
 pub mod model;
-pub use service::*;
+pub mod service;
+pub use repository::*;

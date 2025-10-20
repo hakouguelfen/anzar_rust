@@ -15,7 +15,7 @@ pub enum TokenType {
     RefreshToken,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, Validate)]
 pub struct Claims {
     #[validate(length(equal = 24), custom(function = "validate_objectid"))]
     pub sub: String,
@@ -62,10 +62,7 @@ impl FromRequest for Claims {
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
         match req.extensions().get::<Claims>() {
             Some(claims) => ready(Ok(claims.clone())),
-            None => ready(Err(Error::InvalidToken {
-                token_type: crate::error::TokenErrorType::AccessToken,
-                reason: crate::error::InvalidTokenReason::SignatureMismatch,
-            })),
+            None => ready(Ok(Claims::default())),
         }
     }
 }

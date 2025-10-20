@@ -13,14 +13,14 @@ async fn test_register_success() {
 async fn test_register_failures() {
     // Arrange
     let test_app = Helpers::init_config().await;
-    let client = reqwest::Client::new();
 
     for (body, message, code) in InvalidTestCases::registration_credentials().into_iter() {
         // for duplication email test, need to create a valid user before
         if message == "duplication emails" {
             let valid_data = ValidTestCases::register_data();
-            client
-                .post(format!("{test_app}/auth/register"))
+            test_app
+                .client
+                .post(format!("{}/auth/register", test_app.address))
                 .json(&valid_data)
                 .send()
                 .await
@@ -28,8 +28,9 @@ async fn test_register_failures() {
         }
 
         // Act
-        let response = client
-            .post(format!("{test_app}/auth/register"))
+        let response = test_app
+            .client
+            .post(format!("{}/auth/register", test_app.address))
             .json(&body)
             .send()
             .await

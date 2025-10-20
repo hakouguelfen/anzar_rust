@@ -11,6 +11,7 @@ pub enum FailureReason {
     NotFound,
     AlreadyExist,
     Expired,
+    Empty,
     Malformed,
     HashMismatch,
     UnauthorizedSource,
@@ -33,10 +34,18 @@ pub enum CredentialField {
 }
 #[derive(Debug)]
 pub enum TokenErrorType {
+    Token,
     AccessToken,
     RefreshToken,
-    PasswordResetToken,
     SessionToken,
+    PasswordResetToken,
+    EmailVerificationToken,
+}
+
+impl From<Error> for std::io::Error {
+    fn from(err: Error) -> Self {
+        std::io::Error::other(err.to_string())
+    }
 }
 
 #[derive(Debug, From)]
@@ -64,6 +73,9 @@ pub enum Error {
     },
 
     // -- Accounts
+    AccuontNotVerified {
+        field: CredentialField,
+    },
     InvalidCredentials {
         field: CredentialField,
         reason: FailureReason,
@@ -88,6 +100,10 @@ pub enum Error {
     // --Communication
     EmailSendFailed {
         to: String,
+    },
+    TlsConfig {
+        path: String,
+        reason: FailureReason,
     },
 
     HashingFailure,
@@ -141,6 +157,7 @@ impl actix_web::ResponseError for Error {
                 token_type: _,
                 reason: _,
             }
+            | Error::AccuontNotVerified { field: _ }
             | Error::InvalidCredentials {
                 field: _,
                 reason: _,
@@ -174,6 +191,7 @@ impl actix_web::ResponseError for Error {
             | Error::DatabaseError(_)
             | Error::EmailSendFailed { to: _ }
             | Error::TokenRevocationFailed { token_id: _ }
+            | Error::TlsConfig { path: _, reason: _ }
             | Error::InternalServerError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::Actix(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::IO(_) => StatusCode::INTERNAL_SERVER_ERROR,

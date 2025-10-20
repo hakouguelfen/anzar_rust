@@ -1,9 +1,9 @@
-use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
 use mongodb::bson::oid::ObjectId;
 use validator::ValidationError;
 
 pub fn validate_token(token: &str) -> Result<(), ValidationError> {
-    URL_SAFE_NO_PAD
+    BASE64_URL_SAFE_NO_PAD
         .decode(token)
         .map_err(|_| ValidationError::new("invalid_base64_token"))?;
 

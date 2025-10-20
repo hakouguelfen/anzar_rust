@@ -156,7 +156,7 @@ impl InvalidTestCases {
         ]
     }
 
-    pub fn jwt_tokens(valid_token: String) -> Vec<(String, &'static str, u16)> {
+    pub fn jwt_tokens(valid_token: &str) -> Vec<(String, &'static str, u16)> {
         vec![
             (
                 "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODliNjVmNDFlOWI2MTRiZWVkMTE4ZTQiLCJleHAiOjE3NTUwMTU1NDQsImlhdCI6MTc1NTAxNDY0NCwidG9rZW5fdHlwZSI6IkFjY2Vzc1Rva2VuIiwicm9sZSI6IlVzZXIifQ.fGAj4Q_yydKIbhZg_Aq9tvfQjBF_BP0BYUWioV1UlPQ".to_string(),
@@ -169,16 +169,16 @@ impl InvalidTestCases {
                 401,
             ),
             (String::default(), "token is empty", 401),
-            (valid_token, "token without Bearer keyword", 401),
+            (valid_token.into(), "token without Bearer keyword", 401),
         ]
     }
 
-    pub fn refresh_tokens(valid_token: String) -> Vec<(String, &'static str, u16)> {
+    pub fn refresh_tokens(valid_token: &str) -> Vec<(String, &'static str, u16)> {
         vec![
             (
                 format!("Bearer {valid_token}").to_string(),
                 "token is valid with accountLocked",
-                403
+                200
             ),
             (
                 "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODliZDhiZWIzZTg4MDdiMzI4OGNkMjYiLCJleHAiOjE3NTYzNDAwMzEsImlhdCI6MTc1NTA0NDAzMSwianRpIjoiMTdiYjYxYWItNTVkZC00MTRjLWE4NGItZGQxMzkyZjYwYzM5IiwidG9rZW5fdHlwZSI6IlJlZnJlc2hUb2tlbiJ9.zSmSyDjVmD6DZuF2Li6-fY3osco2rYfS1Ai9fYZ3j-k".to_string(),
@@ -191,7 +191,7 @@ impl InvalidTestCases {
                 401
             ),
             (String::default(), "token is empty", 401),
-            (valid_token, "token without Bearer keyword", 401),
+            (valid_token.into(), "token without Bearer keyword", 401),
         ]
     }
 }

@@ -1,89 +1,82 @@
-use std::sync::Arc;
+use crate::error::{CredentialField, Error, Result, TokenErrorType};
+use crate::scopes::auth::service::AuthService;
+use crate::scopes::{auth::model::PasswordResetToken, user::User};
+use crate::utils::{Token, TokenHasher};
 
-use crate::{
-    adapters::DatabaseAdapter,
-    config::DatabaseDriver,
-    error::{Error, InvalidTokenReason, Result, TokenErrorType},
-    utils::parser::Parser,
-};
+// [ PasswordResetTokenServiceTrait ]
+pub trait PasswordResetTokenServiceTrait {
+    fn validate_reset_password_token(
+        &self,
+        token: &str,
+    ) -> impl Future<Output = Result<PasswordResetToken>>;
+    fn increment_reset_attempts(&self, user: User) -> impl Future<Output = Result<User>>;
 
-use super::model::PasswordResetToken;
-use chrono::Utc;
-use serde_json::json;
-
-#[derive(Clone)]
-pub struct PasswordResetTokenService {
-    adapter: Arc<dyn DatabaseAdapter<PasswordResetToken>>,
-    database_driver: DatabaseDriver,
+    fn invalidate_password_reset_token(
+        &self,
+        id: &str,
+    ) -> impl Future<Output = Result<PasswordResetToken>>;
+    fn revoke_password_reset_token(
+        &self,
+        user_id: &str,
+    ) -> impl std::future::Future<Output = Result<()>>;
+    fn insert_password_reset_token(
+        &self,
+        otp: PasswordResetToken,
+    ) -> impl Future<Output = Result<()>>;
 }
+impl PasswordResetTokenServiceTrait for AuthService {
+    async fn validate_reset_password_token(&self, token: &str) -> Result<PasswordResetToken> {
+        let hash = Token::hash(token);
 
-impl PasswordResetTokenService {
-    pub fn new(
-        adapter: Arc<dyn DatabaseAdapter<PasswordResetToken>>,
-        database_driver: DatabaseDriver,
-    ) -> Self {
-        Self {
-            adapter,
-            database_driver,
+        // 2. Checks the database for a matching token
+        let reset_token = self.password_reset_token_service.find(&hash).await?;
+        let reset_token_id = reset_token.id.as_ref().ok_or(Error::MalformedData {
+            field: CredentialField::ObjectId,
+        })?;
+
+        // 3. Verify token isn't expired or already used
+        if !reset_token.valid {
+            return Err(Error::TokenAlreadyUsed {
+                token_id: reset_token_id.into(),
+            });
         }
-    }
-
-    pub async fn revoke(&self, user_id: &str) -> Result<()> {
-        let filter = Parser::mode(self.database_driver).convert(json!({"userId": user_id}));
-        let update = json! ({ "$set": json! ({"valid": false}) });
-        let update = Parser::mode(self.database_driver).convert(update);
-
-        self.adapter
-            .update_many(filter, update)
-            .await
-            .map_err(|e| {
-                tracing::error!("Failed to revoke password tokens: {:?}", e);
-                Error::TokenRevocationFailed {
-                    token_id: "".into(),
-                }
-            })?;
-
-        Ok(())
-    }
-
-    pub async fn insert(&self, otp: PasswordResetToken) -> Result<()> {
-        self.adapter.insert(otp).await.map(|_| ()).map_err(|e| {
-            tracing::error!("Failed to insert password reset token to database: {:?}", e);
-            Error::TokenCreationFailed {
-                token_type: crate::error::TokenErrorType::PasswordResetToken,
-            }
-        })
-    }
-
-    pub async fn find(&self, hash: &str) -> Result<PasswordResetToken> {
-        let filter = Parser::mode(self.database_driver).convert(json!({"tokenHash": hash}));
-
-        match self.adapter.find_one(filter).await {
-            Ok(Some(token)) => Ok(token),
-            Ok(None) => Err(Error::InvalidToken {
+        if chrono::Utc::now() > reset_token.expires_at {
+            self.password_reset_token_service
+                .invalidate(reset_token_id)
+                .await?;
+            return Err(Error::TokenExpired {
                 token_type: TokenErrorType::PasswordResetToken,
-                reason: InvalidTokenReason::NotFound,
-            }),
-            Err(err) => Err(err),
+                expired_at: reset_token.expires_at,
+            });
         }
+
+        Ok(reset_token)
     }
 
-    pub async fn invalidate(&self, id: &str) -> Result<PasswordResetToken> {
-        let filter = Parser::mode(self.database_driver).convert(json!({"id": id}));
-        let update = json! ({
-            "$set": json! ({
-                "valid": false,
-                "usedAt": Utc::now().to_string()
-            })
-        });
-        let update = Parser::mode(self.database_driver).convert(update);
+    async fn increment_reset_attempts(&self, user: User) -> Result<User> {
+        let user_id = user.id.as_ref().ok_or(Error::MalformedData {
+            field: CredentialField::ObjectId,
+        })?;
 
-        self.adapter
-            .find_one_and_update(filter, update)
-            .await
-            .ok_or({
-                tracing::error!("Failed to invalidate token");
-                Error::DatabaseError("".into())
-            })
+        let window_expired = user
+            .password_reset_window_start
+            .is_none_or(|start| chrono::Utc::now() - start > chrono::Duration::hours(1));
+
+        if window_expired {
+            self.user_service.update_reset_window(user_id).await?;
+        }
+
+        let user = self.user_service.increment_reset_count(user_id).await?;
+        Ok(user)
+    }
+
+    async fn invalidate_password_reset_token(&self, id: &str) -> Result<PasswordResetToken> {
+        self.password_reset_token_service.invalidate(id).await
+    }
+    async fn revoke_password_reset_token(&self, user_id: &str) -> Result<()> {
+        self.password_reset_token_service.revoke(user_id).await
+    }
+    async fn insert_password_reset_token(&self, otp: PasswordResetToken) -> Result<()> {
+        self.password_reset_token_service.insert(otp).await
     }
 }

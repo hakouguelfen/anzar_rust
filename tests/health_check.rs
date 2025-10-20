@@ -6,11 +6,11 @@ use crate::shared::Helpers;
 async fn test_health_check() {
     // Arrange
     let test_app = Helpers::init_config().await;
-    let client = reqwest::Client::new();
 
     // Act
-    let response = client
-        .get(format!("{test_app}/health_check"))
+    let response = test_app
+        .client
+        .get(format!("{}/health_check", test_app.address))
         .send()
         .await
         .expect("Failed to execute request.");

@@ -1,4 +1,7 @@
-use crate::{config::AppState, error::Error, scopes::config::Configuration};
+use crate::{
+    config::{AppState, Configuration},
+    error::Error,
+};
 use actix_web::{FromRequest, HttpRequest, dev::Payload, web::Data};
 use std::future::{Ready, ready};
 

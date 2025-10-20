@@ -1,14 +1,17 @@
-## Account Suspended
-- Every time a request is made check if account is locked           => [DONE]
-- If account is locked check if suspension time has been past
-- If time has passed -> AcconuntLocked:False -> allow request
-- If not return 403:Forbidden
+Account activation via email verification [DONE]
+account lockouts after failed attempts [DONE]
+
+SQL injection and XSS prevention
+Middleware/guards to protect routes requiring authentication
+CSRF protection for form submissions
+
+Employ normal security measures, such as SQL Injection Prevention methods and Input Validation.
+
 
 ## Password
 Password Validation Missing
 Add checks before hashing:
-
-## 
+### 
 Minimum length (12+ characters recommended)
 Not in common password lists
 Complexity requirements if needed
@@ -18,12 +21,7 @@ Complexity requirements if needed
 if user failed more then 5 times: Lock account -> [ERROR::AcountLocked]
 Limit user from changing password 3 times in 1h -> [ERROR::RateLimitExceeded]
 
-Employ normal security measures, such as SQL Injection Prevention methods and Input Validation.
 
-
-NOT SURE:
-when accessToken is used, check existence of valid refreshToken in DB using jti.
-- if not valid, user should be loggedout.
 
 
 ## TOADD:

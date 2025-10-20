@@ -1,133 +1,139 @@
-use std::sync::Arc;
+use crate::config::PasswordConfig;
+use crate::error::{CredentialField, Error, FailureReason, Result};
+use crate::scopes::auth::service::AuthService;
+use crate::scopes::email::model::EmailVerificationToken;
+use crate::scopes::email::service::EmailVerificationTokenServiceTrait;
+use crate::utils::{CustomPasswordHasher, Password, Token, TokenHasher};
 
-use chrono::Utc;
-use serde_json::json;
+use super::User;
 
-use crate::{
-    adapters::DatabaseAdapter,
-    config::DatabaseDriver,
-    error::{Error, Result},
-    scopes::user::User,
-    utils::parser::Parser,
-};
-
-#[derive(Clone)]
-pub struct UserService {
-    adapter: Arc<dyn DatabaseAdapter<User>>,
-    database_driver: DatabaseDriver,
+pub trait UserServiceTrait {
+    fn authenticate_user(
+        &self,
+        email: &str,
+        password: &str,
+        pass_config: PasswordConfig,
+    ) -> impl Future<Output = Result<User>>;
+    fn create_user(&self, user: User) -> impl Future<Output = Result<User>>;
+    fn create_verification_email(
+        &self,
+        user: &User,
+        expiray: i64,
+    ) -> impl Future<Output = Result<String>>;
+    fn find_user_by_email(&self, email: &str) -> impl Future<Output = Result<User>>;
+    fn find_user(&self, id: &str) -> impl Future<Output = Result<User>>;
+    fn update_user_password(&self, id: &str, hash: &str) -> impl Future<Output = Result<User>>;
+    fn reset_password_state(&self, id: &str) -> impl Future<Output = Result<User>>;
+    fn increment_failed_login_attempts(&self, id: &str) -> impl Future<Output = Result<User>>;
+    fn validate_account(&self, id: &str) -> impl Future<Output = Result<User>>;
+    fn lock_account(&self, id: &str, lockout_duration: i64) -> impl Future<Output = Result<User>>;
+    fn unlock_account(&self, id: &str) -> impl Future<Output = Result<User>>;
+    fn reset_failed_login_attempts(&self, id: &str) -> impl Future<Output = Result<User>>;
 }
+impl UserServiceTrait for AuthService {
+    async fn authenticate_user(
+        &self,
+        email: &str,
+        password: &str,
+        pass_config: PasswordConfig,
+    ) -> Result<User> {
+        let user: User = self.user_service.find_by_email(email).await.map_err(|_| {
+            Error::InvalidCredentials {
+                field: CredentialField::Email,
+                reason: FailureReason::NotFound,
+            }
+        })?;
 
-impl UserService {
-    pub fn new(adapter: Arc<dyn DatabaseAdapter<User>>, database_driver: DatabaseDriver) -> Self {
-        Self {
-            adapter,
-            database_driver,
+        let user_id = user.id.as_ref().ok_or(Error::MalformedData {
+            field: CredentialField::ObjectId,
+        })?;
+
+        if user.account_locked {
+            return Err(Error::AccountSuspended {
+                user_id: user_id.into(),
+            });
         }
-    }
 
-    pub async fn find(&self, user_id: &str) -> Result<User> {
-        let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
+        if user.failed_login_attempts >= pass_config.security.max_failed_login_attempts {
+            self.lock_account(user_id, pass_config.security.lockout_duration)
+                .await?;
 
-        match self.adapter.find_one(filter).await {
-            Ok(Some(user)) => Ok(user),
-            Ok(None) => {
-                tracing::error!("Failed to find user by id: {}", user_id);
-                Err(Error::UserNotFound {
-                    user_id: Some(user_id.into()),
-                    email: None,
+            // NOTE DOCS tell developer to send an email
+            return Err(Error::AccountSuspended {
+                user_id: user_id.into(),
+            });
+        }
+
+        match Password::verify(password, &user.password) {
+            true => {
+                self.reset_failed_login_attempts(user_id).await?;
+                Ok(user)
+            }
+            false => {
+                self.increment_failed_login_attempts(user_id).await?;
+
+                tracing::error!("Failed to verify password");
+                Err(Error::InvalidCredentials {
+                    field: CredentialField::Password,
+                    reason: FailureReason::HashMismatch,
                 })
             }
-            Err(err) => Err(err),
         }
     }
+    async fn create_user(&self, user: User) -> Result<User> {
+        // NOTE maybe hmac to replace this token verification implementation
+        user.validate()?;
 
-    pub async fn find_by_email(&self, email: &str) -> Result<User> {
-        let filter = Parser::mode(self.database_driver).convert(json!( {"email": email}));
+        let password_hash = Password::hash(&user.password)?;
+        let mut user = user.with_password(password_hash);
 
-        match self.adapter.find_one(filter).await {
-            Ok(Some(user)) => Ok(user),
-            Ok(None) => {
-                tracing::error!("Failed to find user by email");
-                Err(Error::UserNotFound {
-                    user_id: None,
-                    email: Some(email.into()),
-                })
-            }
-            Err(err) => Err(err),
-        }
-    }
-
-    pub async fn insert(&self, user: &User) -> Result<String> {
-        self.adapter
-            .insert(user.to_owned())
-            .await
-            .map_err(|_| Error::InvalidCredentials {
-                field: crate::error::CredentialField::Email,
-                reason: crate::error::FailureReason::AlreadyExist,
-            })
-    }
-
-    pub async fn update_password(&self, user_id: &str, password: &str) -> Result<User> {
-        let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
-        let update = json!({ "$set": json!({"password": password}) });
-        let update = Parser::mode(self.database_driver).convert(update);
-
-        let user = self
-            .adapter
-            .find_one_and_update(filter, update)
-            .await
-            .ok_or_else(|| db_error("update password", user_id))?;
+        let user_id: String = self.user_service.insert(&user).await?;
+        user.with_id(&user_id);
 
         Ok(user)
     }
+    async fn create_verification_email(&self, user: &User, expiry: i64) -> Result<String> {
+        let user_id = user.id.as_ref().ok_or(Error::MalformedData {
+            field: CredentialField::ObjectId,
+        })?;
 
-    pub async fn update_reset_window(&self, user_id: &str) -> Result<()> {
-        let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
-        let update = json!({
-            "$set": json!({
-                "passwordResetWindowStart": Utc::now().to_rfc3339()
-            })
-        });
-        let update = Parser::mode(self.database_driver).convert(update);
+        let token = Token::generate(32);
+        let hashed_token = Token::hash(&token);
 
-        self.adapter
-            .find_one_and_update(filter, update)
-            .await
-            .ok_or_else(|| db_error("reset window start", user_id))?;
+        let otp = EmailVerificationToken::default()
+            .with_user_id(user_id)
+            .with_token_hash(&hashed_token)
+            .with_expiray(chrono::Duration::seconds(expiry));
+        self.insert_email_verification_token(otp).await?;
 
-        Ok(())
+        Ok(token)
     }
 
-    pub async fn increment_reset_count(&self, user_id: &str) -> Result<User> {
-        let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
-        let update = json!( { "$inc": json!({"passwordResetCount": 1}) });
-        let update = Parser::mode(self.database_driver).convert(update);
-
-        self.adapter
-            .find_one_and_update(filter, update)
-            .await
-            .ok_or_else(|| db_error("reset counter", user_id))
+    async fn find_user_by_email(&self, email: &str) -> Result<User> {
+        self.user_service.find_by_email(email).await
     }
-
-    pub async fn reset_password_state(&self, user_id: &str) -> Result<User> {
-        let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
-        let update = json!({
-            "$set": json! ({
-                "lastPasswordReset": Utc::now(),
-                "passwordResetCount": 0,
-                "failedResetAttempts": 0
-            })
-        });
-        let update = Parser::mode(self.database_driver).convert(update);
-
-        self.adapter
-            .find_one_and_update(filter, update)
-            .await
-            .ok_or_else(|| db_error("update last password reset time", user_id))
+    async fn find_user(&self, id: &str) -> Result<User> {
+        self.user_service.find(id).await
     }
-}
-
-fn db_error(msg: &str, user_id: &str) -> Error {
-    tracing::error!("Failed to {} for user: {}", msg, user_id);
-    Error::DatabaseError(msg.into())
+    async fn update_user_password(&self, id: &str, hash: &str) -> Result<User> {
+        self.user_service.update_password(id, hash).await
+    }
+    async fn reset_password_state(&self, id: &str) -> Result<User> {
+        self.user_service.reset_password_state(id).await
+    }
+    async fn increment_failed_login_attempts(&self, id: &str) -> Result<User> {
+        self.user_service.increment_failed_login_attempts(id).await
+    }
+    async fn lock_account(&self, id: &str, lockout_duration: i64) -> Result<User> {
+        self.user_service.lock_account(id, lockout_duration).await
+    }
+    async fn unlock_account(&self, id: &str) -> Result<User> {
+        self.user_service.unlock_account(id).await
+    }
+    async fn reset_failed_login_attempts(&self, id: &str) -> Result<User> {
+        self.user_service.reset_failed_login_attempts(id).await
+    }
+    async fn validate_account(&self, id: &str) -> Result<User> {
+        self.user_service.validate_account(id).await
+    }
 }

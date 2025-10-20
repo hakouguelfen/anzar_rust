@@ -33,19 +33,45 @@ pub struct ResetPasswordRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct AuthResponse {
-    #[serde(rename = "accessToken")]
-    pub access_token: String,
-    #[serde(rename = "refreshToken")]
-    pub refresh_token: String,
-    pub user: UserResponse,
+pub struct SessionTokens {
+    pub access: String,
+    pub refresh: String,
 }
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Verification {
+    token: String,
+    link: String,
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AuthResponse {
+    pub user: UserResponse,
+    pub tokens: Option<SessionTokens>,
+    pub verification: Option<Verification>,
+}
+
 impl AuthResponse {
-    pub fn with_jwt(tokens: Tokens, user_response: UserResponse) -> Self {
+    pub fn new(user_response: UserResponse) -> Self {
         Self {
-            access_token: tokens.access_token,
-            refresh_token: tokens.refresh_token,
             user: user_response,
+            tokens: None,
+            verification: None,
         }
+    }
+}
+
+impl AuthResponse {
+    pub fn with_jwt(mut self, tokens: Tokens) -> Self {
+        let _ = self.tokens.insert(SessionTokens {
+            access: tokens.access_token,
+            refresh: tokens.refresh_token,
+        });
+        self
+    }
+    pub fn with_verification(mut self, link: &str, token: &str) -> Self {
+        let _ = self.verification.insert(Verification {
+            token: token.into(),
+            link: link.into(),
+        });
+        self
     }
 }

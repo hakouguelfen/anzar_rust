@@ -1,12 +1,10 @@
-use crate::{error::Error, utils::mongodb_serde::*};
-use actix_web::{FromRequest, HttpMessage, HttpRequest, dev::Payload};
-use chrono::{DateTime, Duration, Utc};
+use crate::utils::mongodb_serde::*;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::FromRow;
-use std::future::{Ready, ready};
+use sqlx::prelude::FromRow;
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize, FromRow)]
-pub struct Session {
+pub struct EmailVerificationToken {
     #[serde(
         rename = "_id",
         default,
@@ -35,46 +33,33 @@ pub struct Session {
     pub used_at: Option<DateTime<Utc>>,
 
     pub token: String,
+    pub valid: bool,
 }
 
-impl Default for Session {
+impl Default for EmailVerificationToken {
     fn default() -> Self {
         Self {
             id: None,
             user_id: String::default(),
-            issued_at: Utc::now(),
-            expires_at: Utc::now() + Duration::hours(24),
-            used_at: None,
             token: String::default(),
+            issued_at: Utc::now(),
+            expires_at: Utc::now() + chrono::Duration::seconds(86400),
+            used_at: None,
+            valid: true,
         }
     }
 }
-
-impl Session {
-    pub fn from_request(session: Session) -> Self {
-        session
-    }
-}
-
-impl Session {
+impl EmailVerificationToken {
     pub fn with_user_id(mut self, user_id: &str) -> Self {
         self.user_id = user_id.into();
         self
     }
-    pub fn with_token(mut self, token: &str) -> Self {
-        self.token = token.into();
+    pub fn with_token_hash(mut self, hash: &str) -> Self {
+        self.token = hash.into();
         self
     }
-}
-
-impl FromRequest for Session {
-    type Error = Error;
-    type Future = Ready<Result<Self, Error>>;
-
-    fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
-        match req.extensions().get::<Session>() {
-            Some(session) => ready(Ok(session.clone())),
-            None => ready(Ok(Session::default())),
-        }
+    pub fn with_expiray(mut self, expires_at: chrono::Duration) -> Self {
+        self.expires_at = Utc::now() + expires_at;
+        self
     }
 }

@@ -1,4 +1,5 @@
 mod models;
+mod repository;
 mod scope;
 
 // #[cfg(test)]
@@ -7,4 +8,5 @@ mod scope;
 pub mod service;
 
 pub use models::{Role, User, UserResponse};
+pub use repository::UserRepository;
 pub use scope::user_scope;

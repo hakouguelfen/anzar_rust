@@ -3,7 +3,7 @@ use std::sync::LazyLock;
 use jsonwebtoken::{DecodingKey, EncodingKey};
 use secrecy::ExposeSecret;
 
-use crate::config::AppConfig;
+use crate::config::EnvironmentConfig;
 
 pub struct Keys {
     pub encoding_acc_tok: EncodingKey,
@@ -27,7 +27,7 @@ impl Keys {
 
 pub static KEYS: LazyLock<Keys> = LazyLock::new(|| {
     // FIXME: Fix this, use middleware or pass it as app_data in startup
-    let configuration = AppConfig::from_env().expect("Failed to read configuration");
+    let configuration = EnvironmentConfig::from_env().expect("Failed to read configuration");
 
     let jwt_acc_secret = configuration.server.jwt_acc_secret;
     let jwt_ref_secret = configuration.server.jwt_ref_secret;

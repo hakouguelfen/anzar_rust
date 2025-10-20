@@ -25,15 +25,15 @@ pub struct RefreshToken {
     #[sqlx(rename = "issuedAt")]
     #[serde(rename = "issuedAt")]
     pub issued_at: DateTime<Utc>,
-    #[sqlx(rename = "expireAt")]
-    #[serde(rename = "expireAt")]
-    pub expire_at: Option<DateTime<Utc>>,
+    #[sqlx(rename = "expiresAt")]
+    #[serde(rename = "expiresAt")]
+    pub expires_at: DateTime<Utc>,
     #[sqlx(rename = "usedAt")]
     #[serde(rename = "usedAt")]
     pub used_at: Option<DateTime<Utc>>,
 
     pub jti: String,
-    pub hash: String,
+    pub token: String,
     pub valid: bool,
 }
 
@@ -43,7 +43,7 @@ impl RefreshToken {
         self
     }
     pub fn with_hash(mut self, hash: &str) -> Self {
-        self.hash = hash.into();
+        self.token = hash.into();
         self.valid = true;
         self
     }
@@ -56,7 +56,7 @@ impl RefreshToken {
         self
     }
     pub fn with_expire_at(mut self, expire_at: DateTime<Utc>) -> Self {
-        let _ = self.expire_at.insert(expire_at);
+        self.expires_at = expire_at;
         self
     }
 }

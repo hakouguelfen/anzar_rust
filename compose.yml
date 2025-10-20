@@ -2,9 +2,7 @@ name: anzar
 
 services:
   server:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
+    build: .
     ports:
       - 3000:3000
     volumes:

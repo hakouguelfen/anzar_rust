@@ -43,6 +43,7 @@ dependencies = [
  "actix-codec",
  "actix-rt",
  "actix-service",
+ "actix-tls",
  "actix-utils",
  "base64 0.22.1",
  "bitflags 2.9.4",
@@ -153,6 +154,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "actix-tls"
+version = "3.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac453898d866cdbecdbc2334fe1738c747b4eba14a677261f2b768ba05329389"
+dependencies = [
+ "actix-rt",
+ "actix-service",
+ "actix-utils",
+ "futures-core",
+ "impl-more",
+ "pin-project-lite",
+ "rustls-pki-types",
+ "tokio",
+ "tokio-rustls",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
 name = "actix-utils"
 version = "3.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -175,6 +195,7 @@ dependencies = [
  "actix-rt",
  "actix-server",
  "actix-service",
+ "actix-tls",
  "actix-utils",
  "actix-web-codegen",
  "bytes",
@@ -333,7 +354,7 @@ checksum = "a23eb6b1614318a8071c9b2521f36b424b2c83db5eb3a0fead4a6c0809af6e61"
 
 [[package]]
 name = "anzar"
-version = "0.4.0"
+version = "0.6.1"
 dependencies = [
  "actix-cors",
  "actix-session",
@@ -346,6 +367,7 @@ dependencies = [
  "dashmap",
  "derive_more 2.0.1",
  "dotenvy",
+ "hmac",
  "jsonwebtoken",
  "mockall",
  "mongodb",
@@ -353,6 +375,7 @@ dependencies = [
  "reqwest",
  "resend-rs",
  "rustls",
+ "rustls-pemfile",
  "secrecy",
  "serde",
  "serde_json",
@@ -3278,6 +3301,15 @@ dependencies = [
  "rustls-webpki",
  "subtle",
  "zeroize",
+]
+
+[[package]]
+name = "rustls-pemfile"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dce314e5fee3f39953d46bb63bb8a46d40c2f8fb7cc5a3b6cab2bde9721d6e50"
+dependencies = [
+ "rustls-pki-types",
 ]
 
 [[package]]
