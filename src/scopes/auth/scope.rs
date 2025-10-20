@@ -4,11 +4,8 @@ use actix_web::{
     web::{self},
 };
 use serde_json::json;
+use validator::ValidateArgs;
 
-use crate::extractors::{
-    AuthPayload, AuthServiceExtractor, AuthenticatedUser, ConfigurationExtractor, ValidatedPayload,
-    ValidatedQuery,
-};
 use crate::middlewares::{
     account_validation::account_validation_middleware, rate_limiting::RATE_LIMITS,
     token_validation::token_validation_middleware,
@@ -16,6 +13,13 @@ use crate::middlewares::{
 use crate::{
     config::AuthStrategy,
     error::{CredentialField, Error, FailureReason, Result},
+};
+use crate::{
+    extractors::{
+        AuthPayload, AuthServiceExtractor, AuthenticatedUser, ConfigurationExtractor,
+        ValidatedPayload, ValidatedQuery,
+    },
+    scopes::auth::models::RegisterRequest,
 };
 
 use crate::utils::Token;
@@ -45,11 +49,14 @@ use super::user::User;
     fields(user_email = %req.email)
 )]
 async fn login(
-    ValidatedPayload(req): ValidatedPayload<LoginRequest>,
+    req: web::Json<LoginRequest>,
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
     ConfigurationExtractor(configuration): ConfigurationExtractor,
     session: actix_session::Session,
 ) -> Result<HttpResponse> {
+    req.validate_with_args(&configuration.auth.password.requirements)
+        .map_err(|err| Error::BadRequest(err.to_string()))?;
+
     let user: User = auth_service
         .authenticate_user(&req.email, &req.password, configuration.auth.password)
         .await?;
@@ -80,21 +87,22 @@ async fn login(
     fields(user_email = %req.email, user_name = %req.username)
 )]
 async fn register(
-    ValidatedPayload(req): ValidatedPayload<User>,
+    req: web::Json<RegisterRequest>,
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
     ConfigurationExtractor(configuration): ConfigurationExtractor,
     session: actix_session::Session,
 ) -> Result<HttpResponse> {
-    let user = auth_service.create_user(req).await?;
+    req.validate_with_args(&configuration.auth.password.requirements)
+        .map_err(|err| Error::BadRequest(err.to_string()))?;
 
-    let email_verification = configuration.auth.email.verification;
-    let email_verification_required = email_verification.required;
+    let user = auth_service.create_user(req.into_inner()).await?;
 
-    if email_verification_required {
-        let email_verification_expiray = email_verification.token_expires_in;
+    let email_config = configuration.auth.email;
+    if email_config.verification.required {
+        let email_verification_expiry = email_config.verification.token_expires_in;
 
         let verification_token = auth_service
-            .create_verification_email(&user, email_verification_expiray)
+            .create_verification_email(&user, email_verification_expiry)
             .await?;
         let link = format!(
             "{}/email/verify?token={}",

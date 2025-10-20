@@ -2,6 +2,8 @@ use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
 use mongodb::bson::oid::ObjectId;
 use validator::ValidationError;
 
+use crate::config::PasswordRequirements;
+
 pub fn validate_token(token: &str) -> Result<(), ValidationError> {
     BASE64_URL_SAFE_NO_PAD
         .decode(token)
@@ -13,5 +15,20 @@ pub fn validate_token(token: &str) -> Result<(), ValidationError> {
 pub fn validate_objectid(id: &str) -> Result<(), ValidationError> {
     ObjectId::parse_str(id).map_err(|_| ValidationError::new("invalid ObjectId"))?;
 
+    Ok(())
+}
+
+pub fn validate_password(
+    password: &str,
+    arg: &PasswordRequirements,
+) -> Result<(), ValidationError> {
+    if (password.len() as u16) < arg.min_length {
+        return Err(ValidationError::new(
+            "password must meet minimum length requirement",
+        ));
+    }
+    if (password.len() as u16) > arg.max_length {
+        return Err(ValidationError::new("password exceeds maximum length"));
+    }
     Ok(())
 }

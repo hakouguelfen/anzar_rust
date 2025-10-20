@@ -5,6 +5,6 @@ mod scope;
 pub mod service;
 
 pub use crate::scopes::user;
-pub use models::AuthResponse;
+pub use models::{AuthResponse, RegisterRequest};
 pub use reset_password::{PasswordResetTokenRepository, model};
 pub use scope::auth_scope;

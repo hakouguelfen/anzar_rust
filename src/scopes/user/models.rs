@@ -12,7 +12,8 @@ pub enum Role {
     Admin,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Validate, FromRow)]
+// FIXME don't use validations here
+#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize, Validate, FromRow)]
 pub struct User {
     #[serde(
         rename = "_id",
@@ -77,9 +78,12 @@ impl User {
     pub fn with_id(&mut self, id: &str) {
         self.id = Some(id.into());
     }
-
-    pub fn with_password(mut self, password: String) -> Self {
-        self.password = password;
+    pub fn with_email(mut self, email: &str) -> Self {
+        self.email = email.into();
+        self
+    }
+    pub fn with_password(mut self, password: &str) -> Self {
+        self.password = password.into();
         self
     }
 }

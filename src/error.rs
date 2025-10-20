@@ -129,6 +129,8 @@ pub enum Error {
     SessionGet(SessionGetError),
     #[from]
     JWT(jsonwebtoken::errors::Error),
+    #[from]
+    Validation(validator::ValidationError),
 }
 
 impl core::fmt::Display for Error {
@@ -184,7 +186,8 @@ impl actix_web::ResponseError for Error {
                 expired_at: _,
             }
             | Error::MalformedData { field: _ }
-            | Error::TokenAlreadyUsed { token_id: _ } => StatusCode::BAD_REQUEST,
+            | Error::TokenAlreadyUsed { token_id: _ }
+            | Error::Validation(_) => StatusCode::BAD_REQUEST,
 
             Error::TokenCreationFailed { token_type: _ }
             | Error::HashingFailure

@@ -1,14 +1,26 @@
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
-// use crate::utils::validation::validate_token;
+use crate::utils::validation::validate_password;
 use crate::{scopes::user::UserResponse, services::jwt::Tokens};
 
+use crate::config::PasswordRequirements;
+
 #[derive(Debug, Deserialize, Validate)]
+#[validate(context = "PasswordRequirements")]
 pub struct LoginRequest {
     #[validate(email)]
     pub email: String,
-    #[validate(length(min = 8, message = "password must be at least 8 characters"))]
+    #[validate(custom(function = "validate_password", use_context))]
+    pub password: String,
+}
+#[derive(Debug, Deserialize, Validate)]
+#[validate(context = "PasswordRequirements")]
+pub struct RegisterRequest {
+    pub username: String,
+    #[validate(email)]
+    pub email: String,
+    #[validate(custom(function = "validate_password", use_context))]
     pub password: String,
 }
 

@@ -6,6 +6,7 @@ use crate::scopes::email::service::EmailVerificationTokenServiceTrait;
 use crate::utils::{CustomPasswordHasher, Password, Token, TokenHasher};
 
 use super::User;
+use crate::scopes::auth::RegisterRequest;
 
 pub trait UserServiceTrait {
     fn authenticate_user(
@@ -14,7 +15,7 @@ pub trait UserServiceTrait {
         password: &str,
         pass_config: PasswordConfig,
     ) -> impl Future<Output = Result<User>>;
-    fn create_user(&self, user: User) -> impl Future<Output = Result<User>>;
+    fn create_user(&self, req: RegisterRequest) -> impl Future<Output = Result<User>>;
     fn create_verification_email(
         &self,
         user: &User,
@@ -80,12 +81,11 @@ impl UserServiceTrait for AuthService {
             }
         }
     }
-    async fn create_user(&self, user: User) -> Result<User> {
-        // NOTE maybe hmac to replace this token verification implementation
-        user.validate()?;
-
-        let password_hash = Password::hash(&user.password)?;
-        let mut user = user.with_password(password_hash);
+    async fn create_user(&self, req: RegisterRequest) -> Result<User> {
+        let password_hash = Password::hash(&req.password)?;
+        let mut user = User::default()
+            .with_email(&req.email)
+            .with_password(&password_hash);
 
         let user_id: String = self.user_service.insert(&user).await?;
         user.with_id(&user_id);
