@@ -3,15 +3,23 @@ use jsonwebtoken::{Validation, decode};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::config::JWT;
 use crate::error::Result;
 use crate::extractors::{Claims, TokenType};
 
-use super::keys::KEYS;
-
-#[derive(Default)]
 pub struct JwtDecoderBuilder {
     token: String,
     token_type: TokenType,
+    decoding_secret: jsonwebtoken::DecodingKey,
+}
+impl JwtDecoderBuilder {
+    pub fn new(decoding_secret: jsonwebtoken::DecodingKey) -> Self {
+        Self {
+            token: String::default(),
+            token_type: TokenType::default(),
+            decoding_secret,
+        }
+    }
 }
 impl JwtDecoderBuilder {
     pub fn with_token(mut self, token: impl Into<String>) -> Self {
@@ -31,37 +39,49 @@ impl JwtDecoderBuilder {
         }
     }
     fn decode_access_token(&self) -> Result<Claims> {
-        let key = &KEYS.decoding_acc_tok;
-        let claims = decode::<Claims>(&self.token, key, &Validation::default())?.claims;
+        let claims =
+            decode::<Claims>(&self.token, &self.decoding_secret, &Validation::default())?.claims;
         Ok(claims)
     }
     fn decode_refresh_token(&self) -> Result<Claims> {
-        let key = &KEYS.decoding_ref_tok;
-        let claims = decode::<Claims>(&self.token, key, &Validation::default())?.claims;
+        let claims =
+            decode::<Claims>(&self.token, &self.decoding_secret, &Validation::default())?.claims;
         Ok(claims)
     }
 }
 
 pub struct JwtEncoderBuilder {
     user_id: String,
+    encoding_secret: jsonwebtoken::EncodingKey,
+    jwt_config: JWT,
 }
 impl JwtEncoderBuilder {
-    pub fn new(user_id: &str) -> Self {
+    pub fn new(user_id: &str, encoding_secret: jsonwebtoken::EncodingKey, jwt_config: JWT) -> Self {
         Self {
             user_id: user_id.into(),
+            encoding_secret,
+            jwt_config,
         }
     }
 
     pub fn build(&self) -> Result<Tokens> {
-        let access_key = &KEYS.encoding_acc_tok;
-        let refresh_key = &KEYS.encoding_ref_tok;
-
-        let claims = Claims::access_token(&self.user_id);
-        let access_token = encode(&Header::default(), &claims, access_key)?;
+        let claims = Claims::new(
+            &self.user_id,
+            TokenType::AccessToken,
+            chrono::Duration::seconds(self.jwt_config.expires_in),
+            &uuid::Uuid::new_v4().to_string(),
+        );
+        let access_token = encode(&Header::default(), &claims, &self.encoding_secret)?;
 
         let refresh_token_jti = Uuid::new_v4().to_string();
-        let claims = Claims::refresh_token(&self.user_id, &refresh_token_jti);
-        let refresh_token = encode(&Header::default(), &claims, refresh_key)?;
+
+        let claims = Claims::new(
+            &self.user_id,
+            TokenType::RefreshToken,
+            chrono::Duration::seconds(self.jwt_config.refresh_expires_in),
+            &refresh_token_jti,
+        );
+        let refresh_token = encode(&Header::default(), &claims, &self.encoding_secret)?;
 
         let tokens: Tokens = Tokens::default()
             .with_access_token(&access_token)

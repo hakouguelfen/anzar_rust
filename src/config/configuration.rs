@@ -9,6 +9,7 @@ pub struct Configuration {
     pub server: Server, // [Optional] Uses Default
     #[serde(default)]
     pub auth: Authentication, // [Optional] Uses Default
+    pub security: Security,
 }
 
 // Database
@@ -67,6 +68,7 @@ impl Default for CorsConfig {
 #[serde(default)]
 pub struct Authentication {
     pub strategy: AuthStrategy,
+    pub jwt: JWT,
     pub email: EmailConfig,
     pub password: PasswordConfig,
 }
@@ -77,6 +79,22 @@ pub enum AuthStrategy {
     #[default]
     Session,
     Jwt,
+}
+
+// ------------------------------------------------------------
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(default)]
+pub struct JWT {
+    pub expires_in: i64,
+    pub refresh_expires_in: i64,
+}
+impl Default for JWT {
+    fn default() -> Self {
+        Self {
+            expires_in: 900,
+            refresh_expires_in: 604800,
+        }
+    }
 }
 
 // ------------------------------------------------------------
@@ -151,4 +169,10 @@ impl Default for PasswordSecurity {
             lockout_duration: 1800,
         }
     }
+}
+
+// ------------------------------------------------------------
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct Security {
+    pub secret_key: String,
 }

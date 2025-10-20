@@ -1,3 +1,4 @@
+use crate::config::JWT;
 use crate::error::{CredentialField, Error, InvalidTokenReason, Result, TokenErrorType};
 use crate::scopes::user::User;
 use crate::services::jwt::{JwtEncoderBuilder, RefreshToken, Tokens};
@@ -8,7 +9,12 @@ use crate::{extractors::AuthPayload, scopes::auth::service::AuthService};
 pub trait JwtServiceTrait {
     fn validate_jwt(&self, payload: AuthPayload, user_id: &str)
     -> impl Future<Output = Result<()>>;
-    fn issue_jwt(&self, user: &User) -> impl std::future::Future<Output = Result<Tokens>>;
+    fn issue_jwt(
+        &self,
+        user: &User,
+        secret: &[u8],
+        jwt_config: JWT,
+    ) -> impl std::future::Future<Output = Result<Tokens>>;
     fn invalidate_jwt(&self, jti: &str) -> impl Future<Output = Result<()>>;
     fn invalidate_session(&self, session_id: &str) -> impl Future<Output = Result<()>>;
     fn logout(&self, payload: AuthPayload) -> impl Future<Output = Result<()>>;
@@ -35,14 +41,17 @@ impl JwtServiceTrait for AuthService {
 
         Ok(())
     }
-    async fn issue_jwt(&self, user: &User) -> Result<Tokens> {
+    async fn issue_jwt(&self, user: &User, secret: &[u8], jwt_config: JWT) -> Result<Tokens> {
         let user_id = user.id.as_ref().ok_or(Error::MalformedData {
             field: CredentialField::ObjectId,
         })?;
 
-        let tokens: Tokens = JwtEncoderBuilder::new(user_id).build().inspect_err(|e| {
-            tracing::error!("Failed to generate authentication tokens: {:?}", e)
-        })?;
+        let encoding_secret = jsonwebtoken::EncodingKey::from_secret(secret);
+        let tokens: Tokens = JwtEncoderBuilder::new(user_id, encoding_secret, jwt_config)
+            .build()
+            .inspect_err(|e| {
+                tracing::error!("Failed to generate authentication tokens: {:?}", e)
+            })?;
 
         let hashed_refresh_token = Token::hash(&tokens.refresh_token);
 

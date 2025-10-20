@@ -1,8 +1,7 @@
 server:
   port: 3000
   host: 0.0.0.0
-  jwt_acc_secret: "08d4f7e9911a070e1ce22ef79c8ef34084b025fa9a9fabcb406820e503e387db"
-  jwt_ref_secret: "f728a7ce67ce61404d46d5a52dede591ebfc257fc7772fe756712d6fb9ba9045"
+  anzar_secret: "f728a7ce67ce61404d46d5a52dede591ebfc257fc7772fe756712d6fb9ba9045"
 database:
   port: 27017
   username: "hakou"

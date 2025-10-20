@@ -36,12 +36,18 @@ fn extract_token_from_header(req: &ServiceRequest, key: String) -> Option<&str> 
         .and_then(|v| v.strip_prefix("Bearer "))
 }
 
-fn decode_claims(token: &str, token_type: TokenType) -> Result<Claims, AuthError> {
+fn decode_claims(
+    token: &str,
+    token_type: TokenType,
+    secret_key: &str,
+) -> Result<Claims, AuthError> {
     let error_type = match token_type {
         TokenType::AccessToken => TokenErrorType::AccessToken,
         TokenType::RefreshToken => TokenErrorType::RefreshToken,
     };
-    JwtDecoderBuilder::default()
+
+    let decoding_secret = jsonwebtoken::DecodingKey::from_secret(secret_key.as_bytes());
+    JwtDecoderBuilder::new(decoding_secret)
         .with_token(token)
         .with_token_type(token_type.clone())
         .build()
@@ -123,15 +129,16 @@ pub async fn token_validation_middleware(
             }
         }
         AuthStrategy::Jwt => {
+            let secret_key = configuration.security.secret_key;
             let access_token = extract_token_from_header(&req, header::AUTHORIZATION.to_string());
             if let Some(token) = access_token {
-                let claims = decode_claims(token, TokenType::AccessToken)?;
+                let claims = decode_claims(token, TokenType::AccessToken, &secret_key)?;
                 req.extensions_mut().insert::<Claims>(claims);
             }
 
             let refresh_token = extract_token_from_header(&req, X_REFRESH_TOKEN.to_string());
             if let Some(token) = refresh_token {
-                let claims = decode_claims(token, TokenType::RefreshToken)?;
+                let claims = decode_claims(token, TokenType::RefreshToken, &secret_key)?;
                 validate_refresh_token(&req, &claims.jti).await?;
 
                 let payload = AuthPayload::from(claims.sub, token, claims.jti);

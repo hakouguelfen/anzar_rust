@@ -4,8 +4,7 @@ use secrecy::SecretString;
 pub struct ServerConfig {
     pub host: String,
     pub port: u16,
-    pub jwt_acc_secret: SecretString,
-    pub jwt_ref_secret: SecretString,
+    pub anzar_secret: SecretString,
 }
 
 impl ServerConfig {

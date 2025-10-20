@@ -42,9 +42,11 @@ async fn test_refresh_token_success() {
             // assert tokens are not empty
             assert!(!access_token.is_empty() && !refresh_token.is_empty());
 
-            let access_token_claims = Helpers::decode_token(access_token, TokenType::AccessToken);
+            let secret_key = test_app.configuration.security.secret_key;
+            let access_token_claims =
+                Helpers::decode_token(access_token, TokenType::AccessToken, &secret_key);
             let refresh_token_claims =
-                Helpers::decode_token(refresh_token, TokenType::RefreshToken);
+                Helpers::decode_token(refresh_token, TokenType::RefreshToken, &secret_key);
 
             // assert new tokens are valid
             assert!(access_token_claims.is_ok());

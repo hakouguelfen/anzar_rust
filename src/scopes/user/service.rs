@@ -84,6 +84,7 @@ impl UserServiceTrait for AuthService {
     async fn create_user(&self, req: RegisterRequest) -> Result<User> {
         let password_hash = Password::hash(&req.password)?;
         let mut user = User::default()
+            .with_username(&req.username)
             .with_email(&req.email)
             .with_password(&password_hash);
 

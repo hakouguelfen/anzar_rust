@@ -70,8 +70,9 @@ impl Helpers {
             .expect("Failed to execute request.")
     }
 
-    pub fn decode_token(token: &str, token_type: TokenType) -> Result<Claims> {
-        JwtDecoderBuilder::default()
+    pub fn decode_token(token: &str, token_type: TokenType, secret_key: &str) -> Result<Claims> {
+        let decoding_secret = jsonwebtoken::DecodingKey::from_secret(secret_key.as_bytes());
+        JwtDecoderBuilder::new(decoding_secret)
             .with_token(token)
             .with_token_type(token_type)
             .build()

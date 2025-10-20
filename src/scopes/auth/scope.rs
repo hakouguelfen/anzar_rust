@@ -70,14 +70,19 @@ async fn login(
         });
     }
 
+    let secret_key = configuration.security.secret_key.as_bytes();
+    let jwt_config = configuration.auth.jwt;
     match configuration.auth.strategy {
         AuthStrategy::Session => auth_service.issue_session(&user).await.map(|token| {
             session.insert("SessionID", token)?;
             Ok(HttpResponse::Ok().json(AuthResponse::new(user.into())))
         })?,
-        AuthStrategy::Jwt => auth_service.issue_jwt(&user).await.map(|tokens| {
-            Ok(HttpResponse::Ok().json(AuthResponse::new(user.into()).with_jwt(tokens)))
-        })?,
+        AuthStrategy::Jwt => auth_service
+            .issue_jwt(&user, secret_key, jwt_config)
+            .await
+            .map(|tokens| {
+                Ok(HttpResponse::Ok().json(AuthResponse::new(user.into()).with_jwt(tokens)))
+            })?,
     }
 }
 
@@ -96,6 +101,9 @@ async fn register(
         .map_err(|err| Error::BadRequest(err.to_string()))?;
 
     let user = auth_service.create_user(req.into_inner()).await?;
+
+    let secret_key = configuration.security.secret_key.as_bytes();
+    let jwt_config = configuration.auth.jwt;
 
     let email_config = configuration.auth.email;
     if email_config.verification.required {
@@ -116,13 +124,16 @@ async fn register(
                     AuthResponse::new(user.into()).with_verification(&link, &verification_token),
                 ))
             })?,
-            AuthStrategy::Jwt => auth_service.issue_jwt(&user).await.map(|tokens| {
-                Ok(HttpResponse::Created().json(
-                    AuthResponse::new(user.into())
-                        .with_jwt(tokens)
-                        .with_verification(&link, &verification_token),
-                ))
-            })?,
+            AuthStrategy::Jwt => auth_service
+                .issue_jwt(&user, secret_key, jwt_config)
+                .await
+                .map(|tokens| {
+                    Ok(HttpResponse::Created().json(
+                        AuthResponse::new(user.into())
+                            .with_jwt(tokens)
+                            .with_verification(&link, &verification_token),
+                    ))
+                })?,
         };
     }
 
@@ -131,9 +142,12 @@ async fn register(
             session.insert("SessionID", token)?;
             Ok(HttpResponse::Created().json(AuthResponse::new(user.into())))
         })?,
-        AuthStrategy::Jwt => auth_service.issue_jwt(&user).await.map(|tokens| {
-            Ok(HttpResponse::Created().json(AuthResponse::new(user.into()).with_jwt(tokens)))
-        })?,
+        AuthStrategy::Jwt => auth_service
+            .issue_jwt(&user, secret_key, jwt_config)
+            .await
+            .map(|tokens| {
+                Ok(HttpResponse::Created().json(AuthResponse::new(user.into()).with_jwt(tokens)))
+            })?,
     }
 }
 
@@ -144,7 +158,7 @@ async fn get_session(session: Session) -> Result<HttpResponse> {
 
 #[tracing::instrument(
     name = "Regenerate user accessToken",
-    skip(payload, auth_service, authenticated_user),
+    skip(payload, auth_service,configuration, authenticated_user),
     fields(user_id = %payload.user_id)
 )]
 
@@ -152,6 +166,7 @@ async fn refresh_token(
     payload: AuthPayload,
     authenticated_user: AuthenticatedUser,
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
+    ConfigurationExtractor(configuration): ConfigurationExtractor,
 ) -> Result<HttpResponse> {
     let user: User = authenticated_user.0;
 
@@ -160,9 +175,14 @@ async fn refresh_token(
     })?;
     auth_service.validate_jwt(payload, user_id).await?;
 
-    auth_service.issue_jwt(&user).await.map(|tokens| {
-        Ok(HttpResponse::Ok().json(AuthResponse::new(user.into()).with_jwt(tokens)))
-    })?
+    let secret_key = configuration.security.secret_key.as_bytes();
+    let jwt_config = configuration.auth.jwt;
+    auth_service
+        .issue_jwt(&user, secret_key, jwt_config)
+        .await
+        .map(
+            |tokens| Ok(HttpResponse::Ok().json(AuthResponse::new(user.into()).with_jwt(tokens))),
+        )?
 }
 
 #[tracing::instrument(

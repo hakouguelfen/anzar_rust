@@ -13,9 +13,11 @@ async fn test_jwt_contains_correct_claims() {
 
     // Login
     let response = Helpers::login(&test_app).await;
+    dbg!(&response);
     assert!(response.status().is_success());
 
     let auth_response: AuthResponse = response.json().await.unwrap();
+    dbg!(&auth_response);
 
     if test_app.configuration.auth.strategy == AuthStrategy::Jwt
         && let Some(tokens) = &auth_response.tokens
@@ -24,8 +26,11 @@ async fn test_jwt_contains_correct_claims() {
         let refresh_token: &str = &tokens.refresh;
 
         assert!(!access_token.is_empty() && !refresh_token.is_empty());
-        let access_token_claims = Helpers::decode_token(access_token, TokenType::AccessToken);
-        let refresh_token_claims = Helpers::decode_token(refresh_token, TokenType::RefreshToken);
+        let secret_key = test_app.configuration.security.secret_key;
+        let access_token_claims =
+            Helpers::decode_token(access_token, TokenType::AccessToken, &secret_key);
+        let refresh_token_claims =
+            Helpers::decode_token(refresh_token, TokenType::RefreshToken, &secret_key);
 
         assert!(access_token_claims.is_ok());
         assert!(refresh_token_claims.is_ok());

@@ -78,6 +78,10 @@ impl User {
     pub fn with_id(&mut self, id: &str) {
         self.id = Some(id.into());
     }
+    pub fn with_username(mut self, username: &str) -> Self {
+        self.username = username.into();
+        self
+    }
     pub fn with_email(mut self, email: &str) -> Self {
         self.email = email.into();
         self
@@ -103,13 +107,10 @@ impl User {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Validate)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct UserResponse {
     pub id: String,
-
-    #[validate(length(min = 4, message = "username must be at least 4 characters"))]
     pub username: String,
-    #[validate(email)]
     pub email: String,
 
     pub role: Role,
