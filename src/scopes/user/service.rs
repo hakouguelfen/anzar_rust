@@ -50,19 +50,15 @@ impl UserServiceTrait for AuthService {
         })?;
 
         if user.account_locked {
-            return Err(Error::AccountSuspended {
-                user_id: user_id.into(),
-            });
-        }
-
-        if user.failed_login_attempts >= pass_config.security.max_failed_login_attempts {
-            self.lock_account(user_id, pass_config.security.lockout_duration)
-                .await?;
-
-            // NOTE DOCS tell developer to send an email
-            return Err(Error::AccountSuspended {
-                user_id: user_id.into(),
-            });
+            if let Some(locked_until) = user.locked_until
+                && chrono::Utc::now() > locked_until
+            {
+                self.unlock_account(user_id).await?;
+            } else {
+                return Err(Error::AccountSuspended {
+                    user_id: user_id.into(),
+                });
+            }
         }
 
         match Password::verify(password, &user.password) {
@@ -71,15 +67,23 @@ impl UserServiceTrait for AuthService {
                 Ok(user)
             }
             false => {
+                tracing::error!("Failed to verify password");
+
                 let user = self.increment_failed_login_attempts(user_id).await?;
+                if user.failed_login_attempts >= pass_config.security.max_failed_login_attempts {
+                    self.lock_account(user_id, pass_config.security.lockout_duration)
+                        .await?;
 
-                let base_secs = 2_u64.pow(user.failed_login_attempts as u32);
-                let jitter = rand::random::<u64>() % 5;
+                    return Err(Error::AccountSuspended {
+                        user_id: user_id.into(),
+                    });
+                }
+
+                let base_secs = 2_u64.pow(user.failed_login_attempts as u32).min(12);
+                let jitter = rand::random::<u64>() % 3;
                 let duration = std::time::Duration::from_secs(base_secs + jitter);
-
                 tokio::time::sleep(duration).await;
 
-                tracing::error!("Failed to verify password");
                 Err(Error::InvalidCredentials {
                     field: CredentialField::Password,
                     reason: FailureReason::HashMismatch,
