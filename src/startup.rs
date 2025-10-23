@@ -18,7 +18,7 @@ use rustls_pemfile::{certs, private_key};
 use crate::config::AppState;
 use crate::error::{Error, FailureReason};
 use crate::middlewares::account_validation;
-use crate::middlewares::rate_limiting::ip_rate_limit_middleware;
+// use crate::middlewares::rate_limiting::ip_rate_limit_middleware;
 use crate::middlewares::token_validation;
 use crate::scopes::{auth, email, health, user};
 
@@ -90,7 +90,7 @@ pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, s
             .wrap(TracingLogger::default())
             .wrap(cors)
             .wrap(session)
-            .wrap(from_fn(ip_rate_limit_middleware))
+            // .wrap(from_fn(ip_rate_limit_middleware))
             .app_data(web::Data::new(app_state_inner.clone()))
             .service(health::health_scope())
             .service(auth::auth_scope())

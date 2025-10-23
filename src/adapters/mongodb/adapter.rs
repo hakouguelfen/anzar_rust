@@ -51,7 +51,7 @@ where
             .map_err(|e| Error::DatabaseError(e.to_string()))
     }
 
-    async fn find_one_and_update(&self, filter: Value, update: Value) -> Option<T> {
+    async fn find_one_and_update(&self, filter: Value, update: Value) -> Result<Option<T>, Error> {
         let mut mongo_filter = mongodb::bson::to_document(&filter).unwrap();
         let mongo_update = mongodb::bson::to_document(&update).unwrap();
 
@@ -63,7 +63,7 @@ where
             .find_one_and_update(mongo_filter, mongo_update)
             .return_document(ReturnDocument::After)
             .await
-            .ok()?
+            .map_err(|e| Error::DatabaseError(e.to_string()))
     }
 
     async fn update_many(&self, filter: Value, update: Value) -> Result<(), Error> {

@@ -61,12 +61,13 @@ impl SessionRepository {
         });
         let update = Parser::mode(self.database_driver).convert(update);
 
-        self.adapter
-            .find_one_and_update(filter, update)
-            .await
-            .ok_or_else(|| Error::TokenNotFound {
+        match self.adapter.find_one_and_update(filter, update).await {
+            Ok(Some(session)) => Ok(session),
+            Ok(None) => Err(Error::TokenNotFound {
                 token_id: id.into(),
-            })
+            }),
+            Err(err) => Err(err),
+        }
     }
 
     pub async fn invalidate(&self, token: &str) -> Result<()> {

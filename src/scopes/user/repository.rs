@@ -72,13 +72,11 @@ impl UserRepository {
         let update = json!({ "$set": json!({"password": password}) });
         let update = Parser::mode(self.database_driver).convert(update);
 
-        let user = self
-            .adapter
-            .find_one_and_update(filter, update)
-            .await
-            .ok_or_else(|| db_error("update password", user_id))?;
-
-        Ok(user)
+        match self.adapter.find_one_and_update(filter, update).await {
+            Ok(Some(user)) => Ok(user),
+            Ok(None) => Err(Error::InvalidRequest),
+            Err(err) => Err(err),
+        }
     }
 
     pub async fn validate_account(&self, user_id: &str) -> Result<User> {
@@ -86,13 +84,11 @@ impl UserRepository {
         let update = json!({ "$set": json!({"verified": true}) });
         let update = Parser::mode(self.database_driver).convert(update);
 
-        let user = self
-            .adapter
-            .find_one_and_update(filter, update)
-            .await
-            .ok_or_else(|| db_error("verify account", user_id))?;
-
-        Ok(user)
+        match self.adapter.find_one_and_update(filter, update).await {
+            Ok(Some(user)) => Ok(user),
+            Ok(None) => Err(Error::InvalidRequest),
+            Err(err) => Err(err),
+        }
     }
 
     pub async fn update_reset_window(&self, user_id: &str) -> Result<()> {
@@ -104,12 +100,11 @@ impl UserRepository {
         });
         let update = Parser::mode(self.database_driver).convert(update);
 
-        self.adapter
-            .find_one_and_update(filter, update)
-            .await
-            .ok_or_else(|| db_error("reset window start", user_id))?;
-
-        Ok(())
+        match self.adapter.find_one_and_update(filter, update).await {
+            Ok(Some(_user)) => Ok(()),
+            Ok(None) => Err(Error::InvalidRequest),
+            Err(err) => Err(err),
+        }
     }
 
     pub async fn increment_reset_count(&self, user_id: &str) -> Result<User> {
@@ -117,10 +112,11 @@ impl UserRepository {
         let update = json!( { "$inc": json!({"passwordResetCount": 1}) });
         let update = Parser::mode(self.database_driver).convert(update);
 
-        self.adapter
-            .find_one_and_update(filter, update)
-            .await
-            .ok_or_else(|| db_error("reset counter", user_id))
+        match self.adapter.find_one_and_update(filter, update).await {
+            Ok(Some(user)) => Ok(user),
+            Ok(None) => Err(Error::InvalidRequest),
+            Err(err) => Err(err),
+        }
     }
 
     pub async fn increment_failed_login_attempts(&self, user_id: &str) -> Result<User> {
@@ -128,10 +124,11 @@ impl UserRepository {
         let update = json!( { "$inc": json!({"failedLoginAttempts": 1}) });
         let update = Parser::mode(self.database_driver).convert(update);
 
-        self.adapter
-            .find_one_and_update(filter, update)
-            .await
-            .ok_or_else(|| db_error("failed attempts", user_id))
+        match self.adapter.find_one_and_update(filter, update).await {
+            Ok(Some(user)) => Ok(user),
+            Ok(None) => Err(Error::InvalidRequest),
+            Err(err) => Err(err),
+        }
     }
 
     pub async fn lock_account(&self, user_id: &str, lockout_duration: i64) -> Result<User> {
@@ -144,10 +141,11 @@ impl UserRepository {
         });
         let update = Parser::mode(self.database_driver).convert(update);
 
-        self.adapter
-            .find_one_and_update(filter, update)
-            .await
-            .ok_or_else(|| db_error("locked until", user_id))
+        match self.adapter.find_one_and_update(filter, update).await {
+            Ok(Some(user)) => Ok(user),
+            Ok(None) => Err(Error::InvalidRequest),
+            Err(err) => Err(err),
+        }
     }
     pub async fn unlock_account(&self, user_id: &str) -> Result<User> {
         let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
@@ -159,10 +157,11 @@ impl UserRepository {
         });
         let update = Parser::mode(self.database_driver).convert(update);
 
-        self.adapter
-            .find_one_and_update(filter, update)
-            .await
-            .ok_or_else(|| db_error("locked until", user_id))
+        match self.adapter.find_one_and_update(filter, update).await {
+            Ok(Some(user)) => Ok(user),
+            Ok(None) => Err(Error::InvalidRequest),
+            Err(err) => Err(err),
+        }
     }
 
     pub async fn reset_failed_login_attempts(&self, user_id: &str) -> Result<User> {
@@ -175,10 +174,11 @@ impl UserRepository {
         });
         let update = Parser::mode(self.database_driver).convert(update);
 
-        self.adapter
-            .find_one_and_update(filter, update)
-            .await
-            .ok_or_else(|| db_error("failed attempts", user_id))
+        match self.adapter.find_one_and_update(filter, update).await {
+            Ok(Some(user)) => Ok(user),
+            Ok(None) => Err(Error::InvalidRequest),
+            Err(err) => Err(err),
+        }
     }
 
     pub async fn reset_password_state(&self, user_id: &str) -> Result<User> {
@@ -193,14 +193,10 @@ impl UserRepository {
         });
         let update = Parser::mode(self.database_driver).convert(update);
 
-        self.adapter
-            .find_one_and_update(filter, update)
-            .await
-            .ok_or_else(|| db_error("update last password reset time", user_id))
+        match self.adapter.find_one_and_update(filter, update).await {
+            Ok(Some(user)) => Ok(user),
+            Ok(None) => Err(Error::InvalidRequest),
+            Err(err) => Err(err),
+        }
     }
-}
-
-fn db_error(msg: &str, user_id: &str) -> Error {
-    tracing::error!("Failed to {} for user: {}", msg, user_id);
-    Error::DatabaseError(msg.into())
 }

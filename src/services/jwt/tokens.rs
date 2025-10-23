@@ -50,13 +50,17 @@ impl JwtDecoderBuilder {
     }
 }
 
-pub struct JwtEncoderBuilder {
+pub struct JwtEncoderBuilder<'a> {
     user_id: String,
     encoding_secret: jsonwebtoken::EncodingKey,
-    jwt_config: JWT,
+    jwt_config: &'a JWT,
 }
-impl JwtEncoderBuilder {
-    pub fn new(user_id: &str, encoding_secret: jsonwebtoken::EncodingKey, jwt_config: JWT) -> Self {
+impl<'a> JwtEncoderBuilder<'a> {
+    pub fn new(
+        user_id: &str,
+        encoding_secret: jsonwebtoken::EncodingKey,
+        jwt_config: &'a JWT,
+    ) -> Self {
         Self {
             user_id: user_id.into(),
             encoding_secret,

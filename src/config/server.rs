@@ -1,6 +1,6 @@
 use secrecy::SecretString;
 
-#[derive(serde::Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 pub struct ServerConfig {
     pub host: String,
     pub port: u16,

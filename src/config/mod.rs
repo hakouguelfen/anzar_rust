@@ -15,7 +15,7 @@ use server::ServerConfig;
 
 use crate::config::database::get_db_type;
 
-#[derive(serde::Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 pub struct EnvironmentConfig {
     pub name: String,
     pub config: String,

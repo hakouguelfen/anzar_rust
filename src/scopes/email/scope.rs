@@ -7,6 +7,7 @@ use validator::Validate;
 
 use crate::{
     error::Result,
+    extractors::ConfigurationExtractor,
     scopes::{email::service::EmailVerificationTokenServiceTrait, user::service::UserServiceTrait},
 };
 use crate::{
@@ -22,6 +23,7 @@ struct TokenQuery {
 #[tracing::instrument(name = "Find user", skip(auth_service, query))]
 async fn verify_email(
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
+    ConfigurationExtractor(configuration): ConfigurationExtractor,
     ValidatedQuery(query): ValidatedQuery<TokenQuery>,
 ) -> Result<HttpResponse> {
     let token = query.token;
@@ -46,9 +48,15 @@ async fn verify_email(
         .validate_account(&email_verificaiton_token.user_id)
         .await?;
 
-    Ok(HttpResponse::Ok().finish())
+    let success_redirect = match configuration.auth.email.verification.success_redirect {
+        Some(url) => url,
+        None => configuration.api_url,
+    };
+    Ok(HttpResponse::Found()
+        .insert_header((actix_web::http::header::LOCATION, success_redirect))
+        .finish())
 }
 
 pub fn email_scope() -> Scope {
-    web::scope("/email/verify").route("", web::get().to(verify_email))
+    web::scope("/email").route("/verify", web::get().to(verify_email))
 }

@@ -1,14 +1,16 @@
 use crate::config::JWT;
-use crate::error::{CredentialField, Error, InvalidTokenReason, Result, TokenErrorType};
+use crate::error::{CredentialField, Error, Result};
 use crate::scopes::user::User;
 use crate::services::jwt::{JwtEncoderBuilder, RefreshToken, Tokens};
 use crate::utils::{Token, TokenHasher};
 use crate::{extractors::AuthPayload, scopes::auth::service::AuthService};
 
-// [ JwtServiceTrait ]
 pub trait JwtServiceTrait {
-    fn validate_jwt(&self, payload: AuthPayload, user_id: &str)
-    -> impl Future<Output = Result<()>>;
+    fn consume_refresh_token(
+        &self,
+        payload: AuthPayload,
+        user_id: &str,
+    ) -> impl Future<Output = Result<()>>;
     fn issue_jwt(
         &self,
         user: &User,
@@ -22,21 +24,10 @@ pub trait JwtServiceTrait {
     fn find_jwt_by_jti(&self, jti: &str) -> impl Future<Output = Result<RefreshToken>>;
 }
 impl JwtServiceTrait for AuthService {
-    async fn validate_jwt(&self, payload: AuthPayload, user_id: &str) -> Result<()> {
-        if self.jwt_service.find(payload).await.is_none() {
-            tracing::error!("Invalid refresh token detected for user: {}", user_id);
-
+    async fn consume_refresh_token(&self, payload: AuthPayload, user_id: &str) -> Result<()> {
+        if self.jwt_service.find_and_consume(payload).await.is_err() {
             // TODO: send an email indicating a breach
-            // revoke or invalidate one token ?
-            // maybe a user decided to revoke access to one of his devices
-            // then he tried to use that devices, token is revoked but trying to validate it
-            // will fail then self.jwt_service.revoke(user_id).await? will be excuted
-            // [NOT RECOMMENDED]
             self.jwt_service.revoke(user_id).await?;
-            return Err(Error::InvalidToken {
-                token_type: TokenErrorType::RefreshToken,
-                reason: InvalidTokenReason::NotFound,
-            });
         }
 
         Ok(())
@@ -47,7 +38,7 @@ impl JwtServiceTrait for AuthService {
         })?;
 
         let encoding_secret = jsonwebtoken::EncodingKey::from_secret(secret);
-        let tokens: Tokens = JwtEncoderBuilder::new(user_id, encoding_secret, jwt_config)
+        let tokens: Tokens = JwtEncoderBuilder::new(user_id, encoding_secret, &jwt_config)
             .build()
             .inspect_err(|e| {
                 tracing::error!("Failed to generate authentication tokens: {:?}", e)
@@ -60,7 +51,9 @@ impl JwtServiceTrait for AuthService {
             .with_hash(&hashed_refresh_token)
             .with_jti(&tokens.refresh_token_jti)
             .with_issued_at(chrono::Utc::now())
-            .with_expire_at(chrono::Utc::now() + chrono::Duration::days(30));
+            .with_expire_at(
+                chrono::Utc::now() + chrono::Duration::seconds(jwt_config.refresh_expires_in),
+            );
 
         self.jwt_service.insert(refresh_token).await?;
 

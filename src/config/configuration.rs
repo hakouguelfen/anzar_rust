@@ -9,7 +9,7 @@ pub struct Configuration {
     pub server: Server, // [Optional] Uses Default
     #[serde(default)]
     pub auth: Authentication, // [Optional] Uses Default
-    pub security: Security,
+    pub security: Security, // Required
 }
 
 // Database
@@ -109,12 +109,16 @@ pub struct EmailConfig {
 pub struct EmailVerification {
     pub required: bool,
     pub token_expires_in: i64, // maybe option
+    pub success_redirect: Option<String>,
+    pub error_redirect: Option<String>,
 }
 impl Default for EmailVerification {
     fn default() -> Self {
         Self {
             required: false,
             token_expires_in: 3600,
+            success_redirect: None,
+            error_redirect: None,
         }
     }
 }
@@ -147,11 +151,16 @@ impl Default for PasswordRequirements {
 #[serde(default)]
 pub struct PasswordReset {
     pub token_expires_in: i64, // maybe option
+    // TODO: remove option and use redirect to root
+    pub success_redirect: Option<String>,
+    pub error_redirect: Option<String>,
 }
 impl Default for PasswordReset {
     fn default() -> Self {
         Self {
             token_expires_in: 3600,
+            success_redirect: None,
+            error_redirect: None,
         }
     }
 }

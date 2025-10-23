@@ -8,7 +8,7 @@ pub enum DatabaseDriver {
     MongoDB,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 pub struct DatabaseConfig {
     pub username: String,
     pub password: SecretString,

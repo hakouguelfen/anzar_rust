@@ -16,7 +16,6 @@ async fn main() -> std::io::Result<()> {
     let listener = TcpListener::bind(address)?;
 
     let app_state = AppState::prod(&env_config).await?;
-    dbg!(&app_state.configuration);
     let server = startup::run(listener, app_state).await?;
 
     drop(env_config);

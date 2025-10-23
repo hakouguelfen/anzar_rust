@@ -37,6 +37,7 @@ pub struct TestApp {
 pub struct Common;
 impl Common {
     pub async fn spawn_app() -> Result<TestApp, std::io::Error> {
+        //FIXME remove hardcoded jwt token from tests
         LazyLock::force(&TRACING);
 
         let listener = TcpListener::bind("localhost:0").expect("Failed to random port");

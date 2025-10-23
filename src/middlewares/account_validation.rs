@@ -80,6 +80,7 @@ pub async fn account_validation_middleware(
     req: ServiceRequest,
     next: Next<impl MessageBody>,
 ) -> Result<ServiceResponse<impl MessageBody>, Error> {
+    dbg!("ⵎⴰⵄⴼ ⵓⵎⴰ, ⵎⵜⵜⴰ ⵀⵜⵙⴰⵡⵉⴹ");
     // pre-processing
     let user_id = extract_user_id_from_extensions(&req)?;
     let user = validate_user(&req, &user_id).await?;

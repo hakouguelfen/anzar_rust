@@ -22,11 +22,12 @@ pub trait PasswordResetTokenServiceTrait {
     fn insert_password_reset_token(
         &self,
         otp: PasswordResetToken,
-    ) -> impl Future<Output = Result<()>>;
+    ) -> impl Future<Output = Result<String>>;
 }
 impl PasswordResetTokenServiceTrait for AuthService {
     async fn validate_reset_password_token(&self, token: &str) -> Result<PasswordResetToken> {
         let hash = Token::hash(token);
+        // FIXME: → Must check hash + expiry + not revoked in one DB transaction.
 
         // 2. Checks the database for a matching token
         let reset_token = self.password_reset_token_service.find(&hash).await?;
@@ -76,7 +77,7 @@ impl PasswordResetTokenServiceTrait for AuthService {
     async fn revoke_password_reset_token(&self, user_id: &str) -> Result<()> {
         self.password_reset_token_service.revoke(user_id).await
     }
-    async fn insert_password_reset_token(&self, otp: PasswordResetToken) -> Result<()> {
+    async fn insert_password_reset_token(&self, otp: PasswordResetToken) -> Result<String> {
         self.password_reset_token_service.insert(otp).await
     }
 }

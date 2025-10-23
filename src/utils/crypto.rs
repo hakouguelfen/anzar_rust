@@ -10,6 +10,7 @@ use sha2::{Digest, Sha256};
 pub trait TokenHasher {
     fn generate(length: usize) -> String;
     fn hash(token: &str) -> String;
+    fn verify(a: &str, b: &str) -> bool;
 }
 
 pub struct Token {}
@@ -27,6 +28,17 @@ impl TokenHasher for Token {
         hasher.update(token.as_bytes());
 
         format!("{:x}", hasher.finalize())
+    }
+
+    fn verify(a: &str, b: &str) -> bool {
+        if a.len() != b.len() {
+            return false;
+        }
+
+        a.bytes()
+            .zip(b.bytes())
+            .fold(0, |acc, (a, b)| acc | (a ^ b))
+            == 0
     }
 }
 

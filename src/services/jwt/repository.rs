@@ -41,7 +41,7 @@ impl JWTRepository {
         Ok(())
     }
 
-    pub async fn find(&self, payload: AuthPayload) -> Option<RefreshToken> {
+    pub async fn find_and_consume(&self, payload: AuthPayload) -> Result<RefreshToken> {
         let filter = json! ({
             "jti": payload.jti,
             "userId": &payload.user_id,
@@ -58,7 +58,14 @@ impl JWTRepository {
         });
         let update = Parser::mode(self.database_driver).convert(update);
 
-        self.adapter.find_one_and_update(filter, update).await
+        match self.adapter.find_one_and_update(filter, update).await {
+            Ok(Some(refresh_token)) => Ok(refresh_token),
+            Ok(None) => Err(Error::InvalidToken {
+                token_type: TokenErrorType::RefreshToken,
+                reason: crate::error::InvalidTokenReason::NotFound,
+            }),
+            Err(err) => Err(err),
+        }
     }
 
     pub async fn find_by_jti(&self, jti: &str) -> Result<RefreshToken> {
@@ -79,17 +86,14 @@ impl JWTRepository {
         let update = json! ({ "$set": json! ({ "valid": false, "usedAt": Utc::now() }) });
         let update = Parser::mode(self.database_driver).convert(update);
 
-        // let res = self.adapter.find_one_and_update(filter, update).await;
-        self.adapter
-            .find_one_and_update(filter, update)
-            .await
-            .ok_or_else(|| {
-                tracing::error!("failed to invalidate token");
-                Error::InvalidToken {
-                    token_type: TokenErrorType::RefreshToken,
-                    reason: crate::error::InvalidTokenReason::Malformed,
-                }
-            })
+        match self.adapter.find_one_and_update(filter, update).await {
+            Ok(Some(refresh_token)) => Ok(refresh_token),
+            Ok(None) => Err(Error::InvalidToken {
+                token_type: TokenErrorType::RefreshToken,
+                reason: crate::error::InvalidTokenReason::Malformed,
+            }),
+            Err(err) => Err(err),
+        }
     }
     pub async fn revoke(&self, user_id: &str) -> Result<()> {
         let filter = Parser::mode(self.database_driver).convert(json!({"userId": user_id}));

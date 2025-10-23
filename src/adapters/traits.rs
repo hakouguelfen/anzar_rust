@@ -10,7 +10,7 @@ pub trait DatabaseAdapter<T: Send + Sync + Serialize + DeserializeOwned + 'stati
 {
     async fn insert(&self, data: T) -> Result<String, Error>;
     async fn find_one(&self, filter: Value) -> Result<Option<T>, Error>;
-    async fn find_one_and_update(&self, filter: Value, update: Value) -> Option<T>;
+    async fn find_one_and_update(&self, filter: Value, update: Value) -> Result<Option<T>, Error>;
     async fn update_many(&self, filter: Value, update: Value) -> Result<(), Error>;
 
     async fn delete_one(&self, filter: Value) -> Result<(), Error>;

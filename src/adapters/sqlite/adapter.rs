@@ -84,11 +84,11 @@ where
             .map_err(|e| Error::DatabaseError(e.to_string()))
     }
 
-    async fn find_one_and_update(&self, filter: Value, update: Value) -> Option<T> {
-        let obj_update = _parse_to_map(update).ok()?;
+    async fn find_one_and_update(&self, filter: Value, update: Value) -> Result<Option<T>, Error> {
+        let obj_update = _parse_to_map(update)?;
         let clause_update = _parse_to_sql(&obj_update, ", ");
 
-        let obj_filter = _parse_to_map(filter).ok()?;
+        let obj_filter = _parse_to_map(filter)?;
         let clause_filter = _parse_to_sql(&obj_filter, " AND ");
 
         let sql = format!(
@@ -107,11 +107,7 @@ where
         query
             .fetch_optional(&self.pool)
             .await
-            .map_err(|e| {
-                dbg!(&e);
-                Error::DatabaseError(e.to_string())
-            })
-            .ok()?
+            .map_err(|e| Error::DatabaseError(e.to_string()))
     }
 
     async fn update_many(&self, filter: Value, update: Value) -> Result<(), Error> {

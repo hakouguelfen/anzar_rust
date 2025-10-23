@@ -6,10 +6,6 @@ use actix_web::{
 use serde_json::json;
 use validator::ValidateArgs;
 
-use crate::middlewares::{
-    account_validation::account_validation_middleware, rate_limiting::RATE_LIMITS,
-    token_validation::token_validation_middleware,
-};
 use crate::{
     config::AuthStrategy,
     error::{CredentialField, Error, FailureReason, Result},
@@ -20,6 +16,13 @@ use crate::{
         ValidatedPayload, ValidatedQuery,
     },
     scopes::auth::models::RegisterRequest,
+};
+use crate::{
+    middlewares::{
+        account_validation::account_validation_middleware, rate_limiting::RATE_LIMITS,
+        token_validation::token_validation_middleware,
+    },
+    scopes::auth::models::ResetLink,
 };
 
 use crate::utils::Token;
@@ -173,7 +176,7 @@ async fn refresh_token(
     let user_id = user.id.as_ref().ok_or(Error::MalformedData {
         field: CredentialField::ObjectId,
     })?;
-    auth_service.validate_jwt(payload, user_id).await?;
+    auth_service.consume_refresh_token(payload, user_id).await?;
 
     let secret_key = configuration.security.secret_key.as_bytes();
     let jwt_config = configuration.auth.jwt;
@@ -213,15 +216,15 @@ async fn request_password_reset(
     let start = std::time::Instant::now();
 
     let email: String = req.email;
+    // 2.
+    let mut bucket = RATE_LIMITS.entry(email.clone()).or_default();
+    bucket.run()?;
+
     let result = async {
         let user = auth_service.find_user_by_email(&email).await?;
         let user_id = user.id.as_ref().ok_or(Error::MalformedData {
             field: CredentialField::ObjectId,
         })?;
-
-        // 2.
-        let mut bucket = RATE_LIMITS.entry(user_id.clone()).or_default();
-        bucket.run()?;
 
         // 3.
         auth_service.revoke_password_reset_token(user_id).await?;
@@ -231,34 +234,43 @@ async fn request_password_reset(
         let hashed_token = Token::hash(&token);
 
         // 5.
-        let otp = PasswordResetToken::default()
+        let expiry_timestamp =
+            chrono::Duration::seconds(configuration.auth.password.reset.token_expires_in);
+        let password_reset_token = PasswordResetToken::default()
             .with_user_id(user_id)
             .with_token_hash(&hashed_token)
-            .with_expiray(chrono::Duration::seconds(
-                configuration.auth.password.reset.token_expires_in,
-            ));
-        auth_service.insert_password_reset_token(otp).await?;
+            .with_expiray(&expiry_timestamp);
+        auth_service
+            .insert_password_reset_token(password_reset_token)
+            .await?;
 
         // 6.
         auth_service.increment_reset_attempts(user).await?;
 
-        let reset_link = format!(
+        let link = format!(
             "{}/auth/password/reset?token={}",
             &configuration.api_url, &token
         );
-        Ok::<String, Error>(reset_link)
+        let reset_link = ResetLink {
+            link,
+            expires_at: expiry_timestamp,
+        };
+        Ok::<ResetLink, Error>(reset_link)
     }
     .await;
 
     let elapsed = start.elapsed().as_millis() as u64;
     if elapsed < TIMING_DELAY_MS {
-        std::thread::sleep(std::time::Duration::from_millis(TIMING_DELAY_MS - elapsed));
+        tokio::time::sleep(tokio::time::Duration::from_millis(
+            TIMING_DELAY_MS.saturating_sub(elapsed),
+        ))
+        .await;
     }
 
     // NOTE Use HMAC or JWT signing so you can later verify it server-side.
     // NOTE maybe use for email_verification
     match result {
-        Ok(reset_link) => Ok(HttpResponse::Ok().json(json!({ "message": reset_link }))),
+        Ok(reset_link) => Ok(HttpResponse::Ok().json(reset_link)),
         Err(err) => {
             tracing::error!("Password reset failed for email {}: {}", email, err);
             Err(err)
@@ -269,41 +281,62 @@ async fn request_password_reset(
 async fn render_reset_form(
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
     ValidatedQuery(query): ValidatedQuery<TokenQuery>,
+    session: actix_session::Session,
 ) -> Result<HttpResponse> {
     let token: &str = &query.token;
     auth_service.validate_reset_password_token(token).await?;
 
-    let body = include_str!("templates/update_password.html");
+    let csrf_token = Token::generate(64);
+    session.insert("csrf_token", &csrf_token)?;
+
+    let body = include_str!("templates/update_password.html")
+        .replace("{{TOKEN}}", token)
+        .replace("{{CSRF_TOKEN}}", &csrf_token);
     Ok(HttpResponse::Ok()
+        .insert_header(("X-Frame-Options", "DENY"))
+        .insert_header(("X-Content-Type-Options", "nosniff"))
+        .insert_header(("Content-Security-Policy", "default-src 'self'"))
         .content_type("text/html; charset=utf-8")
         .body(body))
 }
 
-// NOTE FIXME TODO: CSRF protection
 async fn submit_new_password(
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
-    request: web::Form<ResetPasswordRequest>,
-    // ValidatedQuery(request): ValidatedQuery<ResetPasswordRequest>,
+    ConfigurationExtractor(configuration): ConfigurationExtractor,
+    session: actix_session::Session,
+    form: web::Form<ResetPasswordRequest>,
 ) -> Result<HttpResponse> {
-    const RESPONSE_MESSAGE: &str =
-        "Password successfully reset. Please login with your new password.";
+    // 0. validat password strength
+    form.validate_with_args(&configuration.auth.password.requirements)
+        .map_err(|err| Error::BadRequest(err.to_string()))?;
+
+    // 0.5 Verify CSRF token
+    if let Some(expected) = session.get::<String>("csrf_token")? {
+        if !Token::verify(&expected, &form.csrf_token) {
+            return Ok(HttpResponse::Forbidden().body("Invalid CSRF token"));
+        }
+    } else {
+        return Ok(HttpResponse::Forbidden().body("Missing CSRF token"));
+    }
+    session.remove("csrf_token");
+
+    let token: &str = &form.token;
 
     // 1. ReValidate token
-    let token: &str = &request.token;
     let reset_token = auth_service.validate_reset_password_token(token).await?;
-
-    let user_id = reset_token.user_id;
-    let reset_token_id = reset_token.id.ok_or(Error::InvalidToken {
-        token_type: crate::error::TokenErrorType::PasswordResetToken,
-        reason: crate::error::InvalidTokenReason::Malformed,
+    let reset_token_id = reset_token.id.as_ref().ok_or(Error::MalformedData {
+        field: CredentialField::ObjectId,
     })?;
+    let user_id = reset_token.user_id;
+
+    // NOTE: → Rate limit per token
 
     // 2. Ensure password is different then previous
     let user = auth_service.find_user(&user_id).await?;
     if user.account_locked {
         return Err(Error::AccountSuspended { user_id });
     }
-    if Password::verify(&request.password, &user.password) {
+    if Password::verify(&form.password, &user.password) {
         tracing::warn!("Password reuse attempt for user: {}", user_id);
         return Err(Error::InvalidCredentials {
             field: CredentialField::Password,
@@ -312,7 +345,7 @@ async fn submit_new_password(
     }
 
     // 3.
-    let hashed_password = Password::hash(&request.password)?;
+    let hashed_password = Password::hash(&form.password)?;
     auth_service
         .update_user_password(&user_id, &hashed_password)
         .await?;
@@ -320,7 +353,7 @@ async fn submit_new_password(
 
     // 4.
     auth_service
-        .invalidate_password_reset_token(&reset_token_id)
+        .invalidate_password_reset_token(reset_token_id)
         .await?;
 
     // 6.
@@ -330,13 +363,22 @@ async fn submit_new_password(
     // 7. TODO it may not be neccessary
     auth_service.logout_all(&user_id).await?;
 
-    Ok(HttpResponse::Ok().json(json!({ "message": RESPONSE_MESSAGE })))
+    let success_redirect = match configuration.auth.password.reset.success_redirect {
+        Some(url) => url,
+        None => configuration.api_url,
+    };
+    Ok(HttpResponse::Found()
+        .insert_header((actix_web::http::header::LOCATION, success_redirect))
+        .finish())
 }
 
 pub fn auth_scope() -> Scope {
     web::scope("/auth")
         .route("/login", web::post().to(login))
         .route("/register", web::post().to(register))
+        .route("/password/forgot", web::post().to(request_password_reset))
+        .route("/password/reset", web::get().to(render_reset_form))
+        .route("/password/reset", web::post().to(submit_new_password))
         .service(
             web::scope("")
                 .wrap(from_fn(account_validation_middleware))
@@ -345,7 +387,4 @@ pub fn auth_scope() -> Scope {
                 .route("/refreshToken", web::post().to(refresh_token))
                 .route("/logout", web::post().to(logout)),
         )
-        .route("/password/forgot", web::post().to(request_password_reset))
-        .route("/password/reset", web::get().to(render_reset_form))
-        .route("/password/reset", web::post().to(submit_new_password))
 }

@@ -13,11 +13,9 @@ async fn test_jwt_contains_correct_claims() {
 
     // Login
     let response = Helpers::login(&test_app).await;
-    dbg!(&response);
     assert!(response.status().is_success());
 
     let auth_response: AuthResponse = response.json().await.unwrap();
-    dbg!(&auth_response);
 
     if test_app.configuration.auth.strategy == AuthStrategy::Jwt
         && let Some(tokens) = &auth_response.tokens

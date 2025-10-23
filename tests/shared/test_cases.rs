@@ -26,6 +26,7 @@ pub struct RegisterRequest {
     pub is_premium: bool,
     #[serde(rename = "accountLocked")]
     pub account_locked: bool,
+    pub verified: bool,
 }
 
 pub struct ValidTestCases;
@@ -44,6 +45,7 @@ impl ValidTestCases {
             role: Role::User,
             is_premium: false,
             account_locked: false,
+            verified: true,
         }
     }
     pub fn register_data2() -> RegisterRequest {
@@ -54,6 +56,7 @@ impl ValidTestCases {
             role: Role::User,
             is_premium: false,
             account_locked: false,
+            verified: true,
         }
     }
     pub fn blocked_account() -> RegisterRequest {
@@ -64,6 +67,7 @@ impl ValidTestCases {
             role: Role::User,
             is_premium: false,
             account_locked: true,
+            verified: true,
         }
     }
 }
@@ -125,6 +129,7 @@ impl InvalidTestCases {
                     role: Role::User,
                     is_premium: false,
                     account_locked: false,
+                    verified: true,
                 },
                 "missing email field".into(),
                 400,
@@ -137,6 +142,7 @@ impl InvalidTestCases {
                     role: Role::User,
                     is_premium: false,
                     account_locked: false,
+                    verified: true,
                 },
                 "missing password field".into(),
                 400,
@@ -149,6 +155,7 @@ impl InvalidTestCases {
                     role: Role::User,
                     is_premium: false,
                     account_locked: false,
+                    verified: true,
                 },
                 "duplication emails".into(),
                 401,

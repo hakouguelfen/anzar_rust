@@ -46,8 +46,8 @@ impl PasswordResetTokenRepository {
         Ok(())
     }
 
-    pub async fn insert(&self, otp: PasswordResetToken) -> Result<()> {
-        self.adapter.insert(otp).await.map(|_| ()).map_err(|e| {
+    pub async fn insert(&self, otp: PasswordResetToken) -> Result<String> {
+        self.adapter.insert(otp).await.map_err(|e| {
             tracing::error!("Failed to insert password reset token to database: {:?}", e);
             Error::TokenCreationFailed {
                 token_type: crate::error::TokenErrorType::PasswordResetToken,
@@ -55,11 +55,11 @@ impl PasswordResetTokenRepository {
         })
     }
 
-    pub async fn find(&self, hash: &str) -> Result<PasswordResetToken> {
-        let filter = Parser::mode(self.database_driver).convert(json!({"token": hash}));
+    pub async fn find(&self, token: &str) -> Result<PasswordResetToken> {
+        let filter = Parser::mode(self.database_driver).convert(json!({"token": token}));
 
         match self.adapter.find_one(filter).await {
-            Ok(Some(token)) => Ok(token),
+            Ok(Some(password_reset_token)) => Ok(password_reset_token),
             Ok(None) => Err(Error::InvalidToken {
                 token_type: TokenErrorType::PasswordResetToken,
                 reason: InvalidTokenReason::NotFound,
@@ -78,12 +78,13 @@ impl PasswordResetTokenRepository {
         });
         let update = Parser::mode(self.database_driver).convert(update);
 
-        self.adapter
-            .find_one_and_update(filter, update)
-            .await
-            .ok_or({
-                tracing::error!("Failed to invalidate token");
-                Error::DatabaseError("".into())
-            })
+        match self.adapter.find_one_and_update(filter, update).await {
+            Ok(Some(password_reset_token)) => Ok(password_reset_token),
+            Ok(None) => Err(Error::InvalidToken {
+                token_type: TokenErrorType::PasswordResetToken,
+                reason: InvalidTokenReason::NotFound,
+            }),
+            Err(err) => Err(err),
+        }
     }
 }

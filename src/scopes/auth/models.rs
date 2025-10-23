@@ -36,11 +36,18 @@ pub struct EmailRequest {
     pub email: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ResetLink {
+    pub link: String,
+    pub expires_at: chrono::Duration,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+#[validate(context = "PasswordRequirements")]
 pub struct ResetPasswordRequest {
-    // #[validate(custom(function = "validate_token"))]
     pub token: String,
-    // #[validate(length(min = 8, message = "password must be at least 8 characters"))]
+    pub csrf_token: String,
+    #[validate(custom(function = "validate_password", use_context))]
     pub password: String,
 }
 

@@ -71,7 +71,13 @@ impl UserServiceTrait for AuthService {
                 Ok(user)
             }
             false => {
-                self.increment_failed_login_attempts(user_id).await?;
+                let user = self.increment_failed_login_attempts(user_id).await?;
+
+                let base_secs = 2_u64.pow(user.failed_login_attempts as u32);
+                let jitter = rand::random::<u64>() % 5;
+                let duration = std::time::Duration::from_secs(base_secs + jitter);
+
+                tokio::time::sleep(duration).await;
 
                 tracing::error!("Failed to verify password");
                 Err(Error::InvalidCredentials {
