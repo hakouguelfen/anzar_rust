@@ -63,8 +63,8 @@ impl PasswordResetToken {
         self.token = hash.into();
         self
     }
-    pub fn with_expiray(mut self, expires_at: &chrono::Duration) -> Self {
-        self.expires_at = Utc::now() + expires_at.clone();
+    pub fn with_expiray(mut self, expires_at: &chrono::DateTime<chrono::Utc>) -> Self {
+        self.expires_at = *expires_at;
         self
     }
 }

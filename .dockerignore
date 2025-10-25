@@ -1,7 +1,6 @@
 # Rust-specific files
 target/
 tests/
-migrations/
 cert/
 Dockerfile
 **/*.rs.bk

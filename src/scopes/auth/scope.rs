@@ -234,8 +234,9 @@ async fn request_password_reset(
         let hashed_token = Token::hash(&token);
 
         // 5.
-        let expiry_timestamp =
-            chrono::Duration::seconds(configuration.auth.password.reset.token_expires_in);
+        let expiry_timestamp = chrono::Utc::now()
+            + chrono::Duration::seconds(configuration.auth.password.reset.token_expires_in);
+
         let password_reset_token = PasswordResetToken::default()
             .with_user_id(user_id)
             .with_token_hash(&hashed_token)
@@ -295,7 +296,6 @@ async fn render_reset_form(
     Ok(HttpResponse::Ok()
         .insert_header(("X-Frame-Options", "DENY"))
         .insert_header(("X-Content-Type-Options", "nosniff"))
-        .insert_header(("Content-Security-Policy", "default-src 'self'"))
         .content_type("text/html; charset=utf-8")
         .body(body))
 }

@@ -39,7 +39,7 @@ pub struct EmailRequest {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ResetLink {
     pub link: String,
-    pub expires_at: chrono::Duration,
+    pub expires_at: chrono::DateTime<chrono::Utc>,
 }
 
 #[derive(Debug, Deserialize, Validate)]

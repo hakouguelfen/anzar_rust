@@ -13,6 +13,17 @@ path = "src/lib.rs"
 path = "src/main.rs"
 name = "anzar"
 
+[profile.release]
+opt-level = 'z'          # Optimize for size
+lto = true               # Link-time optimization
+codegen-units = 1        # Better optimization, slower compile
+panic = 'abort'          # Remove panic unwinding
+strip = true             # Strip symbols in cargo
+# Optional: Further size reduction
+[profile.release.package."*"]
+opt-level = 'z'
+strip = true
+
 [dependencies]
 actix-cors = "0.7.0"
 # NOTE maybe use secure_coockie from actiw-web

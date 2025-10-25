@@ -1,9 +1,9 @@
-image: rust:1.85.0
+image: rust:1.90
 
 variables:
   CARGO_HOME: $CI_PROJECT_DIR/.cargo
   RUSTUP_HOME: $CI_PROJECT_DIR/.rustup
-  MONGODB_URI: "mongodb://db:27017/production"
+  MONGODB_URI: "mongodb://db:27017/prod"
   RUST_BACKTRACE: 1
   RUSTFLAGS: "-D warnings"
   # Enable Rust build caching
@@ -53,7 +53,7 @@ test:
     - name: mongo:4.4
       alias: db
   script:
-    - APP_ENVIRONMENT=production cargo test --jobs $(nproc)
+    - ENV=prod cargo test --jobs $(nproc)
     # - cargo tarpaulin --version || cargo install cargo-tarpaulin
     # - cargo tarpaulin --ignore-tests 
 security-audit:
@@ -69,7 +69,7 @@ security-audit:
 #   dependencies:
 #     - prepare
 #   script:
-#     - cargo build --release
+#     - docker build -t hakouguelfen79/anzar .
 #   artifacts:
 #     paths:
 #       - target/release/anzar
