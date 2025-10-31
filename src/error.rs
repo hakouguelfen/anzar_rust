@@ -131,6 +131,8 @@ pub enum Error {
     JWT(jsonwebtoken::errors::Error),
     #[from]
     Validation(validator::ValidationError),
+    #[from]
+    MemCache(memcache::MemcacheError),
 }
 
 impl core::fmt::Display for Error {
@@ -202,6 +204,7 @@ impl actix_web::ResponseError for Error {
             Error::JWT(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::SessionInsert(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::SessionGet(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Error::MemCache(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }

@@ -9,12 +9,13 @@ use super::User;
 use crate::scopes::auth::RegisterRequest;
 
 pub trait UserServiceTrait {
-    fn authenticate_user(
+    fn authenticate_user(&self, email: &str, password: &str) -> impl Future<Output = Result<bool>>;
+    fn register_failed_attempt(
         &self,
-        email: &str,
-        password: &str,
-        pass_config: PasswordConfig,
-    ) -> impl Future<Output = Result<User>>;
+        user: &str,
+        device_cookie: Option<&str>,
+        pass_config: &PasswordConfig,
+    ) -> impl Future<Output = Result<u8>>;
     fn create_user(&self, req: RegisterRequest) -> impl Future<Output = Result<User>>;
     fn create_verification_email(
         &self,
@@ -25,19 +26,11 @@ pub trait UserServiceTrait {
     fn find_user(&self, id: &str) -> impl Future<Output = Result<User>>;
     fn update_user_password(&self, id: &str, hash: &str) -> impl Future<Output = Result<User>>;
     fn reset_password_state(&self, id: &str) -> impl Future<Output = Result<User>>;
-    fn increment_failed_login_attempts(&self, id: &str) -> impl Future<Output = Result<User>>;
     fn validate_account(&self, id: &str) -> impl Future<Output = Result<User>>;
-    fn lock_account(&self, id: &str, lockout_duration: i64) -> impl Future<Output = Result<User>>;
     fn unlock_account(&self, id: &str) -> impl Future<Output = Result<User>>;
-    fn reset_failed_login_attempts(&self, id: &str) -> impl Future<Output = Result<User>>;
 }
 impl UserServiceTrait for AuthService {
-    async fn authenticate_user(
-        &self,
-        email: &str,
-        password: &str,
-        pass_config: PasswordConfig,
-    ) -> Result<User> {
+    async fn authenticate_user(&self, email: &str, password: &str) -> Result<bool> {
         let user: User = self.user_service.find_by_email(email).await.map_err(|_| {
             Error::InvalidCredentials {
                 field: CredentialField::Email,
@@ -45,51 +38,32 @@ impl UserServiceTrait for AuthService {
             }
         })?;
 
-        let user_id = user.id.as_ref().ok_or(Error::MalformedData {
-            field: CredentialField::ObjectId,
-        })?;
+        Ok(Password::verify(password, &user.password))
+    }
 
-        if user.account_locked {
-            if let Some(locked_until) = user.locked_until
-                && chrono::Utc::now() > locked_until
-            {
-                self.unlock_account(user_id).await?;
-            } else {
-                return Err(Error::AccountSuspended {
-                    user_id: user_id.into(),
-                });
-            }
+    async fn register_failed_attempt(
+        &self,
+        user: &str,
+        device_cookie: Option<&str>,
+        pass_config: &PasswordConfig,
+    ) -> Result<u8> {
+        let max_failed_attempts = match device_cookie {
+            Some(_) => pass_config.security.max_failed_login_attempts * 2,
+            None => pass_config.security.max_failed_login_attempts,
+        };
+        let key = match device_cookie {
+            Some(val) => val.into(),
+            None => format!("user:{}", user),
+        };
+        let attempts = self.user_service.increment(&key);
+
+        // count number of failed authentication attempts within time period T for this specific cookie
+        if attempts >= max_failed_attempts {
+            self.user_service
+                .put_cookie_in_lockout(&key, pass_config.security.lockout_duration as u32)?;
         }
 
-        match Password::verify(password, &user.password) {
-            true => {
-                self.reset_failed_login_attempts(user_id).await?;
-                Ok(user)
-            }
-            false => {
-                tracing::error!("Failed to verify password");
-
-                let user = self.increment_failed_login_attempts(user_id).await?;
-                if user.failed_login_attempts >= pass_config.security.max_failed_login_attempts {
-                    self.lock_account(user_id, pass_config.security.lockout_duration)
-                        .await?;
-
-                    return Err(Error::AccountSuspended {
-                        user_id: user_id.into(),
-                    });
-                }
-
-                let base_secs = 2_u64.pow(user.failed_login_attempts as u32).min(12);
-                let jitter = rand::random::<u64>() % 3;
-                let duration = std::time::Duration::from_secs(base_secs + jitter);
-                tokio::time::sleep(duration).await;
-
-                Err(Error::InvalidCredentials {
-                    field: CredentialField::Password,
-                    reason: FailureReason::HashMismatch,
-                })
-            }
-        }
+        Ok(attempts)
     }
     async fn create_user(&self, req: RegisterRequest) -> Result<User> {
         let password_hash = Password::hash(&req.password)?;
@@ -132,17 +106,8 @@ impl UserServiceTrait for AuthService {
     async fn reset_password_state(&self, id: &str) -> Result<User> {
         self.user_service.reset_password_state(id).await
     }
-    async fn increment_failed_login_attempts(&self, id: &str) -> Result<User> {
-        self.user_service.increment_failed_login_attempts(id).await
-    }
-    async fn lock_account(&self, id: &str, lockout_duration: i64) -> Result<User> {
-        self.user_service.lock_account(id, lockout_duration).await
-    }
     async fn unlock_account(&self, id: &str) -> Result<User> {
         self.user_service.unlock_account(id).await
-    }
-    async fn reset_failed_login_attempts(&self, id: &str) -> Result<User> {
-        self.user_service.reset_failed_login_attempts(id).await
     }
     async fn validate_account(&self, id: &str) -> Result<User> {
         self.user_service.validate_account(id).await

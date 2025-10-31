@@ -59,14 +59,6 @@ pub struct User {
     #[sqlx(rename = "failedResetAttempts")] // Map database column to struct field
     #[serde(default, rename = "failedResetAttempts")]
     pub failed_reset_attempts: u8,
-
-    #[sqlx(rename = "failedLoginAttempts")] // Map database column to struct field
-    #[serde(default, rename = "failedLoginAttempts")]
-    pub failed_login_attempts: u8,
-
-    #[sqlx(rename = "lockedUntil")]
-    #[serde(default, rename = "lockedUntil")]
-    pub locked_until: Option<DateTime<Utc>>,
 }
 
 impl User {

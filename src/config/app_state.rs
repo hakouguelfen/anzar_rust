@@ -2,6 +2,7 @@ use std::fs;
 
 use uuid::Uuid;
 
+use crate::adapters::memcache::{MemCache, MemCacheAdapter};
 use crate::adapters::{factory::DatabaseAdapters, mongodb::MongoDB, sqlite::SQLite};
 use crate::config::{Configuration, Database, DatabaseDriver, EnvironmentConfig};
 use crate::error::Result;
@@ -73,13 +74,22 @@ impl AppState {
         }
         let adapters = DatabaseAdapters::sqlite(&db);
 
-        Ok(AuthService::new(adapters, DatabaseDriver::SQLite))
+        let client = MemCache::start("").await?;
+        let memcache = MemCacheAdapter::new(client);
+
+        Ok(AuthService::new(adapters, DatabaseDriver::SQLite, memcache))
     }
 
     async fn from_mongo(conn: &str) -> Result<AuthService> {
         let db = MongoDB::start(conn).await?;
         let adapters = DatabaseAdapters::mongodb(&db);
 
-        Ok(AuthService::new(adapters, DatabaseDriver::MongoDB))
+        let client = MemCache::start("").await?;
+        let memcache = MemCacheAdapter::new(client);
+        Ok(AuthService::new(
+            adapters,
+            DatabaseDriver::MongoDB,
+            memcache,
+        ))
     }
 }

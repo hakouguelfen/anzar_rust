@@ -1,4 +1,5 @@
 use crate::adapters::factory::DatabaseAdapters;
+use crate::adapters::memcache::{MemCache, MemCacheAdapter};
 use crate::adapters::{mongodb::MongoDB, sqlite::SQLite};
 
 use crate::config::{Database, DatabaseDriver};
@@ -20,9 +21,13 @@ pub struct AuthService {
 }
 
 impl AuthService {
-    pub fn new(adapters: DatabaseAdapters, driver: DatabaseDriver) -> Self {
+    pub fn new(
+        adapters: DatabaseAdapters,
+        driver: DatabaseDriver,
+        memcache: MemCacheAdapter,
+    ) -> Self {
         Self {
-            user_service: UserRepository::new(adapters.user_adapter, driver),
+            user_service: UserRepository::new(adapters.user_adapter, driver, memcache),
             jwt_service: JWTRepository::new(adapters.jwt_adapter, driver),
             session_service: SessionRepository::new(adapters.session_adapter, driver),
             password_reset_token_service: PasswordResetTokenRepository::new(
@@ -48,13 +53,19 @@ impl AuthService {
         let db = SQLite::start(conn).await?;
         let adapters = DatabaseAdapters::sqlite(&db);
 
-        Ok(Self::new(adapters, DatabaseDriver::SQLite))
+        let client = MemCache::start("").await?;
+        let memcache = MemCacheAdapter::new(client);
+
+        Ok(Self::new(adapters, DatabaseDriver::SQLite, memcache))
     }
 
     async fn from_mongo(conn: &str) -> Result<Self> {
         let db = MongoDB::start(conn).await?;
         let adapters = DatabaseAdapters::mongodb(&db);
 
-        Ok(Self::new(adapters, DatabaseDriver::MongoDB))
+        let client = MemCache::start("").await?;
+        let memcache = MemCacheAdapter::new(client);
+
+        Ok(Self::new(adapters, DatabaseDriver::MongoDB, memcache))
     }
 }

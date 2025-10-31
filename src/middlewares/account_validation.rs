@@ -32,13 +32,6 @@ async fn validate_user(req: &ServiceRequest, user_id: &str) -> Result<User, Auth
     let user: User = auth_service.find_user(user_id).await?;
 
     if user.account_locked {
-        if let Some(locked_until) = user.locked_until
-            && chrono::Utc::now() > locked_until
-        {
-            let user = auth_service.unlock_account(user_id).await?;
-            return Ok(user);
-        }
-
         return Err(AuthError::AccountSuspended {
             user_id: user_id.into(),
         });

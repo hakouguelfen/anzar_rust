@@ -9,6 +9,7 @@ use validator::ValidateArgs;
 use crate::{
     config::AuthStrategy,
     error::{CredentialField, Error, FailureReason, Result},
+    utils::DeviceCookie,
 };
 use crate::{
     extractors::{
@@ -46,6 +47,8 @@ use super::models::{EmailRequest, LoginRequest, TokenQuery};
 use super::reset_password::model::PasswordResetToken;
 use super::user::User;
 
+use super::support;
+
 #[tracing::instrument(
     name = "Login user",
     skip(req, auth_service, configuration, session),
@@ -60,14 +63,47 @@ async fn login(
     req.validate_with_args(&configuration.auth.password.requirements)
         .map_err(|err| Error::BadRequest(err.to_string()))?;
 
-    let user: User = auth_service
-        .authenticate_user(&req.email, &req.password, configuration.auth.password)
-        .await?;
+    let mut device_cookie = DeviceCookie::new(&configuration.security.secret_key);
+    let key = support::construct_key_from_device_cookie(&session, &device_cookie, &req.email)?;
+
+    // unified lockout check
+    if auth_service.user_service.exists(&key) {
+        return Err(Error::AccountSuspended { user_id: "".into() });
+    }
+
+    match auth_service
+        .authenticate_user(&req.email, &req.password)
+        .await?
+    {
+        true => {
+            let cookie = device_cookie.issue(&req.email);
+            session.insert("DeviceCookie", &cookie)?;
+
+            Ok(())
+        }
+        false => {
+            let pass_config = configuration.auth.password;
+            tracing::error!("Failed to verify password");
+
+            let device_cookie = session.get::<String>("DeviceCookie")?;
+            let attempts = auth_service
+                .register_failed_attempt(&req.email, device_cookie.as_deref(), &pass_config)
+                .await?;
+
+            // Progressive delay
+            support::delay(attempts as u32).await;
+
+            Err(Error::InvalidCredentials {
+                field: CredentialField::Password,
+                reason: FailureReason::HashMismatch,
+            })
+        }
+    }?;
 
     let email_verification = configuration.auth.email.verification;
-    let email_verification_required = email_verification.required;
 
-    if email_verification_required && !user.verified {
+    let user = auth_service.find_user_by_email(&req.email).await?;
+    if email_verification.required && !user.verified {
         return Err(Error::AccuontNotVerified {
             field: CredentialField::Email,
         });
@@ -358,7 +394,6 @@ async fn submit_new_password(
 
     // 6.
     auth_service.reset_password_state(&user_id).await?;
-    auth_service.reset_failed_login_attempts(&user_id).await?;
 
     // 7. TODO it may not be neccessary
     auth_service.logout_all(&user_id).await?;

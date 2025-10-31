@@ -4,6 +4,7 @@ use argon2::{
     password_hash::{SaltString, rand_core::OsRng},
 };
 use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
+use hmac::Mac;
 use rand::TryRngCore;
 use sha2::{Digest, Sha256};
 
@@ -72,5 +73,78 @@ impl CustomPasswordHasher for Password {
         Argon2::default()
             .verify_password(password.as_bytes(), &hash)
             .is_ok()
+    }
+}
+
+pub struct DeviceCookie {
+    id: String,
+    nonce: String, // CSRNG
+    secret_key: String,
+}
+impl DeviceCookie {
+    pub fn new(secret_key: &str) -> Self {
+        Self {
+            id: String::default(),
+            nonce: String::default(),
+            secret_key: secret_key.into(),
+        }
+    }
+    pub fn issue(&mut self, id: &str) -> String {
+        self.nonce = Token::generate(32);
+        self.id = id.into();
+
+        let mut mac = hmac::Hmac::<sha2::Sha256>::new_from_slice(self.secret_key.as_bytes())
+            .expect("HMAC can take key of any size");
+
+        let message = format!("{}{}", self.id, self.nonce);
+        mac.update(message.as_bytes());
+
+        let signature = BASE64_URL_SAFE_NO_PAD.encode(mac.finalize().into_bytes());
+
+        format!("{},{},{}", self.id, self.nonce, signature)
+    }
+
+    pub fn validate(&self, cookie_value: &str) -> bool {
+        let parts: Vec<&str> = cookie_value.split(',').collect();
+        if parts.len() != 3 {
+            return false;
+        }
+
+        let user_id = parts[0];
+        let nonce = parts[1];
+        let signature = parts[2];
+
+        let mut mac = hmac::Hmac::<Sha256>::new_from_slice(self.secret_key.as_bytes())
+            .expect("HMAC can take key of any size");
+        let message = format!("{}{}", user_id, nonce);
+        mac.update(message.as_bytes());
+        let expected = BASE64_URL_SAFE_NO_PAD.encode(mac.finalize().into_bytes());
+
+        self.verify(&expected, signature)
+    }
+
+    fn verify(&self, a: &str, b: &str) -> bool {
+        if a.len() != b.len() {
+            return false;
+        }
+
+        a.bytes()
+            .zip(b.bytes())
+            .fold(0, |acc, (a, b)| acc | (a ^ b))
+            == 0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_device_cookie() {
+        let mut dc = DeviceCookie::new("supersecretkey");
+        let cookie = dc.issue("alice");
+
+        assert!(dc.validate(&cookie));
+        assert!(!dc.validate("alice,wrongnonce,badsig"));
     }
 }

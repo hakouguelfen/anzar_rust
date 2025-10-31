@@ -69,6 +69,7 @@ dashmap = "6.1.0"
 uuid = "1.18.1"
 config = "0.15.18"
 secrecy = { version = "0.10.3", features = ["serde"] }
+memcache = "0.19.0"
 
 
 [dev-dependencies]

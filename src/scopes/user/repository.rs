@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use chrono::{Duration, Utc};
+use chrono::Utc;
 use serde_json::json;
 
 use super::User;
 use crate::{
-    adapters::DatabaseAdapter,
+    adapters::{DatabaseAdapter, memcache::MemCacheAdapter},
     config::DatabaseDriver,
     error::{Error, Result},
     utils::parser::Parser,
@@ -15,16 +15,33 @@ use crate::{
 pub struct UserRepository {
     adapter: Arc<dyn DatabaseAdapter<User>>,
     database_driver: DatabaseDriver,
+    memcache: MemCacheAdapter,
 }
 
 impl UserRepository {
-    pub fn new(adapter: Arc<dyn DatabaseAdapter<User>>, database_driver: DatabaseDriver) -> Self {
+    pub fn new(
+        adapter: Arc<dyn DatabaseAdapter<User>>,
+        database_driver: DatabaseDriver,
+        memcache: MemCacheAdapter,
+    ) -> Self {
         Self {
             adapter,
             database_driver,
+            memcache,
         }
     }
+    // Memcache
+    pub fn increment(&self, key: &str) -> u8 {
+        self.memcache.increment(key)
+    }
+    pub fn put_cookie_in_lockout(&self, key: &str, expiration: u32) -> Result<()> {
+        Ok(self.memcache.lock_account(key, expiration)?)
+    }
+    pub fn exists(&self, key: &str) -> bool {
+        self.memcache.exists(key)
+    }
 
+    // Database
     pub async fn find(&self, user_id: &str) -> Result<User> {
         let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
 
@@ -119,23 +136,10 @@ impl UserRepository {
         }
     }
 
-    pub async fn increment_failed_login_attempts(&self, user_id: &str) -> Result<User> {
-        let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
-        let update = json!( { "$inc": json!({"failedLoginAttempts": 1}) });
-        let update = Parser::mode(self.database_driver).convert(update);
-
-        match self.adapter.find_one_and_update(filter, update).await {
-            Ok(Some(user)) => Ok(user),
-            Ok(None) => Err(Error::InvalidRequest),
-            Err(err) => Err(err),
-        }
-    }
-
-    pub async fn lock_account(&self, user_id: &str, lockout_duration: i64) -> Result<User> {
+    pub async fn lock_account(&self, user_id: &str) -> Result<User> {
         let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
         let update = json!( {
             "$set": json!({
-                "lockedUntil": (Utc::now() + Duration::seconds(lockout_duration)),
                 "accountLocked": true
             })
         });
@@ -151,25 +155,7 @@ impl UserRepository {
         let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
         let update = json!( {
             "$set": json!({
-                "lockedUntil": None::<chrono::DateTime<Utc>>,
                 "accountLocked": false
-            })
-        });
-        let update = Parser::mode(self.database_driver).convert(update);
-
-        match self.adapter.find_one_and_update(filter, update).await {
-            Ok(Some(user)) => Ok(user),
-            Ok(None) => Err(Error::InvalidRequest),
-            Err(err) => Err(err),
-        }
-    }
-
-    pub async fn reset_failed_login_attempts(&self, user_id: &str) -> Result<User> {
-        let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
-        let update = json!( {
-            "$set": json!({
-                "failedLoginAttempts": 0,
-                "lockedUntil": None::<chrono::DateTime<Utc>>
             })
         });
         let update = Parser::mode(self.database_driver).convert(update);
@@ -188,7 +174,6 @@ impl UserRepository {
                 "lastPasswordReset": Utc::now(),
                 "passwordResetCount": 0,
                 "failedResetAttempts": 0,
-                "failedLoginAttempts": 0
             })
         });
         let update = Parser::mode(self.database_driver).convert(update);

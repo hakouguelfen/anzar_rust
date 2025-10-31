@@ -8,6 +8,7 @@ ARG APP_NAME
 WORKDIR /app
 
 RUN mkdir migrations
+
 RUN apk add --no-cache musl-dev
 RUN --mount=type=bind,source=src,target=src \
     --mount=type=bind,source=Cargo.toml,target=Cargo.toml \
