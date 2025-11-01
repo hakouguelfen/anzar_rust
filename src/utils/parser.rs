@@ -83,16 +83,12 @@ mod tests {
         let input = json!({
             "$set": json! ({
                 "lastPasswordReset": "time",
-                "passwordResetCount": 0,
-                "failedResetAttempts": 0
             })
         });
         let output = Parser::mode(DatabaseDriver::SQLite).convert(input.clone());
 
         let expected = json! ({
             "lastPasswordReset": "time",
-            "passwordResetCount": 0,
-            "failedResetAttempts": 0
         });
 
         assert_eq!(output, expected);

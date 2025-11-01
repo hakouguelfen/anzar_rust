@@ -6,8 +6,11 @@ use actix_web::{
     web,
 };
 
-use crate::error::{Error as AuthError, TokenErrorType};
 use crate::{config::AppState, error::InvalidTokenReason};
+use crate::{
+    error::{Error as AuthError, TokenErrorType},
+    services::account::service::AccountServiceTrait,
+};
 
 use crate::scopes::{
     auth::service::AuthService,
@@ -30,8 +33,9 @@ async fn validate_user(req: &ServiceRequest, user_id: &str) -> Result<User, Auth
     let auth_service = extract_auth_service(req)?;
 
     let user: User = auth_service.find_user(user_id).await?;
+    let account = auth_service.find_account(user_id).await?;
 
-    if user.account_locked {
+    if account.locked {
         return Err(AuthError::AccountSuspended {
             user_id: user_id.into(),
         });

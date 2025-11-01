@@ -9,6 +9,7 @@ use validator::ValidateArgs;
 use crate::{
     config::AuthStrategy,
     error::{CredentialField, Error, FailureReason, Result},
+    services::account::service::AccountServiceTrait,
     utils::DeviceCookie,
 };
 use crate::{
@@ -114,14 +115,12 @@ async fn login(
     match configuration.auth.strategy {
         AuthStrategy::Session => auth_service.issue_session(&user).await.map(|token| {
             session.insert("SessionID", token)?;
-            Ok(HttpResponse::Ok().json(AuthResponse::new(user.into())))
+            Ok(HttpResponse::Ok().json(AuthResponse::new(user)))
         })?,
         AuthStrategy::Jwt => auth_service
             .issue_jwt(&user, secret_key, jwt_config)
             .await
-            .map(|tokens| {
-                Ok(HttpResponse::Ok().json(AuthResponse::new(user.into()).with_jwt(tokens)))
-            })?,
+            .map(|tokens| Ok(HttpResponse::Ok().json(AuthResponse::new(user).with_jwt(tokens))))?,
     }
 }
 
@@ -159,16 +158,15 @@ async fn register(
         return match configuration.auth.strategy {
             AuthStrategy::Session => auth_service.issue_session(&user).await.map(|token| {
                 session.insert("SessionID", token)?;
-                Ok(HttpResponse::Created().json(
-                    AuthResponse::new(user.into()).with_verification(&link, &verification_token),
-                ))
+                Ok(HttpResponse::Created()
+                    .json(AuthResponse::new(user).with_verification(&link, &verification_token)))
             })?,
             AuthStrategy::Jwt => auth_service
                 .issue_jwt(&user, secret_key, jwt_config)
                 .await
                 .map(|tokens| {
                     Ok(HttpResponse::Created().json(
-                        AuthResponse::new(user.into())
+                        AuthResponse::new(user)
                             .with_jwt(tokens)
                             .with_verification(&link, &verification_token),
                     ))
@@ -179,13 +177,13 @@ async fn register(
     match configuration.auth.strategy {
         AuthStrategy::Session => auth_service.issue_session(&user).await.map(|token| {
             session.insert("SessionID", token)?;
-            Ok(HttpResponse::Created().json(AuthResponse::new(user.into())))
+            Ok(HttpResponse::Created().json(AuthResponse::new(user)))
         })?,
         AuthStrategy::Jwt => auth_service
             .issue_jwt(&user, secret_key, jwt_config)
             .await
             .map(|tokens| {
-                Ok(HttpResponse::Created().json(AuthResponse::new(user.into()).with_jwt(tokens)))
+                Ok(HttpResponse::Created().json(AuthResponse::new(user).with_jwt(tokens)))
             })?,
     }
 }
@@ -219,9 +217,7 @@ async fn refresh_token(
     auth_service
         .issue_jwt(&user, secret_key, jwt_config)
         .await
-        .map(
-            |tokens| Ok(HttpResponse::Ok().json(AuthResponse::new(user.into()).with_jwt(tokens))),
-        )?
+        .map(|tokens| Ok(HttpResponse::Ok().json(AuthResponse::new(user).with_jwt(tokens))))?
 }
 
 #[tracing::instrument(
@@ -248,7 +244,6 @@ async fn request_password_reset(
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
     ConfigurationExtractor(configuration): ConfigurationExtractor,
 ) -> Result<HttpResponse> {
-    const TIMING_DELAY_MS: u64 = 800;
     let start = std::time::Instant::now();
 
     let email: String = req.email;
@@ -282,7 +277,8 @@ async fn request_password_reset(
             .await?;
 
         // 6.
-        auth_service.increment_reset_attempts(user).await?;
+        let mut bucket = RATE_LIMITS.entry(user_id.clone()).or_default();
+        bucket.run()?;
 
         let link = format!(
             "{}/auth/password/reset?token={}",
@@ -296,13 +292,7 @@ async fn request_password_reset(
     }
     .await;
 
-    let elapsed = start.elapsed().as_millis() as u64;
-    if elapsed < TIMING_DELAY_MS {
-        tokio::time::sleep(tokio::time::Duration::from_millis(
-            TIMING_DELAY_MS.saturating_sub(elapsed),
-        ))
-        .await;
-    }
+    support::throttle_since(start).await;
 
     // NOTE Use HMAC or JWT signing so you can later verify it server-side.
     // NOTE maybe use for email_verification
@@ -368,11 +358,11 @@ async fn submit_new_password(
     // NOTE: → Rate limit per token
 
     // 2. Ensure password is different then previous
-    let user = auth_service.find_user(&user_id).await?;
-    if user.account_locked {
+    let account = auth_service.find_account(&user_id).await?;
+    if account.locked {
         return Err(Error::AccountSuspended { user_id });
     }
-    if Password::verify(&form.password, &user.password) {
+    if Password::verify(&form.password, &account.password) {
         tracing::warn!("Password reuse attempt for user: {}", user_id);
         return Err(Error::InvalidCredentials {
             field: CredentialField::Password,

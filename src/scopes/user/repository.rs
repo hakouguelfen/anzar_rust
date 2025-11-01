@@ -108,34 +108,6 @@ impl UserRepository {
         }
     }
 
-    pub async fn update_reset_window(&self, user_id: &str) -> Result<()> {
-        let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
-        let update = json!({
-            "$set": json!({
-                "passwordResetWindowStart": Utc::now().to_rfc3339()
-            })
-        });
-        let update = Parser::mode(self.database_driver).convert(update);
-
-        match self.adapter.find_one_and_update(filter, update).await {
-            Ok(Some(_user)) => Ok(()),
-            Ok(None) => Err(Error::InvalidRequest),
-            Err(err) => Err(err),
-        }
-    }
-
-    pub async fn increment_reset_count(&self, user_id: &str) -> Result<User> {
-        let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
-        let update = json!( { "$inc": json!({"passwordResetCount": 1}) });
-        let update = Parser::mode(self.database_driver).convert(update);
-
-        match self.adapter.find_one_and_update(filter, update).await {
-            Ok(Some(user)) => Ok(user),
-            Ok(None) => Err(Error::InvalidRequest),
-            Err(err) => Err(err),
-        }
-    }
-
     pub async fn lock_account(&self, user_id: &str) -> Result<User> {
         let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
         let update = json!( {
@@ -172,8 +144,6 @@ impl UserRepository {
         let update = json!({
             "$set": json! ({
                 "lastPasswordReset": Utc::now(),
-                "passwordResetCount": 0,
-                "failedResetAttempts": 0,
             })
         });
         let update = Parser::mode(self.database_driver).convert(update);

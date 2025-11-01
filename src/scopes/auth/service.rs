@@ -8,12 +8,14 @@ use crate::error::Result;
 use crate::scopes::auth::PasswordResetTokenRepository;
 use crate::scopes::email::EmailVerificationTokenRepository;
 use crate::scopes::user::UserRepository;
+use crate::services::account::AccountRepository;
 use crate::services::jwt::JWTRepository;
 use crate::services::session::SessionRepository;
 
 #[derive(Clone)]
 pub struct AuthService {
     pub(crate) user_service: UserRepository,
+    pub(crate) account_service: AccountRepository,
     pub(crate) jwt_service: JWTRepository,
     pub(crate) session_service: SessionRepository,
     pub(crate) password_reset_token_service: PasswordResetTokenRepository,
@@ -28,6 +30,7 @@ impl AuthService {
     ) -> Self {
         Self {
             user_service: UserRepository::new(adapters.user_adapter, driver, memcache),
+            account_service: AccountRepository::new(adapters.account_adapter, driver),
             jwt_service: JWTRepository::new(adapters.jwt_adapter, driver),
             session_service: SessionRepository::new(adapters.session_adapter, driver),
             password_reset_token_service: PasswordResetTokenRepository::new(

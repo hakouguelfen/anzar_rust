@@ -22,3 +22,15 @@ pub async fn delay(attempts: u32) {
     let duration = std::time::Duration::from_secs(base_secs + jitter);
     tokio::time::sleep(duration).await;
 }
+
+pub async fn throttle_since(start: std::time::Instant) {
+    const TIMING_DELAY_MS: u64 = 800;
+
+    let elapsed = start.elapsed().as_millis() as u64;
+    if elapsed < TIMING_DELAY_MS {
+        tokio::time::sleep(tokio::time::Duration::from_millis(
+            TIMING_DELAY_MS.saturating_sub(elapsed),
+        ))
+        .await;
+    }
+}

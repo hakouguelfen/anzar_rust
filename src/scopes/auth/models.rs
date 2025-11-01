@@ -1,8 +1,9 @@
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
+use crate::scopes::user::User;
+use crate::services::jwt::Tokens;
 use crate::utils::validation::validate_password;
-use crate::{scopes::user::UserResponse, services::jwt::Tokens};
 
 use crate::config::PasswordRequirements;
 
@@ -63,15 +64,15 @@ pub struct Verification {
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AuthResponse {
-    pub user: UserResponse,
+    pub user: User,
     pub tokens: Option<SessionTokens>,
     pub verification: Option<Verification>,
 }
 
 impl AuthResponse {
-    pub fn new(user_response: UserResponse) -> Self {
+    pub fn new(user: User) -> Self {
         Self {
-            user: user_response,
+            user,
             tokens: None,
             verification: None,
         }

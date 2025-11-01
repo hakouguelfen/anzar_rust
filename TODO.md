@@ -4,6 +4,7 @@
 ## TOADD:
 - tests for return type 
 - Listen to kill app on syscall SIGTERM
+- Retry-After header, after rate limiting
 
 ## 4. Global or Behavioral Limits
 - Many accounts being hit from one IP.

@@ -1,6 +1,6 @@
 use crate::error::{CredentialField, Error, Result, TokenErrorType};
+use crate::scopes::auth::model::PasswordResetToken;
 use crate::scopes::auth::service::AuthService;
-use crate::scopes::{auth::model::PasswordResetToken, user::User};
 use crate::utils::{Token, TokenHasher};
 
 // [ PasswordResetTokenServiceTrait ]
@@ -9,7 +9,6 @@ pub trait PasswordResetTokenServiceTrait {
         &self,
         token: &str,
     ) -> impl Future<Output = Result<PasswordResetToken>>;
-    fn increment_reset_attempts(&self, user: User) -> impl Future<Output = Result<User>>;
 
     fn invalidate_password_reset_token(
         &self,
@@ -52,23 +51,6 @@ impl PasswordResetTokenServiceTrait for AuthService {
         }
 
         Ok(reset_token)
-    }
-
-    async fn increment_reset_attempts(&self, user: User) -> Result<User> {
-        let user_id = user.id.as_ref().ok_or(Error::MalformedData {
-            field: CredentialField::ObjectId,
-        })?;
-
-        let window_expired = user
-            .password_reset_window_start
-            .is_none_or(|start| chrono::Utc::now() - start > chrono::Duration::hours(1));
-
-        if window_expired {
-            self.user_service.update_reset_window(user_id).await?;
-        }
-
-        let user = self.user_service.increment_reset_count(user_id).await?;
-        Ok(user)
     }
 
     async fn invalidate_password_reset_token(&self, id: &str) -> Result<PasswordResetToken> {

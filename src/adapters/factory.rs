@@ -6,10 +6,11 @@ use sqlx::{Pool, Sqlite};
 use crate::{
     adapters::{mongodb::MongodbAdapter, sqlite::SQLiteAdapter, traits::DatabaseAdapter},
     scopes::{auth::model::PasswordResetToken, email::model::EmailVerificationToken, user::User},
-    services::{jwt::RefreshToken, session::model::Session},
+    services::{account::model::Account, jwt::RefreshToken, session::model::Session},
 };
 
 const USER: &str = "user";
+const ACCOUNT: &str = "account";
 const REFRESH_TOKEN: &str = "refresh_token";
 const PASSWORD_RESET_TOKEN: &str = "password_reset_token";
 const EMAIL_VERIFICATION_TOKEN: &str = "email_verification_token";
@@ -17,6 +18,7 @@ const SESSION: &str = "session";
 
 pub struct DatabaseAdapters {
     pub user_adapter: Arc<dyn DatabaseAdapter<User>>,
+    pub account_adapter: Arc<dyn DatabaseAdapter<Account>>,
     pub jwt_adapter: Arc<dyn DatabaseAdapter<RefreshToken>>,
     pub session_adapter: Arc<dyn DatabaseAdapter<Session>>,
     pub reset_token_adapter: Arc<dyn DatabaseAdapter<PasswordResetToken>>,
@@ -27,6 +29,7 @@ impl DatabaseAdapters {
     pub fn mongodb(db: &Database) -> Self {
         Self {
             user_adapter: Arc::new(MongodbAdapter::<User>::new(db, USER)),
+            account_adapter: Arc::new(MongodbAdapter::<Account>::new(db, ACCOUNT)),
             jwt_adapter: Arc::new(MongodbAdapter::<RefreshToken>::new(db, REFRESH_TOKEN)),
             session_adapter: Arc::new(MongodbAdapter::<Session>::new(db, SESSION)),
             reset_token_adapter: Arc::new(MongodbAdapter::<PasswordResetToken>::new(
@@ -43,6 +46,7 @@ impl DatabaseAdapters {
     pub fn sqlite(db: &Pool<Sqlite>) -> Self {
         Self {
             user_adapter: Arc::new(SQLiteAdapter::<User>::new(db, USER)),
+            account_adapter: Arc::new(SQLiteAdapter::<Account>::new(db, ACCOUNT)),
             jwt_adapter: Arc::new(SQLiteAdapter::<RefreshToken>::new(db, REFRESH_TOKEN)),
             session_adapter: Arc::new(SQLiteAdapter::<Session>::new(db, SESSION)),
             reset_token_adapter: Arc::new(SQLiteAdapter::<PasswordResetToken>::new(

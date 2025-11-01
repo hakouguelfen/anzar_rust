@@ -3,6 +3,7 @@ use crate::error::{CredentialField, Error, FailureReason, Result};
 use crate::scopes::auth::service::AuthService;
 use crate::scopes::email::model::EmailVerificationToken;
 use crate::scopes::email::service::EmailVerificationTokenServiceTrait;
+use crate::services::account::model::Account;
 use crate::utils::{CustomPasswordHasher, Password, Token, TokenHasher};
 
 use super::User;
@@ -38,7 +39,12 @@ impl UserServiceTrait for AuthService {
             }
         })?;
 
-        Ok(Password::verify(password, &user.password))
+        let user_id = user.id.as_ref().ok_or(Error::MalformedData {
+            field: CredentialField::ObjectId,
+        })?;
+        let account = self.account_service.find(user_id).await?;
+
+        Ok(Password::verify(password, &account.password))
     }
 
     async fn register_failed_attempt(
@@ -66,14 +72,17 @@ impl UserServiceTrait for AuthService {
         Ok(attempts)
     }
     async fn create_user(&self, req: RegisterRequest) -> Result<User> {
-        let password_hash = Password::hash(&req.password)?;
+        let password = Password::hash(&req.password)?;
         let mut user = User::default()
             .with_username(&req.username)
-            .with_email(&req.email)
-            .with_password(&password_hash);
+            .with_email(&req.email);
 
         let user_id: String = self.user_service.insert(&user).await?;
         user.with_id(&user_id);
+
+        // TODO: auto insert when user is created is available in mose DB
+        let account = Account::user(&user_id).with_password(&password);
+        self.account_service.insert(account).await?;
 
         Ok(user)
     }
