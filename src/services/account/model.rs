@@ -4,6 +4,15 @@ use sqlx::FromRow;
 
 use crate::utils::mongodb_serde::*;
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, sqlx::Type)]
+pub enum AccountStatus {
+    Active,
+    Suspended,
+    Unverified,
+    Locked,
+    InvalidCredentials,
+}
+
 #[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize, FromRow)]
 pub struct Account {
     #[serde(
@@ -15,7 +24,12 @@ pub struct Account {
     pub id: Option<String>,
 
     #[sqlx(rename = "userId")]
-    #[serde(rename = "userId", default, deserialize_with = "deserialize_object_id")]
+    #[serde(
+        rename = "userId",
+        default,
+        serialize_with = "serialize_object_id_as_string",
+        deserialize_with = "deserialize_object_id"
+    )]
     pub user_id: String,
 
     pub password: String,

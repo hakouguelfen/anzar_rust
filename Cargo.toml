@@ -69,9 +69,10 @@ dashmap = "6.1.0"
 uuid = "1.18.1"
 config = "0.15.18"
 secrecy = { version = "0.10.3", features = ["serde"] }
-memcache = "0.19.0"
+
+# TODO maybe use redis
+memcache = { version = "0.19", default-features = false }
 
 
 [dev-dependencies]
 reqwest = { version = "0.12.8", default-features = false, features = ["json", "rustls-tls"] }
-# rustls-tls-webpki-roots

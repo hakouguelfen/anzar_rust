@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use chrono::Utc;
 use serde_json::json;
 
 use super::User;
@@ -34,11 +33,14 @@ impl UserRepository {
     pub fn increment(&self, key: &str) -> u8 {
         self.memcache.increment(key)
     }
+    pub fn get_attempts(&self, key: &str) -> u8 {
+        self.memcache.get_attempts(key)
+    }
     pub fn put_cookie_in_lockout(&self, key: &str, expiration: u32) -> Result<()> {
         Ok(self.memcache.lock_account(key, expiration)?)
     }
-    pub fn exists(&self, key: &str) -> bool {
-        self.memcache.exists(key)
+    pub fn contains_key(&self, key: &str) -> bool {
+        self.memcache.contains_key(key)
     }
 
     // Database
@@ -84,68 +86,9 @@ impl UserRepository {
             })
     }
 
-    pub async fn update_password(&self, user_id: &str, password: &str) -> Result<User> {
-        let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
-        let update = json!({ "$set": json!({"password": password}) });
-        let update = Parser::mode(self.database_driver).convert(update);
-
-        match self.adapter.find_one_and_update(filter, update).await {
-            Ok(Some(user)) => Ok(user),
-            Ok(None) => Err(Error::InvalidRequest),
-            Err(err) => Err(err),
-        }
-    }
-
     pub async fn validate_account(&self, user_id: &str) -> Result<User> {
         let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
         let update = json!({ "$set": json!({"verified": true}) });
-        let update = Parser::mode(self.database_driver).convert(update);
-
-        match self.adapter.find_one_and_update(filter, update).await {
-            Ok(Some(user)) => Ok(user),
-            Ok(None) => Err(Error::InvalidRequest),
-            Err(err) => Err(err),
-        }
-    }
-
-    pub async fn lock_account(&self, user_id: &str) -> Result<User> {
-        let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
-        let update = json!( {
-            "$set": json!({
-                "accountLocked": true
-            })
-        });
-        let update = Parser::mode(self.database_driver).convert(update);
-
-        match self.adapter.find_one_and_update(filter, update).await {
-            Ok(Some(user)) => Ok(user),
-            Ok(None) => Err(Error::InvalidRequest),
-            Err(err) => Err(err),
-        }
-    }
-    pub async fn unlock_account(&self, user_id: &str) -> Result<User> {
-        let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
-        let update = json!( {
-            "$set": json!({
-                "accountLocked": false
-            })
-        });
-        let update = Parser::mode(self.database_driver).convert(update);
-
-        match self.adapter.find_one_and_update(filter, update).await {
-            Ok(Some(user)) => Ok(user),
-            Ok(None) => Err(Error::InvalidRequest),
-            Err(err) => Err(err),
-        }
-    }
-
-    pub async fn reset_password_state(&self, user_id: &str) -> Result<User> {
-        let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
-        let update = json!({
-            "$set": json! ({
-                "lastPasswordReset": Utc::now(),
-            })
-        });
         let update = Parser::mode(self.database_driver).convert(update);
 
         match self.adapter.find_one_and_update(filter, update).await {

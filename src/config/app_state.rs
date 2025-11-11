@@ -56,40 +56,27 @@ impl AppState {
     }
 
     async fn build_authservice(database: &Database) -> Result<AuthService> {
-        match database.driver {
-            // DatabaseDriver::SQLite => Ok(Self::from_sqlite("/app/test.db".into()).await?),
-            DatabaseDriver::SQLite => Ok(Self::from_sqlite(&database.connection_string).await?),
-            DatabaseDriver::MongoDB => Ok(Self::from_mongo(&database.connection_string).await?),
+        let client = MemCache::start(&database.cache).await?;
+        let memcache = MemCacheAdapter::new(client);
+
+        let adapters = match database.driver {
+            DatabaseDriver::SQLite => {
+                let db = SQLite::start(&database.connection_string).await?;
+                if &database.connection_string == "sqlite::memory:" {
+                    sqlx::migrate!("./migrations")
+                        .run(&db)
+                        .await
+                        .expect("migrations to run");
+                }
+                DatabaseAdapters::sqlite(&db)
+            }
+            DatabaseDriver::MongoDB => {
+                let db = MongoDB::start(&database.connection_string).await?;
+                DatabaseAdapters::mongodb(&db)
+            }
             DatabaseDriver::PostgreSQL => todo!(),
-        }
-    }
+        };
 
-    async fn from_sqlite(conn: &str) -> Result<AuthService> {
-        let db = SQLite::start(conn).await?;
-        if conn == "sqlite::memory:" {
-            sqlx::migrate!("./migrations")
-                .run(&db)
-                .await
-                .expect("migrations to run");
-        }
-        let adapters = DatabaseAdapters::sqlite(&db);
-
-        let client = MemCache::start("").await?;
-        let memcache = MemCacheAdapter::new(client);
-
-        Ok(AuthService::new(adapters, DatabaseDriver::SQLite, memcache))
-    }
-
-    async fn from_mongo(conn: &str) -> Result<AuthService> {
-        let db = MongoDB::start(conn).await?;
-        let adapters = DatabaseAdapters::mongodb(&db);
-
-        let client = MemCache::start("").await?;
-        let memcache = MemCacheAdapter::new(client);
-        Ok(AuthService::new(
-            adapters,
-            DatabaseDriver::MongoDB,
-            memcache,
-        ))
+        Ok(AuthService::new(adapters, database.driver, memcache))
     }
 }

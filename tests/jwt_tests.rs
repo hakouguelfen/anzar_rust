@@ -33,7 +33,10 @@ async fn test_jwt_contains_correct_claims() {
         assert!(access_token_claims.is_ok());
         assert!(refresh_token_claims.is_ok());
 
-        assert_eq!(auth_response.user.id, access_token_claims.unwrap().sub);
+        assert_eq!(
+            auth_response.user.id,
+            Some(access_token_claims.unwrap().sub)
+        );
     }
 }
 

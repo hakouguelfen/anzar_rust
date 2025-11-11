@@ -15,6 +15,7 @@ pub enum FailureReason {
     Malformed,
     HashMismatch,
     UnauthorizedSource,
+    Any,
 }
 #[derive(Debug)]
 pub enum InvalidTokenReason {
@@ -28,6 +29,7 @@ pub enum CredentialField {
     Username,
     Email,
     Password,
+    EmailOrPassword,
     Token,
     ApiKey,
     ObjectId,
@@ -73,7 +75,7 @@ pub enum Error {
     },
 
     // -- Accounts
-    AccuontNotVerified {
+    AccountNotVerified {
         field: CredentialField,
     },
     InvalidCredentials {
@@ -83,9 +85,7 @@ pub enum Error {
     MissingCredentials {
         field: CredentialField,
     },
-    AccountSuspended {
-        user_id: String,
-    },
+    AccountSuspended {},
     UserNotFound {
         user_id: Option<String>,
         email: Option<String>,
@@ -161,14 +161,14 @@ impl actix_web::ResponseError for Error {
                 token_type: _,
                 reason: _,
             }
-            | Error::AccuontNotVerified { field: _ }
+            | Error::AccountNotVerified { field: _ }
             | Error::InvalidCredentials {
                 field: _,
                 reason: _,
             }
             | Error::MissingCredentials { field: _ } => StatusCode::UNAUTHORIZED,
 
-            Error::AccountSuspended { user_id: _ } => StatusCode::FORBIDDEN,
+            Error::AccountSuspended {} => StatusCode::FORBIDDEN,
 
             Error::RateLimitExceeded {
                 limit: _,

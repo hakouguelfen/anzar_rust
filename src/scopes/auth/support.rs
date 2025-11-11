@@ -1,3 +1,5 @@
+use rand::Rng;
+
 use crate::error::Result;
 use crate::utils::DeviceCookie;
 
@@ -8,8 +10,9 @@ pub fn construct_key_from_device_cookie(
 ) -> Result<String> {
     if let Some(cookie) = session.get::<String>("DeviceCookie")? {
         match device_cookie.validate(&cookie) {
-            true => Ok(format!("lockout:{}", cookie)),
-            false => Ok(format!("lockout:user:{}", email)),
+            Some(true) => Ok(format!("lockout:{}", cookie)),
+            Some(false) => Ok(format!("lockout:user:{}", email)),
+            None => Ok(format!("lockout:user:{}", email)),
         }
     } else {
         Ok(format!("lockout:user:{}", email))
@@ -26,11 +29,11 @@ pub async fn delay(attempts: u32) {
 pub async fn throttle_since(start: std::time::Instant) {
     const TIMING_DELAY_MS: u64 = 800;
 
+    let jitter = rand::rng().random_range(0..=20); // +/- 20ms
     let elapsed = start.elapsed().as_millis() as u64;
+    let delay = TIMING_DELAY_MS.saturating_sub(elapsed) + jitter;
+
     if elapsed < TIMING_DELAY_MS {
-        tokio::time::sleep(tokio::time::Duration::from_millis(
-            TIMING_DELAY_MS.saturating_sub(elapsed),
-        ))
-        .await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(delay)).await;
     }
 }

@@ -9,7 +9,7 @@ use validator::ValidateArgs;
 use crate::{
     config::AuthStrategy,
     error::{CredentialField, Error, FailureReason, Result},
-    services::account::service::AccountServiceTrait,
+    services::account::{model::AccountStatus, service::AccountServiceTrait},
     utils::DeviceCookie,
 };
 use crate::{
@@ -61,66 +61,78 @@ async fn login(
     ConfigurationExtractor(configuration): ConfigurationExtractor,
     session: actix_session::Session,
 ) -> Result<HttpResponse> {
-    req.validate_with_args(&configuration.auth.password.requirements)
-        .map_err(|err| Error::BadRequest(err.to_string()))?;
+    // START TIMING-SAFE EXECUTION BLOCK
+    let start = std::time::Instant::now();
 
     let mut device_cookie = DeviceCookie::new(&configuration.security.secret_key);
-    let key = support::construct_key_from_device_cookie(&session, &device_cookie, &req.email)?;
 
-    // unified lockout check
-    if auth_service.user_service.exists(&key) {
-        return Err(Error::AccountSuspended { user_id: "".into() });
-    }
+    // ALWAYS execute the same operations regardless of user existence
+    let (user, account_status, attempts) = auth_service
+        .authenticate_user(
+            &req.email,
+            &req.password,
+            &device_cookie,
+            &session,
+            &configuration,
+        )
+        .await?;
 
-    match auth_service
-        .authenticate_user(&req.email, &req.password)
-        .await?
-    {
-        true => {
+    // ENFORCE CONSTANT-TIME EXECUTION
+    support::throttle_since(start).await;
+
+    // Now handle responses
+    match account_status {
+        AccountStatus::Active => {
+            // Issue new device cookie
+            tracing::info!("user logged in");
             let cookie = device_cookie.issue(&req.email);
-            session.insert("DeviceCookie", &cookie)?;
 
-            Ok(())
+            match configuration.auth.strategy {
+                AuthStrategy::Session => auth_service.issue_session(&user).await.map(|token| {
+                    session.purge();
+                    session.renew();
+                    session.insert("DeviceCookie", &cookie)?;
+                    session.insert("SessionID", token)?;
+                    Ok(HttpResponse::Ok().json(AuthResponse::new(user)))
+                })?,
+                AuthStrategy::Jwt => auth_service
+                    .issue_jwt(
+                        &user,
+                        configuration.security.secret_key.as_bytes(),
+                        configuration.auth.jwt,
+                    )
+                    .await
+                    .map(|tokens| {
+                        session.purge();
+                        session.renew();
+                        session.insert("DeviceCookie", &cookie)?;
+
+                        Ok(HttpResponse::Ok()
+                            .insert_header(actix_web::http::header::ContentType(
+                                actix_web::mime::APPLICATION_JSON,
+                            ))
+                            .insert_header(("X-Content-Type-Options", "nosniff"))
+                            .insert_header(("X-Frame-Options", "DENY"))
+                            .insert_header(("Content-Security-Policy", "self"))
+                            .insert_header((
+                                "Strict-Transport-Security",
+                                "max-age=31536000; includeSubDomains",
+                            ))
+                            .json(AuthResponse::new(user).with_jwt(tokens)))
+                    })?,
+            }
         }
-        false => {
-            let pass_config = configuration.auth.password;
-            tracing::error!("Failed to verify password");
-
-            let device_cookie = session.get::<String>("DeviceCookie")?;
-            let attempts = auth_service
-                .register_failed_attempt(&req.email, device_cookie.as_deref(), &pass_config)
-                .await?;
-
-            // Progressive delay
-            support::delay(attempts as u32).await;
-
-            Err(Error::InvalidCredentials {
-                field: CredentialField::Password,
-                reason: FailureReason::HashMismatch,
-            })
-        }
-    }?;
-
-    let email_verification = configuration.auth.email.verification;
-
-    let user = auth_service.find_user_by_email(&req.email).await?;
-    if email_verification.required && !user.verified {
-        return Err(Error::AccuontNotVerified {
+        AccountStatus::Unverified => Err(Error::AccountNotVerified {
             field: CredentialField::Email,
-        });
-    }
-
-    let secret_key = configuration.security.secret_key.as_bytes();
-    let jwt_config = configuration.auth.jwt;
-    match configuration.auth.strategy {
-        AuthStrategy::Session => auth_service.issue_session(&user).await.map(|token| {
-            session.insert("SessionID", token)?;
-            Ok(HttpResponse::Ok().json(AuthResponse::new(user)))
-        })?,
-        AuthStrategy::Jwt => auth_service
-            .issue_jwt(&user, secret_key, jwt_config)
-            .await
-            .map(|tokens| Ok(HttpResponse::Ok().json(AuthResponse::new(user).with_jwt(tokens))))?,
+        }),
+        AccountStatus::Suspended => Err(Error::AccountSuspended {}),
+        _ => {
+            support::delay(attempts as u32).await;
+            return Err(Error::InvalidCredentials {
+                field: CredentialField::EmailOrPassword,
+                reason: FailureReason::Any,
+            });
+        }
     }
 }
 
@@ -355,12 +367,12 @@ async fn submit_new_password(
     })?;
     let user_id = reset_token.user_id;
 
-    // NOTE: → Rate limit per token
+    // NOTE → Rate limit per token
 
     // 2. Ensure password is different then previous
     let account = auth_service.find_account(&user_id).await?;
     if account.locked {
-        return Err(Error::AccountSuspended { user_id });
+        return Err(Error::AccountSuspended {});
     }
     if Password::verify(&form.password, &account.password) {
         tracing::warn!("Password reuse attempt for user: {}", user_id);
@@ -382,10 +394,7 @@ async fn submit_new_password(
         .invalidate_password_reset_token(reset_token_id)
         .await?;
 
-    // 6.
-    auth_service.reset_password_state(&user_id).await?;
-
-    // 7. TODO it may not be neccessary
+    // 6. TODO it may not be neccessary
     auth_service.logout_all(&user_id).await?;
 
     let success_redirect = match configuration.auth.password.reset.success_redirect {

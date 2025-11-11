@@ -11,6 +11,7 @@ target/
 cert/
 migrations/
 
+entrypoint.sh
 TODO.md
 anzar.db
 anzar.dev.yml

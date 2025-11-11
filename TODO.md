@@ -5,6 +5,8 @@
 - tests for return type 
 - Listen to kill app on syscall SIGTERM
 - Retry-After header, after rate limiting
+- Implement weak password checks, such as testing new or changed passwords against the top 10,000 worst passwords list.
+
 
 ## 4. Global or Behavioral Limits
 - Many accounts being hit from one IP.
@@ -29,3 +31,5 @@ Attackers may cause permanent lockout for all untrusted devices for a specific u
 
 Issue a valid device cookie after visiting password reset link (an actual password reset is not necessary). Thus, if the user demonstrates their possession of a personal email account then the system may trust a client to try entering their credentials.
 
+
+https://www.pornhub.com/view_video.php?viewkey=68fafcce6e6e7

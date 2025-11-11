@@ -1,16 +1,28 @@
-use crate::config::PasswordConfig;
-use crate::error::{CredentialField, Error, FailureReason, Result};
+use crate::config::{Configuration, PasswordConfig};
+use crate::error::{CredentialField, Error, Result};
 use crate::scopes::auth::service::AuthService;
 use crate::scopes::email::model::EmailVerificationToken;
 use crate::scopes::email::service::EmailVerificationTokenServiceTrait;
-use crate::services::account::model::Account;
-use crate::utils::{CustomPasswordHasher, Password, Token, TokenHasher};
+use crate::services::account::model::{Account, AccountStatus};
+use crate::services::fake::service::FakeUserGenerator;
+use crate::utils::{CustomPasswordHasher, DeviceCookie, Password, Token, TokenHasher};
 
 use super::User;
-use crate::scopes::auth::RegisterRequest;
+use crate::scopes::auth::{RegisterRequest, support};
 
 pub trait UserServiceTrait {
-    fn authenticate_user(&self, email: &str, password: &str) -> impl Future<Output = Result<bool>>;
+    fn find_by_email_with_password(
+        &self,
+        email: &str,
+    ) -> impl Future<Output = Result<(User, String)>>;
+    fn authenticate_user(
+        &self,
+        email: &str,
+        password: &str,
+        device_cookie: &DeviceCookie,
+        session: &actix_session::Session,
+        configuration: &Configuration,
+    ) -> impl Future<Output = Result<(User, AccountStatus, u8)>>;
     fn register_failed_attempt(
         &self,
         user: &str,
@@ -25,26 +37,66 @@ pub trait UserServiceTrait {
     ) -> impl Future<Output = Result<String>>;
     fn find_user_by_email(&self, email: &str) -> impl Future<Output = Result<User>>;
     fn find_user(&self, id: &str) -> impl Future<Output = Result<User>>;
-    fn update_user_password(&self, id: &str, hash: &str) -> impl Future<Output = Result<User>>;
-    fn reset_password_state(&self, id: &str) -> impl Future<Output = Result<User>>;
     fn validate_account(&self, id: &str) -> impl Future<Output = Result<User>>;
-    fn unlock_account(&self, id: &str) -> impl Future<Output = Result<User>>;
 }
 impl UserServiceTrait for AuthService {
-    async fn authenticate_user(&self, email: &str, password: &str) -> Result<bool> {
-        let user: User = self.user_service.find_by_email(email).await.map_err(|_| {
-            Error::InvalidCredentials {
-                field: CredentialField::Email,
-                reason: FailureReason::NotFound,
-            }
-        })?;
+    async fn find_by_email_with_password(&self, email: &str) -> Result<(User, String)> {
+        // FIXME Single query with JOIN
+        let user = self.user_service.find_by_email(email).await?;
 
-        let user_id = user.id.as_ref().ok_or(Error::MalformedData {
+        let id = user.id.as_ref().ok_or_else(|| Error::MalformedData {
             field: CredentialField::ObjectId,
         })?;
-        let account = self.account_service.find(user_id).await?;
 
-        Ok(Password::verify(password, &account.password))
+        let account = self.account_service.find(id).await?;
+
+        Ok((user, account.password))
+    }
+    async fn authenticate_user(
+        &self,
+        email: &str,
+        password: &str,
+        device_cookie: &DeviceCookie,
+        session: &actix_session::Session,
+        configuration: &Configuration,
+    ) -> Result<(User, AccountStatus, u8)> {
+        let session_device_cookie = session.get::<String>("DeviceCookie").ok().flatten();
+        let device_cookie_ref = session_device_cookie.as_deref();
+
+        // ALWAYS execute ALL operations in parallel
+        let (user_result, fake_data, suspension_check, attempts) = tokio::join!(
+            self.find_by_email_with_password(email),
+            async {
+                FakeUserGenerator::new(configuration.security.secret_key.as_bytes())
+                    .generate_fake_user_data(email)
+            },
+            async {
+                let key = support::construct_key_from_device_cookie(session, device_cookie, email)
+                    .unwrap();
+                self.user_service.contains_key(&key)
+            },
+            self.register_failed_attempt(email, device_cookie_ref, &configuration.auth.password,)
+        );
+
+        // Select real or fake data (constant-time selection)
+        let (target_user, target_hash) = match user_result {
+            Ok((user, password_hash)) => (user.clone(), password_hash.clone()),
+            Err(_) => (fake_data.0, fake_data.1),
+        };
+        // ALWAYS verify password (constant-time even with fake hash)
+        let password_valid = Password::verify(password, &target_hash);
+
+        let is_suspended = suspension_check;
+        let is_unverified = configuration.auth.email.verification.required && !target_user.verified;
+
+        let result = match password_valid {
+            true if !is_suspended && !is_unverified => AccountStatus::Active,
+            true if is_suspended => AccountStatus::Suspended,
+            true if is_unverified => AccountStatus::Unverified,
+            _ => AccountStatus::InvalidCredentials,
+        };
+
+        Ok((target_user.clone(), result, attempts.unwrap_or(0)))
     }
 
     async fn register_failed_attempt(
@@ -53,17 +105,21 @@ impl UserServiceTrait for AuthService {
         device_cookie: Option<&str>,
         pass_config: &PasswordConfig,
     ) -> Result<u8> {
-        let max_failed_attempts = match device_cookie {
-            Some(_) => pass_config.security.max_failed_login_attempts * 2,
-            None => pass_config.security.max_failed_login_attempts,
-        };
         let key = match device_cookie {
             Some(val) => val.into(),
             None => format!("user:{}", user),
         };
+        if self.user_service.contains_key(&key) {
+            return Ok(self.user_service.get_attempts(&key));
+        }
+
         let attempts = self.user_service.increment(&key);
 
         // count number of failed authentication attempts within time period T for this specific cookie
+        let max_failed_attempts = match device_cookie {
+            Some(_) => pass_config.security.max_failed_login_attempts * 2,
+            None => pass_config.security.max_failed_login_attempts,
+        };
         if attempts >= max_failed_attempts {
             self.user_service
                 .put_cookie_in_lockout(&key, pass_config.security.lockout_duration as u32)?;
@@ -108,15 +164,6 @@ impl UserServiceTrait for AuthService {
     }
     async fn find_user(&self, id: &str) -> Result<User> {
         self.user_service.find(id).await
-    }
-    async fn update_user_password(&self, id: &str, hash: &str) -> Result<User> {
-        self.user_service.update_password(id, hash).await
-    }
-    async fn reset_password_state(&self, id: &str) -> Result<User> {
-        self.user_service.reset_password_state(id).await
-    }
-    async fn unlock_account(&self, id: &str) -> Result<User> {
-        self.user_service.unlock_account(id).await
     }
     async fn validate_account(&self, id: &str) -> Result<User> {
         self.user_service.validate_account(id).await
