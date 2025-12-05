@@ -2,24 +2,22 @@ use std::fs::File;
 use std::io::BufReader;
 use std::net::TcpListener;
 
-use tracing_actix_web::TracingLogger;
-
 use actix_cors::Cors;
 use actix_session::{SessionMiddleware, storage::CookieSessionStore};
+
 use actix_web::cookie::Key;
 use actix_web::dev::Server;
-use actix_web::middleware::from_fn;
-use actix_web::{App, HttpServer};
-use actix_web::{http, web};
+use actix_web::middleware::{self, from_fn};
+use actix_web::{App, HttpServer, http, web};
+
+use tracing_actix_web::TracingLogger;
 
 use rustls::{ServerConfig, pki_types::CertificateDer};
 use rustls_pemfile::{certs, private_key};
 
 use crate::config::AppState;
 use crate::error::{Error, FailureReason};
-use crate::middlewares::account_validation;
-// use crate::middlewares::rate_limiting::ip_rate_limit_middleware;
-use crate::middlewares::token_validation;
+use crate::middlewares::{account_validation, requests_filters, token_validation};
 use crate::scopes::{auth, email, health, user};
 
 fn load_rustls_config(cert: String, key: String) -> Result<rustls::ServerConfig, Error> {
@@ -78,18 +76,34 @@ pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, s
             ])
             .supports_credentials()
             .max_age(3600);
-        let session =
-            SessionMiddleware::builder(CookieSessionStore::default(), Key::from(&[0; 64]))
-                // FIXME Set appropriate Domain and Path
-                .cookie_secure(true)
-                .cookie_same_site(actix_web::cookie::SameSite::Strict)
-                .cookie_http_only(true)
-                .build();
+
+        // FIXME Should be a fixed secret
+        let key = Key::from(app_state.configuration.security.secret_key.as_bytes());
+        let session = SessionMiddleware::builder(CookieSessionStore::default(), key)
+            .cookie_secure(true)
+            .cookie_same_site(actix_web::cookie::SameSite::Strict)
+            .cookie_http_only(true)
+            .build();
 
         App::new()
             .wrap(TracingLogger::default())
+            // .wrap(TracingLogger::<CustomRootSpanBuilder>::new())
             .wrap(cors)
             .wrap(session)
+            .wrap(from_fn(requests_filters))
+            .wrap(
+                middleware::DefaultHeaders::new()
+                    .add((
+                        http::header::CONTENT_TYPE,
+                        actix_web::mime::APPLICATION_JSON,
+                    ))
+                    .add(("X-Content-Type-Options", "nosniff"))
+                    .add(("X-Frame-Options", "DENY"))
+                    .add(("X-XSS-Protection", "0"))
+                    .add(("Cache-Control", "no-store"))
+                    .add(("Content-Security-Policy", "default-src 'self'"))
+                    .add(("Strict-Transport-Security", "max-age=31536000")), // NOTE production only
+            )
             // .wrap(from_fn(ip_rate_limit_middleware))
             .app_data(web::Data::new(app_state_inner.clone()))
             .service(health::health_scope())

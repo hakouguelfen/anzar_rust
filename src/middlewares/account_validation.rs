@@ -36,9 +36,7 @@ async fn validate_user(req: &ServiceRequest, user_id: &str) -> Result<User, Auth
     let account = auth_service.find_account(user_id).await?;
 
     if account.locked {
-        return Err(AuthError::AccountSuspended {
-            user_id: user_id.into(),
-        });
+        return Err(AuthError::AccountSuspended {});
     }
 
     Ok(user)
@@ -71,7 +69,6 @@ pub async fn account_validation_middleware(
     req: ServiceRequest,
     next: Next<impl MessageBody>,
 ) -> Result<ServiceResponse<impl MessageBody>, Error> {
-    dbg!("ⵎⴰⵄⴼ ⵓⵎⴰ, ⵎⵜⵜⴰ ⵀⵜⵙⴰⵡⵉⴹ");
     // pre-processing
     let user_id = extract_user_id_from_extensions(&req)?;
     let user = validate_user(&req, &user_id).await?;

@@ -63,23 +63,24 @@ impl CustomPasswordHasher for Password {
     }
 
     fn verify(password: &str, hash: &str) -> bool {
-        let Ok(hash) = PasswordHash::new(hash) else {
-            tracing::error!(
-                "Failed to Parse a password hash from a string in the PHC string format."
-            );
-            return false;
-        };
+        static DUMMY_HASH: &str = "$argon2id$v=19$m=65536,t=3,p=4$\
+     Lm1Jk9XQ2E1o8XxZMZ1jPQ$\
+     8vBxrT9uC1NQb3lQfa2RyEBJxK2Sr6ELrRvsGqIzJxA";
+
+        let parsed = PasswordHash::new(hash)
+            .or_else(|_| PasswordHash::new(DUMMY_HASH))
+            .unwrap();
 
         Argon2::default()
-            .verify_password(password.as_bytes(), &hash)
+            .verify_password(password.as_bytes(), &parsed)
             .is_ok()
     }
 }
 
-pub struct DeviceCookie {
+pub struct HmacSigner {
     secret_key: String,
 }
-impl DeviceCookie {
+impl HmacSigner {
     pub fn new(secret_key: &str) -> Self {
         Self {
             secret_key: secret_key.into(),
@@ -141,7 +142,7 @@ mod tests {
 
     #[test]
     fn test_device_cookie() {
-        let mut dc = DeviceCookie::new("supersecretkey");
+        let mut dc = HmacSigner::new("supersecretkey");
         let cookie = dc.issue("alice").unwrap_or_default();
 
         assert!(dc.validate(&cookie).unwrap_or_default());

@@ -20,10 +20,11 @@ struct TokenQuery {
     pub token: String,
 }
 
-#[tracing::instrument(name = "Find user", skip(auth_service, query))]
+#[tracing::instrument(name = "Email Verification", skip(auth_service, query))]
 async fn verify_email(
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
     ConfigurationExtractor(configuration): ConfigurationExtractor,
+    // FIXME to be validated
     ValidatedQuery(query): ValidatedQuery<TokenQuery>,
 ) -> Result<HttpResponse> {
     let token = query.token;

@@ -4,18 +4,18 @@ use actix_web::{
     web::{self},
 };
 use serde_json::json;
-use validator::ValidateArgs;
+use validator::{Validate, ValidateArgs};
 
 use crate::{
     config::AuthStrategy,
     error::{CredentialField, Error, FailureReason, Result},
     services::account::{model::AccountStatus, service::AccountServiceTrait},
-    utils::DeviceCookie,
+    utils::HmacSigner,
 };
 use crate::{
     extractors::{
         AuthPayload, AuthServiceExtractor, AuthenticatedUser, ConfigurationExtractor,
-        ValidatedPayload, ValidatedQuery,
+        ValidatedQuery,
     },
     scopes::auth::models::RegisterRequest,
 };
@@ -56,22 +56,25 @@ use super::support;
     fields(user_email = %req.email)
 )]
 async fn login(
-    req: web::Json<LoginRequest>,
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
     ConfigurationExtractor(configuration): ConfigurationExtractor,
+    req: web::Json<LoginRequest>,
     session: actix_session::Session,
 ) -> Result<HttpResponse> {
+    req.validate_with_args(&configuration.auth.password.requirements)
+        .map_err(|e| Error::BadRequest(e.to_string()))?;
+
     // START TIMING-SAFE EXECUTION BLOCK
     let start = std::time::Instant::now();
 
-    let mut device_cookie = DeviceCookie::new(&configuration.security.secret_key);
+    let mut hmac_signer = HmacSigner::new(&configuration.security.secret_key);
 
     // ALWAYS execute the same operations regardless of user existence
     let (user, account_status, attempts) = auth_service
         .authenticate_user(
             &req.email,
             &req.password,
-            &device_cookie,
+            &hmac_signer,
             &session,
             &configuration,
         )
@@ -85,43 +88,32 @@ async fn login(
         AccountStatus::Active => {
             // Issue new device cookie
             tracing::info!("user logged in");
-            let cookie = device_cookie.issue(&req.email);
+            let cookie = hmac_signer.issue(&req.email);
 
             match configuration.auth.strategy {
                 AuthStrategy::Session => auth_service.issue_session(&user).await.map(|token| {
                     session.purge();
                     session.renew();
-                    session.insert("DeviceCookie", &cookie)?;
-                    session.insert("SessionID", token)?;
+                    session.insert(support::DEVICE_COOKIE, &cookie)?;
+                    session.insert(support::SESSION_COOKIE, token)?;
                     Ok(HttpResponse::Ok().json(AuthResponse::new(user)))
                 })?,
-                AuthStrategy::Jwt => auth_service
-                    .issue_jwt(
-                        &user,
-                        configuration.security.secret_key.as_bytes(),
-                        configuration.auth.jwt,
-                    )
-                    .await
-                    .map(|tokens| {
-                        session.purge();
-                        session.renew();
-                        session.insert("DeviceCookie", &cookie)?;
+                AuthStrategy::Jwt => {
+                    auth_service
+                        .issue_jwt(&user, &configuration)
+                        .await
+                        .map(|tokens| {
+                            session.purge();
+                            session.renew();
+                            session.insert(support::DEVICE_COOKIE, &cookie)?;
 
-                        Ok(HttpResponse::Ok()
-                            .insert_header(actix_web::http::header::ContentType(
-                                actix_web::mime::APPLICATION_JSON,
-                            ))
-                            .insert_header(("X-Content-Type-Options", "nosniff"))
-                            .insert_header(("X-Frame-Options", "DENY"))
-                            .insert_header(("Content-Security-Policy", "self"))
-                            .insert_header((
-                                "Strict-Transport-Security",
-                                "max-age=31536000; includeSubDomains",
-                            ))
-                            .json(AuthResponse::new(user).with_jwt(tokens)))
-                    })?,
+                            Ok(HttpResponse::Ok().json(AuthResponse::new(user).with_jwt(tokens)))
+                        })?
+                }
             }
         }
+        // NOTE fully mask account existence
+        // only return InvalidCredentials
         AccountStatus::Unverified => Err(Error::AccountNotVerified {
             field: CredentialField::Email,
         }),
@@ -142,20 +134,20 @@ async fn login(
     fields(user_email = %req.email, user_name = %req.username)
 )]
 async fn register(
-    req: web::Json<RegisterRequest>,
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
     ConfigurationExtractor(configuration): ConfigurationExtractor,
+    req: web::Json<RegisterRequest>,
     session: actix_session::Session,
 ) -> Result<HttpResponse> {
     req.validate_with_args(&configuration.auth.password.requirements)
         .map_err(|err| Error::BadRequest(err.to_string()))?;
 
+    // let mut bucket = RATE_LIMITS.entry(email.clone()).or_default();
+    // bucket.run()?;
+
     let user = auth_service.create_user(req.into_inner()).await?;
 
-    let secret_key = configuration.security.secret_key.as_bytes();
-    let jwt_config = configuration.auth.jwt;
-
-    let email_config = configuration.auth.email;
+    let email_config = &configuration.auth.email;
     if email_config.verification.required {
         let email_verification_expiry = email_config.verification.token_expires_in;
 
@@ -169,30 +161,32 @@ async fn register(
 
         return match configuration.auth.strategy {
             AuthStrategy::Session => auth_service.issue_session(&user).await.map(|token| {
-                session.insert("SessionID", token)?;
+                session.insert(support::SESSION_COOKIE, token)?;
                 Ok(HttpResponse::Created()
                     .json(AuthResponse::new(user).with_verification(&link, &verification_token)))
             })?,
-            AuthStrategy::Jwt => auth_service
-                .issue_jwt(&user, secret_key, jwt_config)
-                .await
-                .map(|tokens| {
-                    Ok(HttpResponse::Created().json(
-                        AuthResponse::new(user)
-                            .with_jwt(tokens)
-                            .with_verification(&link, &verification_token),
-                    ))
-                })?,
+            AuthStrategy::Jwt => {
+                auth_service
+                    .issue_jwt(&user, &configuration)
+                    .await
+                    .map(|tokens| {
+                        Ok(HttpResponse::Created().json(
+                            AuthResponse::new(user)
+                                .with_jwt(tokens)
+                                .with_verification(&link, &verification_token),
+                        ))
+                    })?
+            }
         };
     }
 
     match configuration.auth.strategy {
         AuthStrategy::Session => auth_service.issue_session(&user).await.map(|token| {
-            session.insert("SessionID", token)?;
+            session.insert(support::SESSION_COOKIE, token)?;
             Ok(HttpResponse::Created().json(AuthResponse::new(user)))
         })?,
         AuthStrategy::Jwt => auth_service
-            .issue_jwt(&user, secret_key, jwt_config)
+            .issue_jwt(&user, &configuration)
             .await
             .map(|tokens| {
                 Ok(HttpResponse::Created().json(AuthResponse::new(user).with_jwt(tokens)))
@@ -210,13 +204,13 @@ async fn get_session(session: Session) -> Result<HttpResponse> {
     skip(payload, auth_service,configuration, authenticated_user),
     fields(user_id = %payload.user_id)
 )]
-
 async fn refresh_token(
     payload: AuthPayload,
     authenticated_user: AuthenticatedUser,
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
     ConfigurationExtractor(configuration): ConfigurationExtractor,
 ) -> Result<HttpResponse> {
+    tracing::info!("user is refreshing token");
     let user: User = authenticated_user.0;
 
     let user_id = user.id.as_ref().ok_or(Error::MalformedData {
@@ -224,17 +218,15 @@ async fn refresh_token(
     })?;
     auth_service.consume_refresh_token(payload, user_id).await?;
 
-    let secret_key = configuration.security.secret_key.as_bytes();
-    let jwt_config = configuration.auth.jwt;
     auth_service
-        .issue_jwt(&user, secret_key, jwt_config)
+        .issue_jwt(&user, &configuration)
         .await
         .map(|tokens| Ok(HttpResponse::Ok().json(AuthResponse::new(user).with_jwt(tokens))))?
 }
 
 #[tracing::instrument(
     name = "Logout user",
-    skip(payload, auth_service, session),
+    skip(payload, auth_service, session, session_manager),
     fields(user_id = %payload.user_id)
 )]
 async fn logout(
@@ -242,23 +234,29 @@ async fn logout(
     ConfigurationExtractor(configuration): ConfigurationExtractor,
     payload: AuthPayload,
     session: Session,
+    session_manager: actix_session::Session,
 ) -> Result<HttpResponse> {
     let result = match configuration.auth.strategy {
         AuthStrategy::Session => auth_service.invalidate_session(&session.token).await,
         AuthStrategy::Jwt => auth_service.invalidate_jwt(&payload.jti).await,
     };
+
+    session_manager.purge();
     result.map(|_| Ok(HttpResponse::Ok().json(json!({ "status": "ok" }))))?
 }
 
 #[tracing::instrument(name = "Forgot password", skip(auth_service, configuration))]
 async fn request_password_reset(
-    ValidatedPayload(req): ValidatedPayload<EmailRequest>,
+    req: web::Json<EmailRequest>,
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
     ConfigurationExtractor(configuration): ConfigurationExtractor,
 ) -> Result<HttpResponse> {
+    req.validate()
+        .map_err(|err| Error::BadRequest(err.to_string()))?;
+
     let start = std::time::Instant::now();
 
-    let email: String = req.email;
+    let email: String = req.into_inner().email;
     // 2.
     let mut bucket = RATE_LIMITS.entry(email.clone()).or_default();
     bucket.run()?;
@@ -326,14 +324,13 @@ async fn render_reset_form(
     auth_service.validate_reset_password_token(token).await?;
 
     let csrf_token = Token::generate(64);
-    session.insert("csrf_token", &csrf_token)?;
+    session.purge();
+    session.insert(support::CSRF_COOKIE, &csrf_token)?;
 
     let body = include_str!("templates/update_password.html")
         .replace("{{TOKEN}}", token)
         .replace("{{CSRF_TOKEN}}", &csrf_token);
     Ok(HttpResponse::Ok()
-        .insert_header(("X-Frame-Options", "DENY"))
-        .insert_header(("X-Content-Type-Options", "nosniff"))
         .content_type("text/html; charset=utf-8")
         .body(body))
 }
@@ -349,7 +346,7 @@ async fn submit_new_password(
         .map_err(|err| Error::BadRequest(err.to_string()))?;
 
     // 0.5 Verify CSRF token
-    if let Some(expected) = session.get::<String>("csrf_token")? {
+    if let Some(expected) = session.get::<String>(support::CSRF_COOKIE)? {
         if !Token::verify(&expected, &form.csrf_token) {
             return Ok(HttpResponse::Forbidden().body("Invalid CSRF token"));
         }

@@ -1,4 +1,4 @@
-use crate::config::JWT;
+use crate::config::Configuration;
 use crate::error::{CredentialField, Error, Result};
 use crate::scopes::user::User;
 use crate::services::jwt::{JwtEncoderBuilder, RefreshToken, Tokens};
@@ -14,8 +14,7 @@ pub trait JwtServiceTrait {
     fn issue_jwt(
         &self,
         user: &User,
-        secret: &[u8],
-        jwt_config: JWT,
+        configuration: &Configuration,
     ) -> impl std::future::Future<Output = Result<Tokens>>;
     fn invalidate_jwt(&self, jti: &str) -> impl Future<Output = Result<()>>;
     fn invalidate_session(&self, session_id: &str) -> impl Future<Output = Result<()>>;
@@ -32,7 +31,10 @@ impl JwtServiceTrait for AuthService {
 
         Ok(())
     }
-    async fn issue_jwt(&self, user: &User, secret: &[u8], jwt_config: JWT) -> Result<Tokens> {
+    async fn issue_jwt(&self, user: &User, configuration: &Configuration) -> Result<Tokens> {
+        let secret = configuration.security.secret_key.as_bytes();
+        let jwt_config = &configuration.auth.jwt;
+
         let user_id = user.id.as_ref().ok_or(Error::MalformedData {
             field: CredentialField::ObjectId,
         })?;

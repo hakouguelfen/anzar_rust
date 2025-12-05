@@ -11,6 +11,7 @@ use actix_web::{
 use crate::{
     config::AuthStrategy,
     extractors::{AuthPayload, Claims, TokenType},
+    scopes::auth::support,
 };
 use crate::{
     config::{AppState, Configuration},
@@ -63,6 +64,12 @@ async fn validate_refresh_token(req: &ServiceRequest, jti: &str) -> Result<(), A
     let refresh_token = auth_service.find_jwt_by_jti(jti).await?;
 
     if !refresh_token.valid {
+        let message = format!(
+            "failed authentication with user_id:{}",
+            refresh_token.user_id
+        )
+        .to_string();
+        tracing::info!(message);
         return Err(AuthError::InvalidToken {
             token_type: TokenErrorType::RefreshToken,
             reason: InvalidTokenReason::Expired,
@@ -106,7 +113,7 @@ pub async fn token_validation_middleware(
     match configuration.auth.strategy {
         AuthStrategy::Session => {
             let req_session = req.get_session();
-            let data = req_session.get::<String>("SessionID")?;
+            let data = req_session.get::<String>(support::SESSION_COOKIE)?;
 
             if let Some(session_id) = data {
                 let session = find_session(&req, &session_id).await?;
@@ -133,7 +140,11 @@ pub async fn token_validation_middleware(
             let access_token = extract_token_from_header(&req, header::AUTHORIZATION.to_string());
             if let Some(token) = access_token {
                 let claims = decode_claims(token, TokenType::AccessToken, &secret_key)?;
-                req.extensions_mut().insert::<Claims>(claims);
+                req.extensions_mut().insert::<Claims>(claims.clone());
+
+                let message =
+                    format!("successful authentication with user_id:{}", claims.sub).to_string();
+                tracing::info!(message);
             }
 
             let refresh_token = extract_token_from_header(&req, X_REFRESH_TOKEN.to_string());

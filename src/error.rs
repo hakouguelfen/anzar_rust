@@ -112,6 +112,7 @@ pub enum Error {
     },
     DatabaseError(String),
     InvalidRequest,
+    UnsupportedMediaType(String),
 
     BadRequest(String),
     InternalServerError(String),
@@ -131,6 +132,8 @@ pub enum Error {
     JWT(jsonwebtoken::errors::Error),
     #[from]
     Validation(validator::ValidationError),
+    #[from]
+    Validations(validator::ValidationErrors),
     #[from]
     MemCache(memcache::MemcacheError),
 }
@@ -190,6 +193,9 @@ impl actix_web::ResponseError for Error {
             | Error::MalformedData { field: _ }
             | Error::TokenAlreadyUsed { token_id: _ }
             | Error::Validation(_) => StatusCode::BAD_REQUEST,
+            Error::Validations(_) => StatusCode::BAD_REQUEST,
+
+            Error::UnsupportedMediaType(_) => StatusCode::UNSUPPORTED_MEDIA_TYPE,
 
             Error::TokenCreationFailed { token_type: _ }
             | Error::HashingFailure

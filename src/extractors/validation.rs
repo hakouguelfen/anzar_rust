@@ -8,6 +8,7 @@ use serde::Deserialize;
 use std::pin::Pin;
 use validator::Validate;
 
+// TODO to be removed
 #[derive(Debug, Clone, Copy, Default)]
 pub struct ValidatedPayload<T>(pub T);
 

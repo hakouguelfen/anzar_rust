@@ -28,6 +28,7 @@ impl EmailVerificationTokenRepository {
         }
     }
 
+    // FIXME delete tokens not update
     pub async fn revoke(&self, user_id: &str) -> Result<()> {
         let filter = Parser::mode(self.database_driver).convert(json!({"userId": user_id}));
         let update = json! ({ "$set": json! ({"valid": false}) });

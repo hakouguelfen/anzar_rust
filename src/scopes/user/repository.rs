@@ -42,6 +42,9 @@ impl UserRepository {
     pub fn contains_key(&self, key: &str) -> bool {
         self.memcache.contains_key(key)
     }
+    pub fn clear_key(&self, key: &str) -> bool {
+        self.memcache.clear(key)
+    }
 
     // Database
     pub async fn find(&self, user_id: &str) -> Result<User> {

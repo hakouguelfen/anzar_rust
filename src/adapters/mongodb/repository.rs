@@ -12,6 +12,12 @@ impl MongoDB {
             .await
             .map_err(|_| Error::InternalServerError(NO_CLIENT.replace("{}", connection_string)))?;
 
+        // let session = client
+        //     .start_session()
+        //     .await
+        //     .map_err(|_| Error::InternalServerError(NO_DB.into()))?;
+
+        // client.database_with_options(name, options)
         let db = client
             .default_database()
             .ok_or(Error::InternalServerError(NO_DB.into()))?;

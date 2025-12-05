@@ -30,4 +30,7 @@ impl MemCacheAdapter {
 
         false
     }
+    pub fn clear(&self, key: &str) -> bool {
+        self.client.delete(key).unwrap_or(false)
+    }
 }

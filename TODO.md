@@ -32,4 +32,31 @@ Attackers may cause permanent lockout for all untrusted devices for a specific u
 Issue a valid device cookie after visiting password reset link (an actual password reset is not necessary). Thus, if the user demonstrates their possession of a personal email account then the system may trust a client to try entering their credentials.
 
 
-https://www.pornhub.com/view_video.php?viewkey=68fafcce6e6e7
+
+AUDIT LOG:
+Audit log can be used to answer the following kinds of questions: 
+- Who performed the action and what client did they use? 
+- When was the request received? 
+- What kind of request was it, such as a read or modify operation?
+- What resource was being accessed?  Was the request successful? If not, why? 
+- What other requests did they make around the same time?
+
+
+
+## SECURITY
+### Input Validation
+    * only allow Application/Json requests
+    * add header response "Content-Type:Application/json"
+    * add other header responses:
+        - "X-Content-Type-Options", "nosniff"
+        - "X-Frame-Options", "DENY"
+        - "X-XSS-Protection", "0"
+        - "Cache-Control", "no-store"
+        - "Content-Security-Policy", "default-src 'self'"
+
+### Security Controls
+    * RateLimiting
+    * Authnetication
+    * Audit Log
+    * Access Control
+    * Application Logic
