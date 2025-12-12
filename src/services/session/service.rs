@@ -25,7 +25,7 @@ impl SessionServiceTrait for AuthService {
         let session = Session::default()
             .with_user_id(user_id)
             .with_token(&hashed_token);
-        self.session_service.insert(session).await?;
+        self.session_service.insert(session, None).await?;
 
         Ok(token)
     }

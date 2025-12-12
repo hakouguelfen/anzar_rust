@@ -46,8 +46,12 @@ impl PasswordResetTokenRepository {
         Ok(())
     }
 
-    pub async fn insert(&self, otp: PasswordResetToken) -> Result<String> {
-        self.adapter.insert(otp).await.map_err(|e| {
+    pub async fn insert(
+        &self,
+        otp: PasswordResetToken,
+        session: Option<&mut mongodb::ClientSession>,
+    ) -> Result<String> {
+        self.adapter.insert(otp, session).await.map_err(|e| {
             tracing::error!("Failed to insert password reset token to database: {:?}", e);
             Error::TokenCreationFailed {
                 token_type: crate::error::TokenErrorType::PasswordResetToken,
@@ -56,7 +60,13 @@ impl PasswordResetTokenRepository {
     }
 
     pub async fn find(&self, token: &str) -> Result<PasswordResetToken> {
-        let filter = Parser::mode(self.database_driver).convert(json!({"token": token}));
+        let filter = Parser::mode(self.database_driver).convert(json!({
+            "token": token,
+            "valid": true,
+            // "expiresAt": {
+            //     "$lt": Utc::now().to_string()
+            // },
+        }));
 
         match self.adapter.find_one(filter).await {
             Ok(Some(password_reset_token)) => Ok(password_reset_token),

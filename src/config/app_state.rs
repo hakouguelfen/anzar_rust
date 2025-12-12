@@ -50,8 +50,8 @@ impl AppState {
             env_config.database.name = db_name;
         }
 
+        configuration.database.name = env_config.database.name.clone();
         configuration.database.connection_string = env_config.database.connection_string();
-
         Ok(configuration)
     }
 
@@ -71,8 +71,8 @@ impl AppState {
                 DatabaseAdapters::sqlite(&db)
             }
             DatabaseDriver::MongoDB => {
-                let db = MongoDB::start(&database.connection_string).await?;
-                DatabaseAdapters::mongodb(&db)
+                let client = MongoDB::start(&database.connection_string).await?;
+                DatabaseAdapters::mongodb(&client, &database.name)
             }
             DatabaseDriver::PostgreSQL => todo!(),
         };

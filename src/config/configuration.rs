@@ -19,6 +19,7 @@ pub struct Database {
     pub driver: DatabaseDriver,
     pub connection_string: String,
     pub cache: String,
+    pub name: String,
 }
 
 // Server

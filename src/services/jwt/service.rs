@@ -15,7 +15,7 @@ pub trait JwtServiceTrait {
         &self,
         user: &User,
         configuration: &Configuration,
-    ) -> impl std::future::Future<Output = Result<Tokens>>;
+    ) -> impl Future<Output = Result<Tokens>>;
     fn invalidate_jwt(&self, jti: &str) -> impl Future<Output = Result<()>>;
     fn invalidate_session(&self, session_id: &str) -> impl Future<Output = Result<()>>;
     fn logout(&self, payload: AuthPayload) -> impl Future<Output = Result<()>>;
@@ -40,7 +40,7 @@ impl JwtServiceTrait for AuthService {
         })?;
 
         let encoding_secret = jsonwebtoken::EncodingKey::from_secret(secret);
-        let tokens: Tokens = JwtEncoderBuilder::new(user_id, encoding_secret, &jwt_config)
+        let tokens: Tokens = JwtEncoderBuilder::new(user_id, encoding_secret, jwt_config)
             .build()
             .inspect_err(|e| {
                 tracing::error!("Failed to generate authentication tokens: {:?}", e)
@@ -57,7 +57,7 @@ impl JwtServiceTrait for AuthService {
                 chrono::Utc::now() + chrono::Duration::seconds(jwt_config.refresh_expires_in),
             );
 
-        self.jwt_service.insert(refresh_token).await?;
+        self.jwt_service.insert(refresh_token, None).await?;
 
         Ok(tokens)
     }

@@ -30,13 +30,20 @@ impl JWTRepository {
         }
     }
 
-    pub async fn insert(&self, refresh_token: RefreshToken) -> Result<()> {
-        self.adapter.insert(refresh_token).await.map_err(|e| {
-            tracing::error!("Failed to insert refreshToken to database: {:?}", e);
-            Error::TokenCreationFailed {
-                token_type: TokenErrorType::RefreshToken,
-            }
-        })?;
+    pub async fn insert(
+        &self,
+        refresh_token: RefreshToken,
+        session: Option<&mut mongodb::ClientSession>,
+    ) -> Result<()> {
+        self.adapter
+            .insert(refresh_token, session)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to insert refreshToken to database: {:?}", e);
+                Error::TokenCreationFailed {
+                    token_type: TokenErrorType::RefreshToken,
+                }
+            })?;
 
         Ok(())
     }

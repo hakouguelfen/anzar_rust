@@ -27,8 +27,12 @@ impl AccountRepository {
 }
 
 impl AccountRepository {
-    pub async fn insert(&self, account: Account) -> Result<()> {
-        self.adapter.insert(account).await.map_err(|e| {
+    pub async fn insert(
+        &self,
+        account: Account,
+        session: Option<&mut mongodb::ClientSession>,
+    ) -> Result<()> {
+        self.adapter.insert(account, session).await.map_err(|e| {
             tracing::error!("Failed to insert Account to database: {:?}", e);
             Error::TokenCreationFailed {
                 token_type: TokenErrorType::SessionToken,

@@ -26,13 +26,20 @@ impl SessionRepository {
 }
 
 impl SessionRepository {
-    pub async fn insert(&self, session: Session) -> Result<()> {
-        self.adapter.insert(session).await.map_err(|e| {
-            tracing::error!("Failed to insert SessionId to database: {:?}", e);
-            Error::TokenCreationFailed {
-                token_type: TokenErrorType::SessionToken,
-            }
-        })?;
+    pub async fn insert(
+        &self,
+        session: Session,
+        client_session: Option<&mut mongodb::ClientSession>,
+    ) -> Result<()> {
+        self.adapter
+            .insert(session, client_session)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to insert SessionId to database: {:?}", e);
+                Error::TokenCreationFailed {
+                    token_type: TokenErrorType::SessionToken,
+                }
+            })?;
 
         Ok(())
     }

@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use async_trait::async_trait;
-use mongodb::{Collection, Database, options::ReturnDocument};
+use mongodb::{Collection, options::ReturnDocument};
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::Value;
 
@@ -13,9 +13,9 @@ pub struct MongodbAdapter<T: Send + Sync + Debug> {
 }
 
 impl<T: Send + Sync + Debug> MongodbAdapter<T> {
-    pub fn new(db: &Database, name: &str) -> Self {
+    pub fn new(client: &mongodb::Client, cnx: &str, name: &str) -> Self {
         MongodbAdapter {
-            collection: db.collection::<T>(name),
+            collection: client.database(cnx).collection::<T>(name),
         }
     }
 }
@@ -25,10 +25,18 @@ impl<T> DatabaseAdapter<T> for MongodbAdapter<T>
 where
     T: Debug + Send + Sync + Serialize + DeserializeOwned + 'static,
 {
-    async fn insert(&self, data: T) -> Result<String, Error> {
-        let doc = self
-            .collection
-            .insert_one(data)
+    async fn insert(
+        &self,
+        data: T,
+        session: Option<&mut mongodb::ClientSession>,
+    ) -> Result<String, Error> {
+        let mut operation = self.collection.insert_one(data);
+
+        if let Some(s) = session {
+            operation = operation.session(s);
+        }
+
+        let doc = operation
             .await
             .map_err(|e| Error::DatabaseError(e.to_string()))?;
 

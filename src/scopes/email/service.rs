@@ -13,10 +13,7 @@ pub trait EmailVerificationTokenServiceTrait {
         &self,
         id: &str,
     ) -> impl Future<Output = Result<EmailVerificationToken>>;
-    fn revoke_email_verification_token(
-        &self,
-        user_id: &str,
-    ) -> impl std::future::Future<Output = Result<()>>;
+    fn revoke_email_verification_token(&self, user_id: &str) -> impl Future<Output = Result<()>>;
     fn insert_email_verification_token(
         &self,
         otp: EmailVerificationToken,
@@ -64,6 +61,8 @@ impl EmailVerificationTokenServiceTrait for AuthService {
         self.email_verification_token_service.revoke(user_id).await
     }
     async fn insert_email_verification_token(&self, otp: EmailVerificationToken) -> Result<()> {
-        self.email_verification_token_service.insert(otp).await
+        self.email_verification_token_service
+            .insert(otp, None)
+            .await
     }
 }

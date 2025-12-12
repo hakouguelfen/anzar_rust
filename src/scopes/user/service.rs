@@ -151,17 +151,28 @@ impl UserServiceTrait for AuthService {
     }
 
     async fn create_user(&self, req: RegisterRequest) -> Result<User> {
+        /* FIXME Make sure if a failure accure to return an error
+                 sometimes even though transaction have failed, no data is saved
+                 the function return a success 200 code.
+        */
+        let mut session = self.transaction_repository.start_transactions().await?;
+
         let password = Password::hash(&req.password)?;
         let mut user = User::default()
             .with_username(&req.username)
             .with_email(&req.email);
 
-        let user_id: String = self.user_service.insert(&user).await?;
+        let user_id: String = self.user_service.insert(&user, Some(&mut session)).await?;
         user.with_id(&user_id);
 
-        // TODO: auto insert when user is created is available in mose DB
         let account = Account::user(&user_id).with_password(&password);
-        self.account_service.insert(account).await?;
+        self.account_service
+            .insert(account, Some(&mut session))
+            .await?;
+
+        self.transaction_repository
+            .commit_transaction(session)
+            .await?;
 
         Ok(user)
     }

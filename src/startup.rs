@@ -77,7 +77,6 @@ pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, s
             .supports_credentials()
             .max_age(3600);
 
-        // FIXME Should be a fixed secret
         let key = Key::from(app_state.configuration.security.secret_key.as_bytes());
         let session = SessionMiddleware::builder(CookieSessionStore::default(), key)
             .cookie_secure(true)

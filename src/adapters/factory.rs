@@ -1,4 +1,3 @@
-use mongodb::Database;
 use std::sync::Arc;
 
 use sqlx::{Pool, Sqlite};
@@ -6,7 +5,10 @@ use sqlx::{Pool, Sqlite};
 use crate::{
     adapters::{mongodb::MongodbAdapter, sqlite::SQLiteAdapter, traits::DatabaseAdapter},
     scopes::{auth::model::PasswordResetToken, email::model::EmailVerificationToken, user::User},
-    services::{account::model::Account, jwt::RefreshToken, session::model::Session},
+    services::{
+        account::model::Account, jwt::RefreshToken, session::model::Session,
+        transaction::adapter::MongodbTransaction,
+    },
 };
 
 const USER: &str = "user";
@@ -23,23 +25,31 @@ pub struct DatabaseAdapters {
     pub session_adapter: Arc<dyn DatabaseAdapter<Session>>,
     pub reset_token_adapter: Arc<dyn DatabaseAdapter<PasswordResetToken>>,
     pub email_verification_token: Arc<dyn DatabaseAdapter<EmailVerificationToken>>,
+    pub transaction_adapter: MongodbTransaction,
 }
 
 impl DatabaseAdapters {
-    pub fn mongodb(db: &Database) -> Self {
+    pub fn mongodb(client: &mongodb::Client, cnn_string: &str) -> Self {
         Self {
-            user_adapter: Arc::new(MongodbAdapter::<User>::new(db, USER)),
-            account_adapter: Arc::new(MongodbAdapter::<Account>::new(db, ACCOUNT)),
-            jwt_adapter: Arc::new(MongodbAdapter::<RefreshToken>::new(db, REFRESH_TOKEN)),
-            session_adapter: Arc::new(MongodbAdapter::<Session>::new(db, SESSION)),
+            user_adapter: Arc::new(MongodbAdapter::<User>::new(client, cnn_string, USER)),
+            account_adapter: Arc::new(MongodbAdapter::<Account>::new(client, cnn_string, ACCOUNT)),
+            jwt_adapter: Arc::new(MongodbAdapter::<RefreshToken>::new(
+                client,
+                cnn_string,
+                REFRESH_TOKEN,
+            )),
+            session_adapter: Arc::new(MongodbAdapter::<Session>::new(client, cnn_string, SESSION)),
             reset_token_adapter: Arc::new(MongodbAdapter::<PasswordResetToken>::new(
-                db,
+                client,
+                cnn_string,
                 PASSWORD_RESET_TOKEN,
             )),
             email_verification_token: Arc::new(MongodbAdapter::<EmailVerificationToken>::new(
-                db,
+                client,
+                cnn_string,
                 EMAIL_VERIFICATION_TOKEN,
             )),
+            transaction_adapter: MongodbTransaction::new(client),
         }
     }
 
@@ -57,6 +67,7 @@ impl DatabaseAdapters {
                 db,
                 EMAIL_VERIFICATION_TOKEN,
             )),
+            transaction_adapter: todo!(),
         }
     }
 

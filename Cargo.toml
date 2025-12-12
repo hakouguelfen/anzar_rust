@@ -42,7 +42,7 @@ serde_yaml = "0.9.34"
 
 # Database
 sqlx = { version = "0.8.6", features = ["sqlite", "runtime-tokio", "tls-rustls-ring-webpki", "uuid", "chrono", "json"] }
-mongodb = { version = "3.4.0", features = ["rustls-tls"] }
+mongodb = { version = "3.4.1", features = ["rustls-tls"] }
 
 # Tests
 mockall = "0.13.0"

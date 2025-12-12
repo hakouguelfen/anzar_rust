@@ -9,15 +9,11 @@ pub trait PasswordResetTokenServiceTrait {
         &self,
         token: &str,
     ) -> impl Future<Output = Result<PasswordResetToken>>;
-
     fn invalidate_password_reset_token(
         &self,
         id: &str,
     ) -> impl Future<Output = Result<PasswordResetToken>>;
-    fn revoke_password_reset_token(
-        &self,
-        user_id: &str,
-    ) -> impl std::future::Future<Output = Result<()>>;
+    fn revoke_password_reset_token(&self, user_id: &str) -> impl Future<Output = Result<()>>;
     fn insert_password_reset_token(
         &self,
         otp: PasswordResetToken,
@@ -34,12 +30,7 @@ impl PasswordResetTokenServiceTrait for AuthService {
             field: CredentialField::ObjectId,
         })?;
 
-        // 3. Verify token isn't expired or already used
-        if !reset_token.valid {
-            return Err(Error::TokenAlreadyUsed {
-                token_id: reset_token_id.into(),
-            });
-        }
+        // 3. Verify token isn't expired
         if chrono::Utc::now() > reset_token.expires_at {
             self.password_reset_token_service
                 .invalidate(reset_token_id)
@@ -60,6 +51,6 @@ impl PasswordResetTokenServiceTrait for AuthService {
         self.password_reset_token_service.revoke(user_id).await
     }
     async fn insert_password_reset_token(&self, otp: PasswordResetToken) -> Result<String> {
-        self.password_reset_token_service.insert(otp).await
+        self.password_reset_token_service.insert(otp, None).await
     }
 }

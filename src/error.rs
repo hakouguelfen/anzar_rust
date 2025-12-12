@@ -136,6 +136,8 @@ pub enum Error {
     Validations(validator::ValidationErrors),
     #[from]
     MemCache(memcache::MemcacheError),
+    #[from]
+    MongoDB(mongodb::error::Error),
 }
 
 impl core::fmt::Display for Error {
@@ -211,6 +213,7 @@ impl actix_web::ResponseError for Error {
             Error::SessionInsert(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::SessionGet(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::MemCache(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Error::MongoDB(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }

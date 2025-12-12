@@ -25,7 +25,10 @@ impl DatabaseConfig {
                 // mongodb+srv://<username>:<password>@<host>:<port>/<db_name>
                 // test: mongodb://localhost:27017/dev
                 // prod: mongodb://db:27017/production
-                format!("mongodb://{}:{}/{}", self.host, self.port, self.name)
+                format!(
+                    "mongodb://{}:{}/{}?retryWrites=false",
+                    self.host, self.port, self.name
+                )
             }
             DatabaseDriver::SQLite => self.name.to_string(),
             DatabaseDriver::PostgreSQL => todo!(),

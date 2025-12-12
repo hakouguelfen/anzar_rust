@@ -8,7 +8,12 @@ use crate::error::Error;
 pub trait DatabaseAdapter<T: Send + Sync + Serialize + DeserializeOwned + 'static>:
     Send + Sync
 {
-    async fn insert(&self, data: T) -> Result<String, Error>;
+    async fn insert(
+        &self,
+        data: T,
+        session: Option<&mut mongodb::ClientSession>,
+    ) -> Result<String, Error>;
+
     async fn find_one(&self, filter: Value) -> Result<Option<T>, Error>;
     async fn find_one_and_update(&self, filter: Value, update: Value) -> Result<Option<T>, Error>;
     async fn update_many(&self, filter: Value, update: Value) -> Result<(), Error>;

@@ -1,5 +1,3 @@
-use mongodb::Database;
-
 use crate::{adapters::mongodb::indexes::MongodbIndexes, error::Error};
 
 const NO_CLIENT: &str = "No available server found for connection string '{}'. Please verify that the connection string is valid and the server is reachable.";
@@ -7,20 +5,15 @@ const NO_DB: &str = "Failed to get default database: MongoDB client has no defau
 
 pub struct MongoDB {}
 impl MongoDB {
-    pub async fn start(connection_string: &str) -> Result<Database, Error> {
+    pub async fn start(connection_string: &str) -> Result<mongodb::Client, Error> {
         let client = mongodb::Client::with_uri_str(&connection_string)
             .await
             .map_err(|_| Error::InternalServerError(NO_CLIENT.replace("{}", connection_string)))?;
 
-        // let session = client
-        //     .start_session()
-        //     .await
-        //     .map_err(|_| Error::InternalServerError(NO_DB.into()))?;
-
-        // client.database_with_options(name, options)
         let db = client
             .default_database()
-            .ok_or(Error::InternalServerError(NO_DB.into()))?;
+            .ok_or_else(|| Error::InternalServerError(NO_DB.into()))?;
+        // let db = client.clone().database("default");
 
         let mongodb_indexes = MongodbIndexes { db: db.clone() };
         mongodb_indexes
@@ -33,6 +26,6 @@ impl MongoDB {
             .await
             .map_err(|e| Error::InternalServerError(e.to_string()))?;
 
-        Ok(db)
+        Ok(client)
     }
 }

@@ -79,9 +79,13 @@ impl UserRepository {
         }
     }
 
-    pub async fn insert(&self, user: &User) -> Result<String> {
+    pub async fn insert(
+        &self,
+        user: &User,
+        session: Option<&mut mongodb::ClientSession>,
+    ) -> Result<String> {
         self.adapter
-            .insert(user.to_owned())
+            .insert(user.to_owned(), session)
             .await
             .map_err(|_| Error::InvalidCredentials {
                 field: crate::error::CredentialField::Email,

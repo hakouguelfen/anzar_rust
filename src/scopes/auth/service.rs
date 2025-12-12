@@ -11,6 +11,7 @@ use crate::scopes::user::UserRepository;
 use crate::services::account::AccountRepository;
 use crate::services::jwt::JWTRepository;
 use crate::services::session::SessionRepository;
+use crate::services::transaction::repository::TransactionRepository;
 
 #[derive(Clone)]
 pub struct AuthService {
@@ -20,6 +21,7 @@ pub struct AuthService {
     pub(crate) session_service: SessionRepository,
     pub(crate) password_reset_token_service: PasswordResetTokenRepository,
     pub(crate) email_verification_token_service: EmailVerificationTokenRepository,
+    pub(crate) transaction_repository: TransactionRepository,
 }
 
 impl AuthService {
@@ -41,6 +43,7 @@ impl AuthService {
                 adapters.email_verification_token,
                 driver,
             ),
+            transaction_repository: TransactionRepository::new(adapters.transaction_adapter),
         }
     }
     pub async fn from_database(database: &Database) -> Result<Self> {
@@ -54,8 +57,8 @@ impl AuthService {
                 DatabaseAdapters::sqlite(&db)
             }
             DatabaseDriver::MongoDB => {
-                let db = MongoDB::start(&database.connection_string).await?;
-                DatabaseAdapters::mongodb(&db)
+                let client = MongoDB::start(&database.connection_string).await?;
+                DatabaseAdapters::mongodb(&client, &database.name)
             }
             DatabaseDriver::PostgreSQL => todo!(),
         };
