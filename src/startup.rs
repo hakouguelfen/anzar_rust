@@ -62,11 +62,13 @@ pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, s
     let http_server = HttpServer::new(move || {
         let allowed_origins = app_state.configuration.server.cors.allowed_origins.clone();
 
+        // NOTE maybe implement cors mannually and remove this package
         let cors = Cors::default()
             .allowed_origin_fn(move |origin, _req_head| {
-                allowed_origins
-                    .contains(&origin.to_str().unwrap().to_string())
-                    .to_owned()
+                if let Ok(origin_str) = origin.to_str() {
+                    return allowed_origins.contains(&origin_str.to_string());
+                }
+                false
             })
             .allowed_methods(vec!["GET", "POST", "PUT", "DELETE"])
             .allowed_headers(vec![
