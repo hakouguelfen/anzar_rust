@@ -70,7 +70,7 @@ pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, s
                 }
                 false
             })
-            .allowed_methods(vec!["GET", "POST", "PUT", "DELETE"])
+            .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
             .allowed_headers(vec![
                 http::header::AUTHORIZATION,
                 http::header::ACCEPT,
