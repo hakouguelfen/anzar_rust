@@ -17,7 +17,6 @@ pub trait JwtServiceTrait {
         configuration: &Configuration,
     ) -> impl Future<Output = Result<Tokens>>;
     fn invalidate_jwt(&self, jti: &str) -> impl Future<Output = Result<()>>;
-    fn invalidate_session(&self, session_id: &str) -> impl Future<Output = Result<()>>;
     fn logout(&self, payload: AuthPayload) -> impl Future<Output = Result<()>>;
     fn logout_all(&self, user_id: &str) -> impl Future<Output = Result<()>>;
     fn find_jwt_by_jti(&self, jti: &str) -> impl Future<Output = Result<RefreshToken>>;
@@ -64,10 +63,6 @@ impl JwtServiceTrait for AuthService {
 
     async fn invalidate_jwt(&self, jti: &str) -> Result<()> {
         self.jwt_service.invalidate(jti).await?;
-        Ok(())
-    }
-    async fn invalidate_session(&self, token: &str) -> Result<()> {
-        self.session_service.invalidate(token).await?;
         Ok(())
     }
 

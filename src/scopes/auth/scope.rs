@@ -3,12 +3,13 @@ use actix_web::{
     middleware::from_fn,
     web::{self},
 };
+
 use serde_json::json;
 use validator::{Validate, ValidateArgs};
 
 use crate::{
     config::AuthStrategy,
-    error::{CredentialField, Error, FailureReason, Result},
+    error::{CredentialField, Error, ErrorResponse, FailureReason, Result},
     services::account::{model::AccountStatus, service::AccountServiceTrait},
     utils::HmacSigner,
 };
@@ -50,12 +51,28 @@ use super::user::User;
 
 use super::support;
 
+#[utoipa::path(
+        post,
+        path = "/auth/login",
+        tag = "Auth",
+        summary = "User login",
+        description = "Authenticates a user with email and password. Returns an access token and refresh token on success.",
+        request_body(
+            description = "User login credentials",
+            content = LoginRequest
+        ),
+        responses(
+            (status = 200, description = "User logged successfully", body = AuthResponse),
+            (status = BAD_REQUEST, description = "Invalid request", body = ErrorResponse),
+            (status = UNAUTHORIZED, description = "Invalid credentials", body = ErrorResponse),
+        ),
+    )]
 #[tracing::instrument(
     name = "Login user",
     skip(req, auth_service, configuration, session),
     fields(user_email = %req.email)
 )]
-async fn login(
+pub async fn login(
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
     ConfigurationExtractor(configuration): ConfigurationExtractor,
     req: web::Json<LoginRequest>,
@@ -92,7 +109,7 @@ async fn login(
 
             match configuration.auth.strategy {
                 AuthStrategy::Session => auth_service.issue_session(&user).await.map(|token| {
-                    session.purge();
+                    session.clear();
                     session.renew();
                     session.insert(support::DEVICE_COOKIE, &cookie)?;
                     session.insert(support::SESSION_COOKIE, token)?;
@@ -103,7 +120,7 @@ async fn login(
                         .issue_jwt(&user, &configuration)
                         .await
                         .map(|tokens| {
-                            session.purge();
+                            session.clear();
                             session.renew();
                             session.insert(support::DEVICE_COOKIE, &cookie)?;
 
@@ -128,12 +145,28 @@ async fn login(
     }
 }
 
+#[utoipa::path(
+        post,
+        path = "/auth/register",
+        tag = "Auth",
+        summary = "Register a new user",
+        description = "Creates a new user account. Sends a verification email upon successful registration.",
+        request_body(
+            description = "User register credentials",
+            content = RegisterRequest
+        ),
+        responses(
+            (status = 201, description = "User registerd successfully", body = AuthResponse),
+            (status = BAD_REQUEST, description = "Invalid request", body = ErrorResponse),
+            (status = UNAUTHORIZED, description = "Invalid credentials", body = ErrorResponse),
+        ),
+    )]
 #[tracing::instrument(
     name = "Register user",
     skip(req, auth_service, configuration, session),
     fields(user_email = %req.email, user_name = %req.username)
 )]
-async fn register(
+pub async fn register(
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
     ConfigurationExtractor(configuration): ConfigurationExtractor,
     req: web::Json<RegisterRequest>,
@@ -194,17 +227,43 @@ async fn register(
     }
 }
 
+#[utoipa::path(
+        get,
+        path = "/auth/session",
+        tag = "Auth",
+        summary = "Get current session",
+        description = "Returns the currently authenticated user's session data. Requires a valid Bearer token.",
+        security(("bearer_auth" = [])),
+        responses(
+            (status = 200, description = "Session data returned", body = Session),
+            (status = UNAUTHORIZED, description = "Unauthorized — missing or invalid token", body = ErrorResponse),
+            (status = 403, description = "Account suspended or unverified", body = ErrorResponse),
+        ),
+    )]
 #[tracing::instrument(name = "Get user session", skip(session))]
-async fn get_session(session: Session) -> Result<HttpResponse> {
+pub async fn get_session(session: Session) -> Result<HttpResponse> {
     Ok(HttpResponse::Ok().json(session))
 }
 
+#[utoipa::path(
+        post,
+        path = "/auth/refresh-token",
+        tag = "Auth",
+        summary = "Refresh access token",
+        description = "Issues a new access token using a valid refresh token. Rotate refresh tokens on each call.",
+        security(("bearer_auth" = [])),
+        responses(
+            (status = 200, description = "New token issued", body = AuthResponse),
+            (status = 401, description = "Refresh token invalid or expired", body = ErrorResponse),
+            (status = BAD_REQUEST, description = "invalid request", body = ErrorResponse),
+        ),
+    )]
 #[tracing::instrument(
     name = "Regenerate user accessToken",
     skip(payload, auth_service,configuration, authenticated_user),
     fields(user_id = %payload.user_id)
 )]
-async fn refresh_token(
+pub async fn refresh_token(
     payload: AuthPayload,
     authenticated_user: AuthenticatedUser,
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
@@ -224,6 +283,19 @@ async fn refresh_token(
         .map(|tokens| Ok(HttpResponse::Ok().json(AuthResponse::new(user).with_jwt(tokens))))?
 }
 
+#[utoipa::path(
+        post,
+        path = "/auth/logout",
+        tag = "Auth",
+        summary = "Logout",
+        description = "Invalidates the current session and refresh token. The client should discard stored tokens.",
+        security(("bearer_auth" = [])),
+        responses(
+            (status = 200, description = "Logged out successfully"),
+            (status = 401, description = "Unauthorized", body = ErrorResponse),
+            (status = BAD_REQUEST, description = "invalid request", body = ErrorResponse),
+        ),
+    )]
 #[tracing::instrument(
     name = "Logout user",
     skip(payload, auth_service, session, session_manager),
@@ -245,6 +317,18 @@ async fn logout(
     result.map(|_| Ok(HttpResponse::Ok().json(json!({ "status": "ok" }))))?
 }
 
+#[utoipa::path(
+        post,
+        path = "/auth/password/forgot",
+        tag = "Auth",
+        summary = "Request a password reset",
+        description = "Sends a password reset link to the provided email address if an account exists.",
+        request_body(description = "Email address to send the reset link to", content = EmailRequest),
+        responses(
+            (status = 200, description = "Reset email sent if account exists", body = ResetLink),
+            (status = BAD_REQUEST, description = "invalid request", body = ErrorResponse),
+        ),
+    )]
 #[tracing::instrument(name = "Forgot password", skip(auth_service, configuration))]
 async fn request_password_reset(
     req: web::Json<EmailRequest>,
@@ -271,7 +355,7 @@ async fn request_password_reset(
         auth_service.revoke_password_reset_token(user_id).await?;
 
         // 4.
-        let token = Token::generate(64);
+        let token = Token::with_size64().generate();
         let hashed_token = Token::hash(&token);
 
         // 5.
@@ -315,6 +399,20 @@ async fn request_password_reset(
     }
 }
 
+#[utoipa::path(
+        get,
+        path = "/auth/password/reset",
+        tag = "Auth",
+        summary = "Render password reset form",
+        description = "Validates the reset token from the email link and renders the password reset form.",
+        params(
+            ("token" = TokenQuery, Query, description = "Password reset token")
+        ),
+        responses(
+            (status = 200, description = "Reset form rendered", content_type = "text/html", body = String),
+            (status = BAD_REQUEST, description = "invalid request", body = ErrorResponse),
+        ),
+    )]
 async fn render_reset_form(
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
     ValidatedQuery(query): ValidatedQuery<TokenQuery>,
@@ -323,8 +421,8 @@ async fn render_reset_form(
     let token: &str = &query.token;
     auth_service.validate_reset_password_token(token).await?;
 
-    let csrf_token = Token::generate(64);
-    session.purge();
+    let csrf_token = Token::with_size64().generate();
+    session.clear();
     session.insert(support::CSRF_COOKIE, &csrf_token)?;
 
     let body = include_str!("templates/update_password.html")
@@ -335,6 +433,24 @@ async fn render_reset_form(
         .body(body))
 }
 
+#[utoipa::path(
+        post,
+        path = "/auth/password/reset",
+        tag = "Auth",
+        summary = "Submit new password",
+        description = "Submits a new password using a valid reset token. Invalidates the token after use.",
+        request_body(description = "Reset token and the new password", content = ResetPasswordRequest),
+        responses(
+            (
+                status = 302,
+                description = "Redirect to success page", 
+                headers(
+                    ("Location" = String, description = "Redirect URL")
+                )
+            ),
+            (status = BAD_REQUEST, description = "invalid request", body = ErrorResponse),
+        ),
+)]
 async fn submit_new_password(
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
     ConfigurationExtractor(configuration): ConfigurationExtractor,

@@ -1,4 +1,5 @@
 mod filters;
+mod macros;
 
 pub mod account_validation;
 pub mod rate_limiting;

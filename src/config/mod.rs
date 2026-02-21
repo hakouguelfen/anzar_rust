@@ -44,8 +44,10 @@ impl EnvironmentConfig {
     }
 
     pub fn from_env() -> Result<EnvironmentConfig, config::ConfigError> {
-        let base_path = std::env::current_dir().expect("Failed to determine the current directory");
-        let config_dir = base_path.join("app/configuration/");
+        dotenvy::dotenv().ok();
+        let config_dir_str =
+            std::env::var("APP_CONFIG_DIR").unwrap_or_else(|_| "configuration".into());
+        let config_dir = std::path::PathBuf::from(config_dir_str);
 
         let environment: Environment = Self::app_env();
         let environment_filename = format!("{}.yaml", environment.as_str());
@@ -71,7 +73,8 @@ impl EnvironmentConfig {
             .set_override("name", "Anzar")?
             .set_override("config", content)?
             .set_override("database.driver", db_type)?
-            .build()?;
+            .build()
+            .map_err(|e| dbg!(e))?;
 
         settings.try_deserialize::<EnvironmentConfig>()
     }

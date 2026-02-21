@@ -25,16 +25,18 @@ RUN echo "appuser:x:10001:10001::/app:/sbin/nologin" > /etc/passwd.minimal && \
 # Execution stage
 FROM scratch AS final
 ARG APP_NAME=anzar
+WORKDIR /app
+
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=build /etc/passwd.minimal /etc/passwd
 COPY --from=build /etc/group.minimal /etc/group
 
-COPY --from=build /bin/$APP_NAME /bin/$APP_NAME
-COPY --chown=10001:10001 /app/configuration /app/configuration
+COPY --from=build /bin/$APP_NAME ./$APP_NAME
+COPY --chown=10001:10001 app/configuration ./configuration
 
 USER 10001:10001
 
 ENV ENV=prod
 ENV RUNTIME=docker
 EXPOSE 3000
-ENTRYPOINT ["/bin/anzar"]
+ENTRYPOINT ["./anzar"]

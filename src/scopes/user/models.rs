@@ -1,15 +1,18 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::FromRow;
+use utoipa::ToSchema;
 
-#[derive(Default, Debug, Serialize, Deserialize, Clone, PartialEq, Eq, sqlx::Type)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone, PartialEq, Eq, sqlx::Type, ToSchema)]
+#[schema(example = json!({"role": Role::default()}))]
 pub enum Role {
     #[default]
     User,
     Admin,
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize, FromRow)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Deserialize, Serialize, FromRow, ToSchema)]
+#[schema(example = json!({"id": Some(String::default()), "username": String::default(), "email": String::default(), "role": Role::default(), "verified": "false", "created_at": "2026-02-19T22:42:23.467Z"}))]
 pub struct User {
     #[serde(
         rename = "_id",
@@ -30,6 +33,12 @@ pub struct User {
 }
 
 impl User {
+    pub fn new() -> Self {
+        Self {
+            created_at: Utc::now(),
+            ..Default::default()
+        }
+    }
     pub fn from_request(user: User) -> Self {
         user
     }

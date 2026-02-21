@@ -146,8 +146,9 @@ impl core::fmt::Display for Error {
     }
 }
 
-#[derive(Serialize)]
-struct ErrorResponse {
+#[derive(Serialize, utoipa::ToSchema)]
+#[schema(example = json!({"message": "An Error occured"}))]
+pub struct ErrorResponse {
     message: String,
 }
 impl actix_web::ResponseError for Error {

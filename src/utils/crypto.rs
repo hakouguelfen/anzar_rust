@@ -9,15 +9,25 @@ use rand::TryRngCore;
 use sha2::{Digest, Sha256};
 
 pub trait TokenHasher {
-    fn generate(length: usize) -> String;
+    fn generate(&self) -> String;
     fn hash(token: &str) -> String;
     fn verify(a: &str, b: &str) -> bool;
 }
 
-pub struct Token {}
+pub struct Token {
+    size: usize,
+}
+impl Token {
+    pub fn with_size32() -> Self {
+        Self { size: 32 }
+    }
+    pub fn with_size64() -> Self {
+        Self { size: 64 }
+    }
+}
 impl TokenHasher for Token {
-    fn generate(length: usize) -> String {
-        let mut bytes = vec![0u8; length];
+    fn generate(&self) -> String {
+        let mut bytes = vec![0u8; self.size];
         // FIXME: handle the Result
         let _ = rand::rngs::OsRng.try_fill_bytes(&mut bytes);
 
@@ -87,7 +97,7 @@ impl HmacSigner {
         }
     }
     pub fn issue(&mut self, id: &str) -> Option<String> {
-        let nonce = Token::generate(32);
+        let nonce = Token::with_size32().generate();
         let message = format!("{}|{}", id, nonce);
 
         let mut mac =

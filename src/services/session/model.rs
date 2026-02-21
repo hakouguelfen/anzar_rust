@@ -4,8 +4,10 @@ use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use std::future::{Ready, ready};
+use utoipa::ToSchema;
 
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize, FromRow)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize, FromRow, ToSchema)]
+#[schema(example = json!({"id": Some(String::default()), "user_id": String::default(), "issued_at": "2026-02-19T22:42:23.467Z", "expires_at": "2026-02-19T22:42:23.467Z", "used_at": Some("2026-02-19T22:42:23.467Z"), "token": String::default()}))]
 pub struct Session {
     #[serde(
         rename = "_id",

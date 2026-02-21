@@ -14,11 +14,70 @@ use tracing_actix_web::TracingLogger;
 
 use rustls::{ServerConfig, pki_types::CertificateDer};
 use rustls_pemfile::{certs, private_key};
+use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
 
 use crate::config::AppState;
 use crate::error::{Error, FailureReason};
 use crate::middlewares::{account_validation, requests_filters, token_validation};
+use crate::scopes::auth::TokenQuery;
 use crate::scopes::{auth, email, health, user};
+
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
+
+#[derive(OpenApi)]
+#[openapi(
+    info(
+        title = "Anzar Software API",
+        version = "0.6.2",
+        description = "REST API for the Anzar platform. All protected routes require a Bearer token.",
+        contact(name = "Anzar Team", email = "dev@anzar.io"),
+        license(name = "GPLV3", identifier="GPL"),
+    ),
+    paths(
+        auth::login,
+        auth::register,
+        auth::get_session,
+        auth::refresh_token,
+        auth::logout,
+        auth::request_password_reset,
+        auth::render_reset_form,
+        auth::submit_new_password,
+        user::find_user,
+        email::verify_email
+    ),
+    components(
+        schemas(TokenQuery)
+    ),
+    modifiers(&SecurityAddon),
+    tags(
+        (name = "Anzar Software", description = "This is a Swagger integration"),
+        (name = "Auth", description = "Authentication & session management — login, register, tokens, password reset"),
+        (name = "Users", description = "User lookup and profile management"),
+        (name = "Email", description = "Email verification flows")
+    ),
+    external_docs(
+        url = "https://anzar_software.gitlab.io/python-sdk/",
+        description = "Full Anzar developer documentation"
+    ),
+)]
+pub struct ApiDoc;
+struct SecurityAddon;
+
+impl utoipa::Modify for SecurityAddon {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        let components = openapi.components.get_or_insert_with(Default::default);
+        components.add_security_scheme(
+            "bearer_auth",
+            SecurityScheme::Http(
+                HttpBuilder::new()
+                    .scheme(HttpAuthScheme::Bearer)
+                    .bearer_format("JWT") // optional, just for docs
+                    .build(),
+            ),
+        );
+    }
+}
 
 fn load_rustls_config(cert: String, key: String) -> Result<rustls::ServerConfig, Error> {
     let _ = rustls::crypto::ring::default_provider().install_default();
@@ -63,10 +122,11 @@ pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, s
         let allowed_origins = app_state.configuration.server.cors.allowed_origins.clone();
 
         // NOTE maybe implement cors mannually and remove this package
+        let allowed_origins_clone = allowed_origins.clone();
         let cors = Cors::default()
             .allowed_origin_fn(move |origin, _req_head| {
                 if let Ok(origin_str) = origin.to_str() {
-                    return allowed_origins.contains(&origin_str.to_string());
+                    return allowed_origins_clone.contains(&origin_str.to_string());
                 }
                 false
             })
@@ -86,9 +146,10 @@ pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, s
             .cookie_http_only(true)
             .build();
 
+        // .wrap(TracingLogger::<CustomRootSpanBuilder>::new())
+        // .wrap(from_fn(ip_rate_limit_middleware))
         App::new()
             .wrap(TracingLogger::default())
-            // .wrap(TracingLogger::<CustomRootSpanBuilder>::new())
             .wrap(cors)
             .wrap(session)
             .wrap(from_fn(requests_filters))
@@ -105,8 +166,11 @@ pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, s
                     .add(("Content-Security-Policy", "default-src 'self'"))
                     .add(("Strict-Transport-Security", "max-age=31536000")), // NOTE production only
             )
-            // .wrap(from_fn(ip_rate_limit_middleware))
             .app_data(web::Data::new(app_state_inner.clone()))
+            .service(
+                SwaggerUi::new("/swagger-ui/{_:.*}")
+                    .url("/api-docs/openapi.json", ApiDoc::openapi()),
+            )
             .service(health::health_scope())
             .service(auth::auth_scope())
             .service(

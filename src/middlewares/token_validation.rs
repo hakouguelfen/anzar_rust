@@ -1,13 +1,14 @@
 use actix_session::SessionExt;
 use actix_web::{
     Error, HttpMessage,
-    body::MessageBody,
+    body::BoxBody,
     dev::{ServiceRequest, ServiceResponse},
     http::header,
     middleware::Next,
     web,
 };
 
+use crate::extract_service_response;
 use crate::{
     config::AuthStrategy,
     extractors::{AuthPayload, Claims, TokenType},
@@ -79,9 +80,9 @@ async fn validate_refresh_token(req: &ServiceRequest, jti: &str) -> Result<(), A
     Ok(())
 }
 
-async fn find_session(req: &ServiceRequest, session_id: &str) -> Result<Session, AuthError> {
+async fn find_session(req: &ServiceRequest, token: &str) -> Result<Session, AuthError> {
     let auth_service = extract_auth_service(req)?;
-    auth_service.find_session(session_id).await
+    auth_service.find_session(token).await
 }
 async fn update_session_expiray(req: &ServiceRequest, id: &str) -> Result<Session, AuthError> {
     let auth_service = extract_auth_service(req)?;
@@ -103,20 +104,16 @@ fn extract_configuration_service(req: &ServiceRequest) -> Result<Configuration, 
         ))
 }
 
-pub async fn token_validation_middleware(
-    req: ServiceRequest,
-    next: Next<impl MessageBody>,
-) -> Result<ServiceResponse<impl MessageBody>, Error> {
-    // pre-processing
-    let configuration = extract_configuration_service(&req)?;
+async fn validate_token(req: &ServiceRequest) -> Result<(), Error> {
+    let configuration = extract_configuration_service(req)?;
 
     match configuration.auth.strategy {
         AuthStrategy::Session => {
             let req_session = req.get_session();
             let data = req_session.get::<String>(support::SESSION_COOKIE)?;
 
-            if let Some(session_id) = data {
-                let session = find_session(&req, &session_id).await?;
+            if let Some(token) = data {
+                let session = find_session(req, &token).await?;
 
                 if chrono::Utc::now() > session.expires_at {
                     return Err(AuthError::TokenExpired {
@@ -130,14 +127,14 @@ pub async fn token_validation_middleware(
                 let session_id = session.id.as_ref().ok_or(AuthError::MalformedData {
                     field: crate::error::CredentialField::Token,
                 })?;
-                update_session_expiray(&req, session_id).await?;
+                update_session_expiray(req, session_id).await?;
 
                 req.extensions_mut().insert::<Session>(session);
             }
         }
         AuthStrategy::Jwt => {
             let secret_key = configuration.security.secret_key;
-            let access_token = extract_token_from_header(&req, header::AUTHORIZATION.to_string());
+            let access_token = extract_token_from_header(req, header::AUTHORIZATION.to_string());
             if let Some(token) = access_token {
                 let claims = decode_claims(token, TokenType::AccessToken, &secret_key)?;
                 req.extensions_mut().insert::<Claims>(claims.clone());
@@ -147,10 +144,10 @@ pub async fn token_validation_middleware(
                 tracing::info!(message);
             }
 
-            let refresh_token = extract_token_from_header(&req, X_REFRESH_TOKEN.to_string());
+            let refresh_token = extract_token_from_header(req, X_REFRESH_TOKEN.to_string());
             if let Some(token) = refresh_token {
                 let claims = decode_claims(token, TokenType::RefreshToken, &secret_key)?;
-                validate_refresh_token(&req, &claims.jti).await?;
+                validate_refresh_token(req, &claims.jti).await?;
 
                 let payload = AuthPayload::from(claims.sub, token, claims.jti);
                 req.extensions_mut().insert::<AuthPayload>(payload);
@@ -158,6 +155,15 @@ pub async fn token_validation_middleware(
         }
     };
 
+    Ok(())
+}
+
+pub async fn token_validation_middleware(
+    req: ServiceRequest,
+    next: Next<BoxBody>,
+) -> Result<ServiceResponse<BoxBody>, Error> {
+    // pre-processing
+    extract_service_response!(req, validate_token(&req).await);
     next.call(req).await
     // post-processing
 }

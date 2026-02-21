@@ -5,4 +5,4 @@ mod repository;
 mod scope;
 
 pub use repository::EmailVerificationTokenRepository;
-pub use scope::email_scope;
+pub use scope::{__path_verify_email, email_scope};

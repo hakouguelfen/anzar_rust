@@ -9,6 +9,7 @@ use crate::{
 pub trait SessionServiceTrait {
     fn issue_session(&self, user_id: &User) -> impl Future<Output = Result<String>>;
     fn find_session(&self, session_id: &str) -> impl Future<Output = Result<Session>>;
+    fn invalidate_session(&self, session_id: &str) -> impl Future<Output = Result<()>>;
     fn extend_timeout(&self, session_id: &str) -> impl Future<Output = Result<Session>>;
 }
 impl SessionServiceTrait for AuthService {
@@ -19,7 +20,7 @@ impl SessionServiceTrait for AuthService {
 
         self.session_service.revoke(user_id).await?;
 
-        let token = Token::generate(32);
+        let token = Token::with_size32().generate();
         let hashed_token = Token::hash(&token);
 
         let session = Session::default()
@@ -29,8 +30,13 @@ impl SessionServiceTrait for AuthService {
 
         Ok(token)
     }
-    async fn find_session(&self, session_id: &str) -> Result<Session> {
-        self.session_service.find(session_id).await
+    async fn find_session(&self, token: &str) -> Result<Session> {
+        self.session_service.find(token).await
+    }
+
+    async fn invalidate_session(&self, token: &str) -> Result<()> {
+        self.session_service.invalidate(token).await?;
+        Ok(())
     }
     async fn extend_timeout(&self, session_id: &str) -> Result<Session> {
         self.session_service.extend_timeout(session_id).await

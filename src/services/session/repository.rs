@@ -78,7 +78,7 @@ impl SessionRepository {
     }
 
     pub async fn invalidate(&self, token: &str) -> Result<()> {
-        let filter = json! ({"token": Token::hash(token)});
+        let filter = json! ({"token": token});
         let filter = Parser::mode(self.database_driver).convert(filter);
 
         self.adapter.delete_one(filter).await

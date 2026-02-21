@@ -72,6 +72,9 @@ secrecy = { version = "0.10.3", features = ["serde"] }
 
 # TODO maybe use redis
 memcache = { version = "0.19", default-features = false }
+dotenvy = "0.15.7"
+utoipa = { version = "5.4.0", features = ["chrono", "actix_extras", "yaml"] }
+utoipa-swagger-ui = { version = "9.0.2", features = ["actix-web", "vendored"] }
 
 
 [dev-dependencies]

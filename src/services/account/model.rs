@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
+use utoipa::ToSchema;
 
 use crate::utils::mongodb_serde::*;
 
@@ -13,7 +14,8 @@ pub enum AccountStatus {
     InvalidCredentials,
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize, FromRow)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Deserialize, Serialize, FromRow, ToSchema)]
+#[schema(example = json!({"id": Some(String::default()), "user_id": String::default(), "password": String::default(), "locked": "false", "created_at": "2026-02-19T22:42:23.467Z"}))]
 pub struct Account {
     #[serde(
         rename = "_id",
@@ -44,6 +46,7 @@ impl Account {
     pub fn user(user_id: &str) -> Self {
         Self {
             user_id: user_id.into(),
+            created_at: Utc::now(),
             ..Default::default()
         }
     }

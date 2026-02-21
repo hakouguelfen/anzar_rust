@@ -3,12 +3,18 @@ name: anzar
 services:
   server:
     build: .
+    env_file:
+      - .env
     ports:
       - 3000:3000
     volumes:
-      - .:/app
+      # - .:/app
       - ./anzar.dev.yml:/app/anzar.yml
       # - /home/hakou/Desktop/something/something/test.db:/app/test.db
+
+    # environment:
+    #   - APP_CONFIG_DIR=configurations
+
     extra_hosts:
       - "host.docker.internal:host-gateway"
 

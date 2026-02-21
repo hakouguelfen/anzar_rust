@@ -2,24 +2,36 @@ use actix_web::{
     HttpResponse, Scope,
     web::{self},
 };
-use serde::Deserialize;
-use validator::Validate;
 
-use crate::{
-    error::Result,
-    extractors::ConfigurationExtractor,
-    scopes::{email::service::EmailVerificationTokenServiceTrait, user::service::UserServiceTrait},
-};
 use crate::{
     error::{CredentialField, Error},
     extractors::{AuthServiceExtractor, ValidatedQuery},
+    scopes::auth::TokenQuery,
+};
+use crate::{
+    error::{ErrorResponse, Result},
+    extractors::ConfigurationExtractor,
+    scopes::{email::service::EmailVerificationTokenServiceTrait, user::service::UserServiceTrait},
 };
 
-#[derive(Debug, Validate, Deserialize)]
-struct TokenQuery {
-    pub token: String,
-}
-
+#[utoipa::path(
+    get,
+    path = "/email",
+    tag = "Email",
+    summary = "Verify user email",
+    description = "Validates the email token and update the user account.",
+    params(
+        ("token" = TokenQuery, Query, description = "Email Verification Token")
+    ),
+    responses(
+        (status = 302, description = "Redirect to success page", 
+         headers(
+             ("Location" = String, description = "Redirect URL")
+         )
+        ),
+        (status = BAD_REQUEST, description = "invalid request", body = ErrorResponse),
+    ),
+)]
 #[tracing::instrument(name = "Email Verification", skip(auth_service, query))]
 async fn verify_email(
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
