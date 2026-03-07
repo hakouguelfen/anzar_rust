@@ -1,31 +1,41 @@
 use crate::config::Configuration;
 use crate::error::{CredentialField, Error, Result};
+use crate::scopes::auth::service::AuthService;
 use crate::scopes::user::User;
-use crate::services::jwt::{JwtEncoderBuilder, RefreshToken, Tokens};
+use crate::services::jwt::support;
 use crate::utils::{Token, TokenHasher};
-use crate::{extractors::AuthPayload, scopes::auth::service::AuthService};
+
+use super::{JwtEncoderBuilder, RefreshToken, Tokens};
 
 pub trait JwtServiceTrait {
     fn consume_refresh_token(
         &self,
-        payload: AuthPayload,
-        user_id: &str,
+        refresh_token: &str,
+        secret: &str,
     ) -> impl Future<Output = Result<()>>;
     fn issue_jwt(
         &self,
         user: &User,
         configuration: &Configuration,
     ) -> impl Future<Output = Result<Tokens>>;
-    fn invalidate_jwt(&self, jti: &str) -> impl Future<Output = Result<()>>;
-    fn logout(&self, payload: AuthPayload) -> impl Future<Output = Result<()>>;
+    fn invalidate_jwt(&self, refresh_token: &str, secret: &str)
+    -> impl Future<Output = Result<()>>;
+    // fn logout(&self, payload: AuthPayload) -> impl Future<Output = Result<()>>;
     fn logout_all(&self, user_id: &str) -> impl Future<Output = Result<()>>;
     fn find_jwt_by_jti(&self, jti: &str) -> impl Future<Output = Result<RefreshToken>>;
 }
 impl JwtServiceTrait for AuthService {
-    async fn consume_refresh_token(&self, payload: AuthPayload, user_id: &str) -> Result<()> {
-        if self.jwt_service.find_and_consume(payload).await.is_err() {
+    async fn consume_refresh_token(&self, refresh_token: &str, secret: &str) -> Result<()> {
+        let claims = support::decode(refresh_token, secret)?;
+
+        if self
+            .jwt_service
+            .find_and_consume(&claims, refresh_token)
+            .await
+            .is_err()
+        {
             // TODO: send an email indicating a breach
-            self.jwt_service.revoke(user_id).await?;
+            self.jwt_service.revoke(&claims.sub).await?;
         }
 
         Ok(())
@@ -61,16 +71,18 @@ impl JwtServiceTrait for AuthService {
         Ok(tokens)
     }
 
-    async fn invalidate_jwt(&self, jti: &str) -> Result<()> {
-        self.jwt_service.invalidate(jti).await?;
+    async fn invalidate_jwt(&self, refresh_token: &str, secret: &str) -> Result<()> {
+        let claims = support::decode(refresh_token, secret)?;
+
+        self.jwt_service.invalidate(&claims.jti).await?;
         Ok(())
     }
 
-    async fn logout(&self, payload: AuthPayload) -> Result<()> {
-        self.jwt_service.invalidate(&payload.jti).await?;
-        self.session_service.revoke(&payload.user_id).await?;
-        Ok(())
-    }
+    // async fn logout(&self, payload: AuthPayload) -> Result<()> {
+    //     self.jwt_service.invalidate(&payload.jti).await?;
+    //     self.session_service.revoke(&payload.user_id).await?;
+    //     Ok(())
+    // }
     async fn logout_all(&self, user_id: &str) -> Result<()> {
         self.jwt_service.revoke(user_id).await?;
         self.session_service.revoke(user_id).await?;

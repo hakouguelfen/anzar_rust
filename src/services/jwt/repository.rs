@@ -9,7 +9,7 @@ use crate::{
     adapters::DatabaseAdapter,
     config::DatabaseDriver,
     error::{Error, InvalidTokenReason, Result, TokenErrorType},
-    extractors::AuthPayload,
+    extractors::Claims,
     utils::{Token, TokenHasher, parser::Parser},
 };
 
@@ -48,11 +48,15 @@ impl JWTRepository {
         Ok(())
     }
 
-    pub async fn find_and_consume(&self, payload: AuthPayload) -> Result<RefreshToken> {
+    pub async fn find_and_consume(
+        &self,
+        claims: &Claims,
+        refresh_token: &str,
+    ) -> Result<RefreshToken> {
         let filter = json! ({
-            "jti": payload.jti,
-            "userId": &payload.user_id,
-            "token": Token::hash(&payload.refresh_token),
+            "jti": claims.jti,
+            "userId": &claims.sub,
+            "token": Token::hash(refresh_token),
             "valid": true
         });
         let filter = Parser::mode(self.database_driver).convert(filter);

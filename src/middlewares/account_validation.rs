@@ -16,10 +16,7 @@ use crate::scopes::{
     auth::service::AuthService,
     user::{User, service::UserServiceTrait},
 };
-use crate::{
-    extractors::{AuthPayload, Claims},
-    services::session::model::Session,
-};
+use crate::{extractors::Claims, services::session::model::Session};
 
 fn extract_auth_service(req: &ServiceRequest) -> Result<AuthService, AuthError> {
     req.app_data::<web::Data<AppState>>()
@@ -46,12 +43,6 @@ fn extract_user_id_from_extensions(req: &ServiceRequest) -> Result<String, AuthE
     // Try to get user_id from Session
     if let Some(session) = req.extensions().get::<Session>() {
         return Ok(session.user_id.clone());
-    }
-
-    // Try to get user_id from Refresh Claims
-    // rename AuthPayload -> RefreshClaims
-    if let Some(claims) = req.extensions().get::<AuthPayload>() {
-        return Ok(claims.user_id.clone());
     }
 
     // Try to get user_id from JWT Claims

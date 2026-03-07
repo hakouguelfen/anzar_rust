@@ -17,6 +17,7 @@ pub struct LoginRequest {
     #[validate(custom(function = "validate_password", use_context))]
     pub password: String,
 }
+
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 #[validate(context = "PasswordRequirements")]
 #[schema(example = json!({"username": "name", "email": "example@email.com", "password": "password"}))]
@@ -42,6 +43,12 @@ pub struct EmailRequest {
     pub email: String,
 }
 
+#[derive(Debug, Validate, Deserialize, ToSchema)]
+#[schema(example = json!({"refresh_token": "edc365fa5e13751XXXXXXX"}))]
+pub struct RefreshTokenRequest {
+    pub refresh_token: String,
+}
+
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 #[schema(example = json!({"link": String::default(), "expires_at": "2026-02-19T22:42:23.467Z"}))]
 pub struct ResetLink {
@@ -60,9 +67,11 @@ pub struct ResetPasswordRequest {
 }
 
 #[derive(Default, Debug, Serialize, Deserialize, ToSchema)]
-#[schema(description = "SessionTokens model", example = json!({"access": String::default(), "refresh": String::default()}))]
+#[schema(description = "SessionTokens model", example = json!({"access": String::default(), "expires_in": 3600, "token_type": "Bearer", "refresh": String::default()}))]
 pub struct SessionTokens {
     pub access: String,
+    pub expires_in: i64,
+    pub token_type: String,
     pub refresh: String,
 }
 #[derive(Default, Debug, Serialize, Deserialize, ToSchema)]
@@ -90,9 +99,11 @@ impl AuthResponse {
 }
 
 impl AuthResponse {
-    pub fn with_jwt(mut self, tokens: Tokens) -> Self {
+    pub fn with_jwt(mut self, tokens: Tokens, expires_in: i64) -> Self {
         let _ = self.tokens.insert(SessionTokens {
             access: tokens.access_token,
+            expires_in,
+            token_type: "Bearer".to_string(),
             refresh: tokens.refresh_token,
         });
         self

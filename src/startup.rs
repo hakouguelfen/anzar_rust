@@ -163,6 +163,7 @@ pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, s
                     .add(("X-Frame-Options", "DENY"))
                     .add(("X-XSS-Protection", "0"))
                     .add(("Cache-Control", "no-store"))
+                    .add(("Pragma", "no-cache"))
                     .add(("Content-Security-Policy", "default-src 'self'"))
                     .add(("Strict-Transport-Security", "max-age=31536000")), // NOTE production only
             )

@@ -11,7 +11,7 @@ use actix_web::{
 use crate::extract_service_response;
 use crate::{
     config::AuthStrategy,
-    extractors::{AuthPayload, Claims, TokenType},
+    extractors::{Claims, TokenType},
     scopes::auth::support,
 };
 use crate::{
@@ -20,16 +20,11 @@ use crate::{
 };
 
 use crate::scopes::auth::service::AuthService;
-use crate::services::{
-    jwt::service::JwtServiceTrait,
-    session::{model::Session, service::SessionServiceTrait},
-};
+use crate::services::session::{model::Session, service::SessionServiceTrait};
 use crate::{
     error::{Error as AuthError, TokenErrorType},
     services::jwt::JwtDecoderBuilder,
 };
-
-const X_REFRESH_TOKEN: &str = "x-refresh-token";
 
 fn extract_token_from_header(req: &ServiceRequest, key: String) -> Option<&str> {
     req.headers()
@@ -38,46 +33,16 @@ fn extract_token_from_header(req: &ServiceRequest, key: String) -> Option<&str> 
         .and_then(|v| v.strip_prefix("Bearer "))
 }
 
-fn decode_claims(
-    token: &str,
-    token_type: TokenType,
-    secret_key: &str,
-) -> Result<Claims, AuthError> {
-    let error_type = match token_type {
-        TokenType::AccessToken => TokenErrorType::AccessToken,
-        TokenType::RefreshToken => TokenErrorType::RefreshToken,
-    };
-
+fn decode_claims(token: &str, secret_key: &str) -> Result<Claims, AuthError> {
     let decoding_secret = jsonwebtoken::DecodingKey::from_secret(secret_key.as_bytes());
     JwtDecoderBuilder::new(decoding_secret)
         .with_token(token)
-        .with_token_type(token_type.clone())
+        .with_token_type(TokenType::AccessToken)
         .build()
         .map_err(|_| AuthError::InvalidToken {
-            token_type: error_type,
+            token_type: TokenErrorType::AccessToken,
             reason: InvalidTokenReason::SignatureMismatch,
         })
-}
-
-async fn validate_refresh_token(req: &ServiceRequest, jti: &str) -> Result<(), AuthError> {
-    let auth_service = extract_auth_service(req)?;
-
-    let refresh_token = auth_service.find_jwt_by_jti(jti).await?;
-
-    if !refresh_token.valid {
-        let message = format!(
-            "failed authentication with user_id:{}",
-            refresh_token.user_id
-        )
-        .to_string();
-        tracing::info!(message);
-        return Err(AuthError::InvalidToken {
-            token_type: TokenErrorType::RefreshToken,
-            reason: InvalidTokenReason::Expired,
-        });
-    }
-
-    Ok(())
 }
 
 async fn find_session(req: &ServiceRequest, token: &str) -> Result<Session, AuthError> {
@@ -134,23 +99,15 @@ async fn validate_token(req: &ServiceRequest) -> Result<(), Error> {
         }
         AuthStrategy::Jwt => {
             let secret_key = configuration.security.secret_key;
+
             let access_token = extract_token_from_header(req, header::AUTHORIZATION.to_string());
             if let Some(token) = access_token {
-                let claims = decode_claims(token, TokenType::AccessToken, &secret_key)?;
+                let claims = decode_claims(token, &secret_key)?;
                 req.extensions_mut().insert::<Claims>(claims.clone());
 
                 let message =
                     format!("successful authentication with user_id:{}", claims.sub).to_string();
                 tracing::info!(message);
-            }
-
-            let refresh_token = extract_token_from_header(req, X_REFRESH_TOKEN.to_string());
-            if let Some(token) = refresh_token {
-                let claims = decode_claims(token, TokenType::RefreshToken, &secret_key)?;
-                validate_refresh_token(req, &claims.jti).await?;
-
-                let payload = AuthPayload::from(claims.sub, token, claims.jti);
-                req.extensions_mut().insert::<AuthPayload>(payload);
             }
         }
     };

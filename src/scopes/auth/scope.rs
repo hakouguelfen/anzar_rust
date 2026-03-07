@@ -4,50 +4,34 @@ use actix_web::{
     web::{self},
 };
 
-use serde_json::json;
 use validator::{Validate, ValidateArgs};
 
+use crate::extractors::{
+    AuthServiceExtractor, AuthenticatedUser, ConfigurationExtractor, ValidatedQuery,
+};
+use crate::middlewares::{
+    account_validation::account_validation_middleware, rate_limiting::RATE_LIMITS,
+    token_validation::token_validation_middleware,
+};
 use crate::{
     config::AuthStrategy,
     error::{CredentialField, Error, ErrorResponse, FailureReason, Result},
-    services::account::{model::AccountStatus, service::AccountServiceTrait},
     utils::HmacSigner,
 };
-use crate::{
-    extractors::{
-        AuthPayload, AuthServiceExtractor, AuthenticatedUser, ConfigurationExtractor,
-        ValidatedQuery,
-    },
-    scopes::auth::models::RegisterRequest,
-};
-use crate::{
-    middlewares::{
-        account_validation::account_validation_middleware, rate_limiting::RATE_LIMITS,
-        token_validation::token_validation_middleware,
-    },
-    scopes::auth::models::ResetLink,
-};
 
-use crate::utils::Token;
-use crate::{
-    services::{
-        jwt::service::JwtServiceTrait,
-        session::{model::Session, service::SessionServiceTrait},
-    },
-    utils::{CustomPasswordHasher, Password, TokenHasher},
+use crate::services::{
+    account::{model::AccountStatus, service::AccountServiceTrait},
+    jwt::service::JwtServiceTrait,
+    session::{model::Session, service::SessionServiceTrait},
 };
+use crate::utils::{CustomPasswordHasher, Password, Token, TokenHasher};
 
-use crate::scopes::{
-    auth::{
-        models::{AuthResponse, ResetPasswordRequest},
-        reset_password::service::PasswordResetTokenServiceTrait,
-    },
-    user::service::UserServiceTrait,
+use super::models::{
+    AuthResponse, EmailRequest, LoginRequest, RefreshTokenRequest, RegisterRequest, ResetLink,
+    ResetPasswordRequest, TokenQuery,
 };
-
-use super::models::{EmailRequest, LoginRequest, TokenQuery};
-use super::reset_password::model::PasswordResetToken;
-use super::user::User;
+use super::reset_password::{model::PasswordResetToken, service::PasswordResetTokenServiceTrait};
+use super::user::{User, service::UserServiceTrait};
 
 use super::support;
 
@@ -124,7 +108,10 @@ pub async fn login(
                             session.renew();
                             session.insert(support::DEVICE_COOKIE, &cookie)?;
 
-                            Ok(HttpResponse::Ok().json(AuthResponse::new(user).with_jwt(tokens)))
+                            Ok(HttpResponse::Ok().json(
+                                AuthResponse::new(user)
+                                    .with_jwt(tokens, configuration.auth.jwt.expires_in),
+                            ))
                         })?
                 }
             }
@@ -205,7 +192,7 @@ pub async fn register(
                     .map(|tokens| {
                         Ok(HttpResponse::Created().json(
                             AuthResponse::new(user)
-                                .with_jwt(tokens)
+                                .with_jwt(tokens, configuration.auth.jwt.expires_in)
                                 .with_verification(&link, &verification_token),
                         ))
                     })?
@@ -222,7 +209,9 @@ pub async fn register(
             .issue_jwt(&user, &configuration)
             .await
             .map(|tokens| {
-                Ok(HttpResponse::Created().json(AuthResponse::new(user).with_jwt(tokens)))
+                Ok(HttpResponse::Created().json(
+                    AuthResponse::new(user).with_jwt(tokens, configuration.auth.jwt.expires_in),
+                ))
             })?,
     }
 }
@@ -260,11 +249,10 @@ pub async fn get_session(session: Session) -> Result<HttpResponse> {
     )]
 #[tracing::instrument(
     name = "Regenerate user accessToken",
-    skip(payload, auth_service,configuration, authenticated_user),
-    fields(user_id = %payload.user_id)
+    skip(req, auth_service, configuration, authenticated_user)
 )]
 pub async fn refresh_token(
-    payload: AuthPayload,
+    req: web::Json<RefreshTokenRequest>,
     authenticated_user: AuthenticatedUser,
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
     ConfigurationExtractor(configuration): ConfigurationExtractor,
@@ -272,15 +260,17 @@ pub async fn refresh_token(
     tracing::info!("user is refreshing token");
     let user: User = authenticated_user.0;
 
-    let user_id = user.id.as_ref().ok_or(Error::MalformedData {
-        field: CredentialField::ObjectId,
-    })?;
-    auth_service.consume_refresh_token(payload, user_id).await?;
+    auth_service
+        .consume_refresh_token(&req.0.refresh_token, &configuration.security.secret_key)
+        .await?;
 
     auth_service
         .issue_jwt(&user, &configuration)
         .await
-        .map(|tokens| Ok(HttpResponse::Ok().json(AuthResponse::new(user).with_jwt(tokens))))?
+        .map(|tokens| {
+            Ok(HttpResponse::Ok()
+                .json(AuthResponse::new(user).with_jwt(tokens, configuration.auth.jwt.expires_in)))
+        })?
 }
 
 #[utoipa::path(
@@ -298,23 +288,26 @@ pub async fn refresh_token(
     )]
 #[tracing::instrument(
     name = "Logout user",
-    skip(payload, auth_service, session, session_manager),
-    fields(user_id = %payload.user_id)
+    skip(req, auth_service, session, session_manager)
 )]
 async fn logout(
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
     ConfigurationExtractor(configuration): ConfigurationExtractor,
-    payload: AuthPayload,
+    req: web::Json<RefreshTokenRequest>,
     session: Session,
     session_manager: actix_session::Session,
 ) -> Result<HttpResponse> {
     let result = match configuration.auth.strategy {
         AuthStrategy::Session => auth_service.invalidate_session(&session.token).await,
-        AuthStrategy::Jwt => auth_service.invalidate_jwt(&payload.jti).await,
+        AuthStrategy::Jwt => {
+            auth_service
+                .invalidate_jwt(&req.0.refresh_token, &configuration.security.secret_key)
+                .await
+        }
     };
 
     session_manager.purge();
-    result.map(|_| Ok(HttpResponse::Ok().json(json!({ "status": "ok" }))))?
+    result.map(|_| Ok(HttpResponse::Ok().finish()))?
 }
 
 #[utoipa::path(
@@ -531,7 +524,7 @@ pub fn auth_scope() -> Scope {
                 .wrap(from_fn(account_validation_middleware))
                 .wrap(from_fn(token_validation_middleware))
                 .route("/session", web::get().to(get_session))
-                .route("/refreshToken", web::post().to(refresh_token))
+                .route("/refresh-token", web::post().to(refresh_token))
                 .route("/logout", web::post().to(logout)),
         )
 }
