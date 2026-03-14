@@ -12,7 +12,7 @@ pub trait JwtServiceTrait {
         &self,
         refresh_token: &str,
         secret: &str,
-    ) -> impl Future<Output = Result<()>>;
+    ) -> impl Future<Output = Result<String>>;
     fn issue_jwt(
         &self,
         user: &User,
@@ -25,7 +25,7 @@ pub trait JwtServiceTrait {
     fn find_jwt_by_jti(&self, jti: &str) -> impl Future<Output = Result<RefreshToken>>;
 }
 impl JwtServiceTrait for AuthService {
-    async fn consume_refresh_token(&self, refresh_token: &str, secret: &str) -> Result<()> {
+    async fn consume_refresh_token(&self, refresh_token: &str, secret: &str) -> Result<String> {
         let claims = support::decode(refresh_token, secret)?;
 
         if self
@@ -38,7 +38,7 @@ impl JwtServiceTrait for AuthService {
             self.jwt_service.revoke(&claims.sub).await?;
         }
 
-        Ok(())
+        Ok(claims.sub)
     }
     async fn issue_jwt(&self, user: &User, configuration: &Configuration) -> Result<Tokens> {
         let secret = configuration.security.secret_key.as_bytes();

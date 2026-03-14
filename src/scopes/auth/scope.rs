@@ -6,9 +6,7 @@ use actix_web::{
 
 use validator::{Validate, ValidateArgs};
 
-use crate::extractors::{
-    AuthServiceExtractor, AuthenticatedUser, ConfigurationExtractor, ValidatedQuery,
-};
+use crate::extractors::{AuthServiceExtractor, ConfigurationExtractor, ValidatedQuery};
 use crate::middlewares::{
     account_validation::account_validation_middleware, rate_limiting::RATE_LIMITS,
     token_validation::token_validation_middleware,
@@ -248,21 +246,21 @@ pub async fn get_session(session: Session) -> Result<HttpResponse> {
         ),
     )]
 #[tracing::instrument(
-    name = "Regenerate user accessToken",
-    skip(req, auth_service, configuration, authenticated_user)
+    name = "Refresh user accessToken",
+    skip(req, auth_service, configuration)
 )]
 pub async fn refresh_token(
     req: web::Json<RefreshTokenRequest>,
-    authenticated_user: AuthenticatedUser,
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
     ConfigurationExtractor(configuration): ConfigurationExtractor,
 ) -> Result<HttpResponse> {
     tracing::info!("user is refreshing token");
-    let user: User = authenticated_user.0;
 
-    auth_service
+    let user_id = auth_service
         .consume_refresh_token(&req.0.refresh_token, &configuration.security.secret_key)
         .await?;
+
+    let user: User = auth_service.find_user(&user_id).await?;
 
     auth_service
         .issue_jwt(&user, &configuration)
@@ -519,12 +517,12 @@ pub fn auth_scope() -> Scope {
         .route("/password/forgot", web::post().to(request_password_reset))
         .route("/password/reset", web::get().to(render_reset_form))
         .route("/password/reset", web::post().to(submit_new_password))
+        .route("/refresh-token", web::post().to(refresh_token))
         .service(
             web::scope("")
                 .wrap(from_fn(account_validation_middleware))
                 .wrap(from_fn(token_validation_middleware))
                 .route("/session", web::get().to(get_session))
-                .route("/refresh-token", web::post().to(refresh_token))
                 .route("/logout", web::post().to(logout)),
         )
 }
