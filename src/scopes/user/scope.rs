@@ -15,7 +15,10 @@ use crate::{
         tag = "Users",
         summary = "Get current User",
         description = "Returns the currently authenticated user's data. Requires a valid Bearer token.",
-        security(("bearer_auth" = [])),
+        security(
+            ("session_auth" = []),  // OR
+            ("bearer_auth"    = []),
+        ),
         responses(
             (status = 200, description = "User Found", body = User),
             (status = UNAUTHORIZED, description = "invalid request", body = ErrorResponse),

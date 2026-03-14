@@ -6,7 +6,11 @@ use actix_web::{
     web,
 };
 
-use crate::{config::AppState, error::InvalidTokenReason, extract_service_response};
+use crate::{
+    config::{AppState, Configuration},
+    error::InvalidTokenReason,
+    extract_service_response,
+};
 use crate::{
     error::{Error as AuthError, TokenErrorType},
     services::account::service::AccountServiceTrait,
@@ -26,6 +30,14 @@ fn extract_auth_service(req: &ServiceRequest) -> Result<AuthService, AuthError> 
         ))
 }
 
+fn extract_configuration_service(req: &ServiceRequest) -> Result<Configuration, AuthError> {
+    req.app_data::<web::Data<AppState>>()
+        .map(|state| state.configuration.clone())
+        .ok_or(AuthError::InternalServerError(
+            "extract configuraiton".into(),
+        ))
+}
+
 async fn validate_user(req: &ServiceRequest, user_id: &str) -> Result<User, AuthError> {
     let auth_service = extract_auth_service(req)?;
 
@@ -40,20 +52,30 @@ async fn validate_user(req: &ServiceRequest, user_id: &str) -> Result<User, Auth
 }
 
 fn extract_user_id_from_extensions(req: &ServiceRequest) -> Result<String, AuthError> {
-    // Try to get user_id from Session
-    if let Some(session) = req.extensions().get::<Session>() {
-        return Ok(session.user_id.clone());
-    }
+    let configuration = extract_configuration_service(req)?;
 
-    // Try to get user_id from JWT Claims
-    if let Some(claims) = req.extensions().get::<Claims>() {
-        return Ok(claims.sub.clone());
-    }
+    match configuration.auth.strategy {
+        crate::config::AuthStrategy::Session => {
+            if let Some(session) = req.extensions().get::<Session>() {
+                return Ok(session.user_id.clone());
+            }
 
-    Err(AuthError::InvalidToken {
-        token_type: TokenErrorType::Token,
-        reason: InvalidTokenReason::NotFound,
-    })
+            Err(AuthError::InvalidToken {
+                token_type: TokenErrorType::SessionToken,
+                reason: InvalidTokenReason::NotFound,
+            })
+        }
+        crate::config::AuthStrategy::Jwt => {
+            if let Some(claims) = req.extensions().get::<Claims>() {
+                return Ok(claims.sub.clone());
+            }
+
+            Err(AuthError::InvalidToken {
+                token_type: TokenErrorType::AccessToken,
+                reason: InvalidTokenReason::NotFound,
+            })
+        }
+    }
 }
 
 pub async fn account_validation_middleware(

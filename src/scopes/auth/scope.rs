@@ -38,13 +38,25 @@ use super::support;
         path = "/auth/login",
         tag = "Auth",
         summary = "User login",
-        description = "Authenticates a user with email and password. Returns an access token and refresh token on success.",
+        description = "Authenticates a user with email and password.\n\n\
+            **Session strategy**: Returns a session cookie (`id`) managed by the server.\n\
+            **JWT strategy**: Returns `access` and `refresh` in the response body.",
         request_body(
             description = "User login credentials",
             content = LoginRequest
         ),
         responses(
-            (status = 200, description = "User logged successfully", body = AuthResponse),
+            (
+                status = 200,
+                description = "User logged successfully",
+                body = AuthResponse,
+                headers(
+                    ("Set-Cookie" = String,
+                     description = "Session cookie (session strategy only). \
+                     HttpOnly, Secure, SameSite=Strict. \
+                                Format: id=<session_id>; HttpOnly; Secure; SameSite=Strict")
+                )
+            ),
             (status = BAD_REQUEST, description = "Invalid request", body = ErrorResponse),
             (status = UNAUTHORIZED, description = "Invalid credentials", body = ErrorResponse),
         ),
@@ -135,13 +147,25 @@ pub async fn login(
         path = "/auth/register",
         tag = "Auth",
         summary = "Register a new user",
-        description = "Creates a new user account. Sends a verification email upon successful registration.",
+        description = "Creates a new user account with email and password.\n\n\
+            **Session strategy**: Returns a session cookie (`id`) managed by the server.\n\
+            **JWT strategy**: Returns `access` and `refresh` in the response body.",
         request_body(
             description = "User register credentials",
             content = RegisterRequest
         ),
         responses(
-            (status = 201, description = "User registerd successfully", body = AuthResponse),
+            (
+                status = 201,
+                description = "User registerd successfully",
+                body = AuthResponse,
+                headers(
+                    ("Set-Cookie" = String,
+                     description = "Session cookie (session strategy only). \
+                     HttpOnly, Secure, SameSite=Strict. \
+                                Format: id=<session_id>; HttpOnly; Secure; SameSite=Strict")
+                )
+            ),
             (status = BAD_REQUEST, description = "Invalid request", body = ErrorResponse),
             (status = UNAUTHORIZED, description = "Invalid credentials", body = ErrorResponse),
         ),
@@ -220,7 +244,10 @@ pub async fn register(
         tag = "Auth",
         summary = "Get current session",
         description = "Returns the currently authenticated user's session data. Requires a valid Bearer token.",
-        security(("bearer_auth" = [])),
+        security(
+            ("session_auth" = []),  // OR
+            ("bearer_auth"    = []),
+        ),
         responses(
             (status = 200, description = "Session data returned", body = Session),
             (status = UNAUTHORIZED, description = "Unauthorized — missing or invalid token", body = ErrorResponse),
@@ -238,7 +265,10 @@ pub async fn get_session(session: Session) -> Result<HttpResponse> {
         tag = "Auth",
         summary = "Refresh access token",
         description = "Issues a new access token using a valid refresh token. Rotate refresh tokens on each call.",
-        security(("bearer_auth" = [])),
+        security(
+            ("session_auth" = []),  // OR
+            ("bearer_auth"    = []),
+        ),
         responses(
             (status = 200, description = "New token issued", body = AuthResponse),
             (status = 401, description = "Refresh token invalid or expired", body = ErrorResponse),
@@ -277,7 +307,10 @@ pub async fn refresh_token(
         tag = "Auth",
         summary = "Logout",
         description = "Invalidates the current session and refresh token. The client should discard stored tokens.",
-        security(("bearer_auth" = [])),
+        security(
+            ("session_auth" = []),  // OR
+            ("bearer_auth"    = []),
+        ),
         responses(
             (status = 200, description = "Logged out successfully"),
             (status = 401, description = "Unauthorized", body = ErrorResponse),

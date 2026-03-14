@@ -14,7 +14,7 @@ use tracing_actix_web::TracingLogger;
 
 use rustls::{ServerConfig, pki_types::CertificateDer};
 use rustls_pemfile::{certs, private_key};
-use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
+use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme};
 
 use crate::config::AppState;
 use crate::error::{Error, FailureReason};
@@ -67,6 +67,13 @@ struct SecurityAddon;
 impl utoipa::Modify for SecurityAddon {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
         let components = openapi.components.get_or_insert_with(Default::default);
+        // Session: cookie named "id" (actix-session default)
+        components.add_security_scheme(
+            "session_auth",
+            SecurityScheme::ApiKey(ApiKey::Cookie(ApiKeyValue::new("id"))),
+        );
+
+        // JWT: Bearer token in Authorization header
         components.add_security_scheme(
             "bearer_auth",
             SecurityScheme::Http(
