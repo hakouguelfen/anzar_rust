@@ -9,7 +9,7 @@ use actix_web::{
 
 use crate::error::Error as AuthError;
 
-pub async fn requests_filters(
+pub async fn validate_content_type(
     req: ServiceRequest,
     next: Next<impl MessageBody>,
 ) -> Result<ServiceResponse<impl MessageBody>, Error> {

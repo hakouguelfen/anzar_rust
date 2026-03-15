@@ -2,7 +2,7 @@ use crate::adapters::factory::DatabaseAdapters;
 use crate::adapters::memcache::{MemCache, MemCacheAdapter};
 use crate::adapters::{mongodb::MongoDB, sqlite::SQLite};
 
-use crate::config::{Database, DatabaseDriver};
+use crate::config::{Database, database::driver::DatabaseDriver};
 use crate::error::Result;
 
 use crate::scopes::auth::PasswordResetTokenRepository;
@@ -21,7 +21,7 @@ pub struct AuthService {
     pub(crate) session_service: SessionRepository,
     pub(crate) password_reset_token_service: PasswordResetTokenRepository,
     pub(crate) email_verification_token_service: EmailVerificationTokenRepository,
-    pub(crate) transaction_repository: TransactionRepository,
+    pub(crate) _transaction_repository: TransactionRepository,
 }
 
 impl AuthService {
@@ -43,7 +43,7 @@ impl AuthService {
                 adapters.email_verification_token,
                 driver,
             ),
-            transaction_repository: TransactionRepository::new(adapters.transaction_adapter),
+            _transaction_repository: TransactionRepository::new(adapters.transaction_adapter),
         }
     }
     pub async fn from_database(database: &Database) -> Result<Self> {
@@ -58,7 +58,8 @@ impl AuthService {
             }
             DatabaseDriver::MongoDB => {
                 let client = MongoDB::start(&database.connection_string).await?;
-                DatabaseAdapters::mongodb(&client, &database.name)
+                let db_name = database.name().unwrap_or_default();
+                DatabaseAdapters::mongodb(&client, db_name)
             }
             DatabaseDriver::PostgreSQL => todo!(),
         };

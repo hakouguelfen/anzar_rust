@@ -19,7 +19,14 @@ pub struct Database {
     pub driver: DatabaseDriver,
     pub connection_string: String,
     pub cache: String,
-    pub name: String,
+}
+impl Database {
+    pub fn name(&self) -> Option<&str> {
+        self.connection_string
+            .rsplit('/')
+            .next()
+            .filter(|s| !s.is_empty())
+    }
 }
 
 // Server

@@ -78,7 +78,7 @@ fn extract_user_id_from_extensions(req: &ServiceRequest) -> Result<String, AuthE
     }
 }
 
-pub async fn account_validation_middleware(
+pub async fn authorization_middleware(
     req: ServiceRequest,
     next: Next<BoxBody>,
 ) -> Result<ServiceResponse<BoxBody>, Error> {

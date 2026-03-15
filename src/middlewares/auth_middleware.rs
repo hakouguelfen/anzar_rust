@@ -115,7 +115,7 @@ async fn validate_token(req: &ServiceRequest) -> Result<(), Error> {
     Ok(())
 }
 
-pub async fn token_validation_middleware(
+pub async fn auth_middleware(
     req: ServiceRequest,
     next: Next<BoxBody>,
 ) -> Result<ServiceResponse<BoxBody>, Error> {

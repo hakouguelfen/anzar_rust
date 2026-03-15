@@ -5,7 +5,7 @@ use serde_json::json;
 use super::User;
 use crate::{
     adapters::{DatabaseAdapter, memcache::MemCacheAdapter},
-    config::DatabaseDriver,
+    config::database::driver::DatabaseDriver,
     error::{Error, Result},
     utils::parser::Parser,
 };

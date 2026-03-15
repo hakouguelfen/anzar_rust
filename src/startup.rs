@@ -18,7 +18,7 @@ use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder
 
 use crate::config::AppState;
 use crate::error::{Error, FailureReason};
-use crate::middlewares::{account_validation, requests_filters, token_validation};
+use crate::middlewares::{auth_middleware, authorization_middleware, validate_content_type};
 use crate::scopes::auth::TokenQuery;
 use crate::scopes::{auth, email, health, user};
 
@@ -159,7 +159,7 @@ pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, s
             .wrap(TracingLogger::default())
             .wrap(cors)
             .wrap(session)
-            .wrap(from_fn(requests_filters))
+            .wrap(from_fn(validate_content_type))
             .wrap(
                 middleware::DefaultHeaders::new()
                     .add((
@@ -183,8 +183,8 @@ pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, s
             .service(auth::auth_scope())
             .service(
                 user::user_scope()
-                    .wrap(from_fn(account_validation::account_validation_middleware))
-                    .wrap(from_fn(token_validation::token_validation_middleware)),
+                    .wrap(from_fn(authorization_middleware))
+                    .wrap(from_fn(auth_middleware)),
             )
             .service(email::email_scope())
     });

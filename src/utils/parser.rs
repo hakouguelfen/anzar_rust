@@ -1,7 +1,7 @@
 use mongodb::bson::oid::ObjectId;
 use serde_json::Value;
 
-use crate::config::DatabaseDriver;
+use crate::config::database::driver::DatabaseDriver;
 
 pub struct Parser {
     database_driver: DatabaseDriver,

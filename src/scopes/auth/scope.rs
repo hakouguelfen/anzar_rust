@@ -7,10 +7,7 @@ use actix_web::{
 use validator::{Validate, ValidateArgs};
 
 use crate::extractors::{AuthServiceExtractor, ConfigurationExtractor, ValidatedQuery};
-use crate::middlewares::{
-    account_validation::account_validation_middleware, rate_limiting::RATE_LIMITS,
-    token_validation::token_validation_middleware,
-};
+use crate::middlewares::{auth_middleware, authorization_middleware, rate_limiting::RATE_LIMITS};
 use crate::{
     config::AuthStrategy,
     error::{CredentialField, Error, ErrorResponse, FailureReason, Result},
@@ -553,8 +550,8 @@ pub fn auth_scope() -> Scope {
         .route("/refresh-token", web::post().to(refresh_token))
         .service(
             web::scope("")
-                .wrap(from_fn(account_validation_middleware))
-                .wrap(from_fn(token_validation_middleware))
+                .wrap(from_fn(authorization_middleware))
+                .wrap(from_fn(auth_middleware))
                 .route("/session", web::get().to(get_session))
                 .route("/logout", web::post().to(logout)),
         )

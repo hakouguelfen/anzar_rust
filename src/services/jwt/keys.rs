@@ -3,7 +3,7 @@ use std::sync::LazyLock;
 use jsonwebtoken::{DecodingKey, EncodingKey};
 use secrecy::ExposeSecret;
 
-use crate::config::EnvironmentConfig;
+use crate::config::AppConfig;
 
 pub struct Keys {
     pub encoding_secret: EncodingKey,
@@ -21,7 +21,7 @@ impl Keys {
 
 pub static KEYS: LazyLock<Keys> = LazyLock::new(|| {
     // FIXME: Fix this, use middleware or pass it as app_data in startup
-    let configuration = EnvironmentConfig::from_env().expect("Failed to read configuration");
+    let configuration = AppConfig::load().expect("Failed to read configuration");
 
     let anzar_secret = configuration.server.anzar_secret;
 

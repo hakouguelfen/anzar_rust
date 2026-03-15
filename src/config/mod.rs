@@ -1,81 +1,67 @@
 mod app_state;
 mod configuration;
-mod database;
+pub mod database;
 mod environment;
 mod runtime;
 mod server;
 
 pub use app_state::AppState;
 pub use configuration::*;
-use database::DatabaseConfig;
-pub use database::DatabaseDriver;
 use environment::*;
-use runtime::Runtime;
 use server::ServerConfig;
 
-use crate::config::database::get_db_type;
+use database::config::DatabaseConfig;
+use database::driver::DatabaseDriver;
+use database::support;
 
 #[derive(Debug, serde::Deserialize)]
-pub struct EnvironmentConfig {
+pub struct AppConfig {
     pub name: String,
-    pub config: String,
+    pub config_path: String,
     pub server: ServerConfig,
     pub database: DatabaseConfig,
 }
 
-impl EnvironmentConfig {
-    fn app_env() -> Environment {
+impl AppConfig {
+    fn env() -> Environment {
         std::env::var("ENV")
             .unwrap_or_else(|_| Environment::Dev.as_str().into())
             .try_into()
             .expect("Failed to parse ENV")
     }
-    fn db_env() -> EnvironmentDatabase {
+    fn db() -> DatabaseDriver {
         std::env::var("DB")
-            .unwrap_or_else(|_| EnvironmentDatabase::SQLite.as_str().into())
+            .unwrap_or_else(|_| DatabaseDriver::SQLite.as_str().into())
             .try_into()
             .expect("Failed to parse DB")
     }
-    fn runtime_env() -> Runtime {
-        std::env::var("RUNTIME")
-            .unwrap_or_else(|_| Runtime::Local.as_str().into())
-            .try_into()
-            .expect("Failed to parse RUNTIME")
-    }
 
-    pub fn from_env() -> Result<EnvironmentConfig, config::ConfigError> {
-        dotenvy::dotenv().ok();
-        let config_dir_str =
-            std::env::var("APP_CONFIG_DIR").unwrap_or_else(|_| "configuration".into());
+    pub fn load() -> Result<AppConfig, config::ConfigError> {
+        // FIXME maybe its configuration not app/configuration
+        let config_dir_str = "app/configuration".to_string();
         let config_dir = std::path::PathBuf::from(config_dir_str);
 
-        let environment: Environment = Self::app_env();
-        let environment_filename = format!("{}.yaml", environment.as_str());
+        let environment: Environment = Self::env();
+        let environment_path = format!("{}.yaml", environment.as_str());
 
-        let runtime = Self::runtime_env();
-        let content: &str = match runtime {
-            Runtime::Docker => "/app/anzar.yml",
-            Runtime::Local => "./anzar.dev.yml",
-        };
-
-        let environment_database: EnvironmentDatabase = Self::db_env();
-        let database_filename = format!(
+        let environment_database: DatabaseDriver = Self::db();
+        let database_path = format!(
             "{}/{}.yaml",
             environment_database.as_str(),
             environment.as_str(),
         );
 
-        let db_type: &str = get_db_type(environment_database.as_str());
+        let db_type: &str = support::get_db_type(environment_database.as_str());
         let settings = config::Config::builder()
             .add_source(config::File::from(config_dir.join("base.yaml")).required(true))
-            .add_source(config::File::from(config_dir.join(environment_filename)))
-            .add_source(config::File::from(config_dir.join(database_filename)))
+            .add_source(config::File::from(config_dir.join(environment_path)))
+            .add_source(config::File::from(config_dir.join(database_path)))
             .set_override("name", "Anzar")?
-            .set_override("config", content)?
+            .set_override("config", "/app/anzar.yml")?
             .set_override("database.driver", db_type)?
             .build()
             .map_err(|e| dbg!(e))?;
 
-        settings.try_deserialize::<EnvironmentConfig>()
+        settings.try_deserialize::<AppConfig>()
     }
 }

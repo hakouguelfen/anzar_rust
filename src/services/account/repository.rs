@@ -4,7 +4,7 @@ use serde_json::json;
 
 use crate::error::{Error, Result, TokenErrorType};
 use crate::utils::parser::Parser;
-use crate::{adapters::DatabaseAdapter, config::DatabaseDriver};
+use crate::{adapters::DatabaseAdapter, config::database::driver::DatabaseDriver};
 
 use super::model::Account;
 

@@ -1,12 +1,5 @@
+use super::driver::DatabaseDriver;
 use secrecy::SecretString;
-
-#[derive(Debug, Default, Clone, Copy, serde::Deserialize, serde::Serialize, Eq, PartialEq)]
-pub enum DatabaseDriver {
-    #[default]
-    SQLite,
-    PostgreSQL,
-    MongoDB,
-}
 
 #[derive(Debug, serde::Deserialize)]
 pub struct DatabaseConfig {
@@ -44,14 +37,5 @@ impl DatabaseConfig {
 
     pub fn is_nosql(&self) -> bool {
         matches!(self.driver, DatabaseDriver::MongoDB)
-    }
-}
-
-pub fn get_db_type(s: &str) -> &str {
-    match s.to_lowercase().as_str() {
-        "postgres" | "postgresql" => "PostgreSQL",
-        "mongodb" => "MongoDB",
-        "sqlite" => "SQLite",
-        _ => "SQLite",
     }
 }

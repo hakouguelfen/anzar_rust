@@ -5,7 +5,10 @@ use serde_json::json;
 
 use crate::error::{Error, InvalidTokenReason, Result, TokenErrorType};
 use crate::utils::{Token, TokenHasher, parser::Parser};
-use crate::{adapters::DatabaseAdapter, config::DatabaseDriver, services::session::model::Session};
+use crate::{
+    adapters::DatabaseAdapter, config::database::driver::DatabaseDriver,
+    services::session::model::Session,
+};
 
 #[derive(Clone)]
 pub struct SessionRepository {

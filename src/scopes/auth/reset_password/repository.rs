@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     adapters::DatabaseAdapter,
-    config::DatabaseDriver,
+    config::database::driver::DatabaseDriver,
     error::{Error, InvalidTokenReason, Result, TokenErrorType},
     utils::parser::Parser,
 };

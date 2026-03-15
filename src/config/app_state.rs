@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::adapters::memcache::{MemCache, MemCacheAdapter};
 use crate::adapters::{factory::DatabaseAdapters, mongodb::MongoDB, sqlite::SQLite};
-use crate::config::{Configuration, Database, DatabaseDriver, EnvironmentConfig};
+use crate::config::{AppConfig, Configuration, Database, DatabaseDriver};
 use crate::error::Result;
 use crate::scopes::auth::service::AuthService;
 
@@ -15,8 +15,8 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub async fn prod(env_config: &EnvironmentConfig) -> Result<Self> {
-        let content = fs::read_to_string(&env_config.config)?;
+    pub async fn production(app_config: &AppConfig) -> Result<Self> {
+        let content = fs::read_to_string(&app_config.config_path)?;
         let configuration: Configuration = serde_yaml::from_str(content.as_str())?;
         let auth_service = AuthService::from_database(&configuration.database).await?;
 
@@ -26,7 +26,7 @@ impl AppState {
         })
     }
 
-    pub async fn test(address: &str) -> Result<Self> {
+    pub async fn testing(address: &str) -> Result<Self> {
         let configuration = Self::build_config(address).await?;
         let auth_service = Self::build_authservice(&configuration.database).await?;
 
@@ -37,9 +37,9 @@ impl AppState {
     }
 
     async fn build_config(address: &str) -> Result<Configuration> {
-        let mut env_config = EnvironmentConfig::from_env().expect("Failed to read configuration");
+        let mut env_config = AppConfig::load().expect("Failed to read configuration");
 
-        let content = fs::read_to_string(&env_config.config)?;
+        let content = fs::read_to_string(&env_config.config_path)?;
         let mut configuration: Configuration = serde_yaml::from_str(content.as_str())?;
 
         configuration.api_url = address.into();
@@ -50,7 +50,6 @@ impl AppState {
             env_config.database.name = db_name;
         }
 
-        configuration.database.name = env_config.database.name.clone();
         configuration.database.connection_string = env_config.database.connection_string();
         Ok(configuration)
     }
@@ -72,7 +71,8 @@ impl AppState {
             }
             DatabaseDriver::MongoDB => {
                 let client = MongoDB::start(&database.connection_string).await?;
-                DatabaseAdapters::mongodb(&client, &database.name)
+                let db_name = database.name().unwrap_or_default();
+                DatabaseAdapters::mongodb(&client, db_name)
             }
             DatabaseDriver::PostgreSQL => todo!(),
         };

@@ -7,7 +7,7 @@ use serde_json::json;
 use super::RefreshToken;
 use crate::{
     adapters::DatabaseAdapter,
-    config::DatabaseDriver,
+    config::database::driver::DatabaseDriver,
     error::{Error, InvalidTokenReason, Result, TokenErrorType},
     extractors::Claims,
     utils::{Token, TokenHasher, parser::Parser},

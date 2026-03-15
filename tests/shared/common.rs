@@ -4,9 +4,9 @@ use std::net::TcpListener;
 use std::sync::LazyLock;
 
 use anzar::adapters::sqlite::SQLite;
+use anzar::config::AppConfig;
 use anzar::config::AppState;
 use anzar::config::DatabaseDriver;
-use anzar::config::EnvironmentConfig;
 use anzar::scopes::auth::service::AuthService;
 
 use anzar::config::{AuthStrategy, Authentication, Configuration, Database};
@@ -44,7 +44,7 @@ impl Common {
         let port = listener.local_addr()?.port();
         let address = format!("http://localhost:{port}");
 
-        let app_state = AppState::test(&address).await?;
+        let app_state = AppState::testing(&address).await?;
         let server = anzar::startup::run(listener, app_state.clone())
             .await
             .expect("Failed to bind address");
