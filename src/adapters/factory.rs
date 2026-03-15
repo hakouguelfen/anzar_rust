@@ -25,7 +25,7 @@ pub struct DatabaseAdapters {
     pub session_adapter: Arc<dyn DatabaseAdapter<Session>>,
     pub reset_token_adapter: Arc<dyn DatabaseAdapter<PasswordResetToken>>,
     pub email_verification_token: Arc<dyn DatabaseAdapter<EmailVerificationToken>>,
-    pub transaction_adapter: MongodbTransaction,
+    // pub transaction_adapter: MongodbTransaction,
 }
 
 impl DatabaseAdapters {
@@ -49,7 +49,7 @@ impl DatabaseAdapters {
                 cnn_string,
                 EMAIL_VERIFICATION_TOKEN,
             )),
-            transaction_adapter: MongodbTransaction::new(client),
+            // transaction_adapter: MongodbTransaction::new(client),
         }
     }
 
@@ -67,7 +67,7 @@ impl DatabaseAdapters {
                 db,
                 EMAIL_VERIFICATION_TOKEN,
             )),
-            transaction_adapter: todo!(),
+            // transaction_adapter: todo!(),
         }
     }
 

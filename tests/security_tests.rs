@@ -3,7 +3,8 @@ use shared::Helpers;
 
 use anzar::{config::AuthStrategy, extractors::TokenType, scopes::auth::AuthResponse};
 
-const X_REFRESH_TOKEN: &str = "x-refresh-token";
+use crate::shared::RefreshTokenRequest;
+
 #[actix_web::test]
 async fn test_password_not_returned_in_responses() {
     let test_app = Helpers::init_config().await;
@@ -35,7 +36,10 @@ async fn test_password_not_returned_in_responses() {
         let response = test_app
             .client
             .post(format!("{}/auth/logout", test_app.address))
-            .header(X_REFRESH_TOKEN, format!("Bearer {refresh_token}"))
+            .bearer_auth(&tokens.access)
+            .json(&RefreshTokenRequest {
+                refresh_token: refresh_token.to_string(),
+            })
             .send()
             .await
             .expect("Failed to execute request.");
@@ -64,13 +68,16 @@ async fn test_complete_auth_flow() {
         && let Some(tokens) = &auth_response.tokens
     {
         let old_refresh_token: &str = &tokens.refresh;
+        let old_access_token: &str = &tokens.access;
         assert!(!old_refresh_token.is_empty());
 
         // [3] Refresh access token
         let response = test_app
             .client
-            .post(format!("{}/auth/refreshToken", test_app.address))
-            .header(X_REFRESH_TOKEN, format!("Bearer {old_refresh_token}"))
+            .post(format!("{}/auth/refresh-token", test_app.address))
+            .json(&RefreshTokenRequest {
+                refresh_token: old_refresh_token.to_string(),
+            })
             .send()
             .await
             .expect("Failed to execute request.");
@@ -82,15 +89,17 @@ async fn test_complete_auth_flow() {
         assert!(&auth_response.tokens.is_some());
 
         let tokens = auth_response.tokens.as_ref().unwrap();
-        let access_token: &str = &tokens.access;
-        let refresh_token: &str = &tokens.refresh;
-        assert!(!access_token.is_empty() && !refresh_token.is_empty());
+        let new_access_token: &str = &tokens.access;
+        let new_refresh_token: &str = &tokens.refresh;
+
+        // assert tokens are not empty
+        assert!(!new_access_token.is_empty() && !new_refresh_token.is_empty());
 
         let secret_key = test_app.configuration.security.secret_key;
         let access_token_claims =
-            Helpers::decode_token(access_token, TokenType::AccessToken, &secret_key);
+            Helpers::decode_token(new_access_token, TokenType::AccessToken, &secret_key);
         let refresh_token_claims =
-            Helpers::decode_token(refresh_token, TokenType::RefreshToken, &secret_key);
+            Helpers::decode_token(new_refresh_token, TokenType::RefreshToken, &secret_key);
         // assert new tokens are valid
         assert!(access_token_claims.is_ok());
         assert!(refresh_token_claims.is_ok());
@@ -104,7 +113,7 @@ async fn test_complete_auth_flow() {
         let response = test_app
             .client
             .get(format!("{}/user", test_app.address))
-            .bearer_auth(access_token)
+            .bearer_auth(new_access_token)
             .send()
             .await
             .expect("Failed to execute request.");
@@ -114,22 +123,25 @@ async fn test_complete_auth_flow() {
         let response = test_app
             .client
             .post(format!("{}/auth/logout", test_app.address))
-            .header(X_REFRESH_TOKEN, format!("Bearer {old_refresh_token}"))
+            .bearer_auth(old_access_token)
+            .json(&RefreshTokenRequest {
+                refresh_token: old_refresh_token.to_string(),
+            })
             .send()
             .await
             .expect("Failed to execute request.");
-        assert_eq!(
-            401,
-            response.status().as_u16(),
-            "The API did not fail when the payload was: {}",
-            "invalid refreshToken was used"
-        );
+        // this operation should successed even if refreshToken is invalid
+        // logout is a safe operation
+        assert!(response.status().is_success());
 
         // [7] Logout with valid refreshToken
         let response = test_app
             .client
             .post(format!("{}/auth/logout", test_app.address))
-            .header(X_REFRESH_TOKEN, format!("Bearer {}", refresh_token))
+            .bearer_auth(new_access_token)
+            .json(&RefreshTokenRequest {
+                refresh_token: new_refresh_token.to_string(),
+            })
             .send()
             .await
             .expect("Failed to execute request.");

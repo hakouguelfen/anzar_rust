@@ -57,7 +57,7 @@ impl AppConfig {
             .add_source(config::File::from(config_dir.join(environment_path)))
             .add_source(config::File::from(config_dir.join(database_path)))
             .set_override("name", "Anzar")?
-            .set_override("config", "/app/anzar.yml")?
+            .set_override("config_path", "./app/anzar.yml")?
             .set_override("database.driver", db_type)?
             .build()
             .map_err(|e| dbg!(e))?;

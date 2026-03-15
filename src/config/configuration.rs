@@ -25,7 +25,7 @@ impl Database {
         self.connection_string
             .rsplit('/')
             .next()
-            .filter(|s| !s.is_empty())
+            .and_then(|s| s.split('?').next())
     }
 }
 

@@ -36,6 +36,10 @@ impl JwtServiceTrait for AuthService {
         {
             // TODO: send an email indicating a breach
             self.jwt_service.revoke(&claims.sub).await?;
+            return Err(Error::InvalidToken {
+                token_type: crate::error::TokenErrorType::RefreshToken,
+                reason: crate::error::InvalidTokenReason::Expired,
+            });
         }
 
         Ok(claims.sub)

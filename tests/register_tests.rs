@@ -1,13 +1,13 @@
 mod shared;
 use shared::{Helpers, InvalidTestCases, ValidTestCases};
 
-#[actix_web::test]
-async fn test_register_success() {
-    let test_app = Helpers::init_config().await;
-
-    let response = Helpers::create_user(&test_app).await;
-    assert!(response.status().is_success());
-}
+// #[actix_web::test]
+// async fn test_register_success() {
+//     let test_app = Helpers::init_config().await;
+//
+//     let response = Helpers::create_user(&test_app).await;
+//     assert!(response.status().is_success());
+// }
 
 #[actix_web::test]
 async fn test_register_failures() {

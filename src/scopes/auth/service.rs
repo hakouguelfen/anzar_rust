@@ -21,7 +21,7 @@ pub struct AuthService {
     pub(crate) session_service: SessionRepository,
     pub(crate) password_reset_token_service: PasswordResetTokenRepository,
     pub(crate) email_verification_token_service: EmailVerificationTokenRepository,
-    pub(crate) _transaction_repository: TransactionRepository,
+    // pub(crate) transaction_repository: TransactionRepository,
 }
 
 impl AuthService {
@@ -43,7 +43,7 @@ impl AuthService {
                 adapters.email_verification_token,
                 driver,
             ),
-            _transaction_repository: TransactionRepository::new(adapters.transaction_adapter),
+            // transaction_repository: TransactionRepository::new(adapters.transaction_adapter),
         }
     }
     pub async fn from_database(database: &Database) -> Result<Self> {

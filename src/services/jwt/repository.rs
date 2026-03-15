@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use mongodb::bson::doc;
 use serde_json::json;
 
 use super::RefreshToken;
@@ -108,7 +107,7 @@ impl JWTRepository {
     }
     pub async fn revoke(&self, user_id: &str) -> Result<()> {
         let filter = Parser::mode(self.database_driver).convert(json!({"userId": user_id}));
-        let update = json! ({ "$set": doc! {"valid": false} });
+        let update = json! ({ "$set": json! ({ "valid": false, "usedAt": Utc::now() }) });
         let update = Parser::mode(self.database_driver).convert(update);
 
         self.adapter

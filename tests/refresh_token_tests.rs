@@ -3,7 +3,7 @@ use shared::{Helpers, InvalidTestCases};
 
 use anzar::{config::AuthStrategy, extractors::TokenType, scopes::auth::AuthResponse};
 
-const X_REFRESH_TOKEN: &str = "x-refresh-token";
+use crate::shared::RefreshTokenRequest;
 
 #[actix_web::test]
 async fn test_refresh_token_success() {
@@ -27,8 +27,10 @@ async fn test_refresh_token_success() {
         // refresh access token
         let response = test_app
             .client
-            .post(format!("{}/auth/refreshToken", test_app.address))
-            .header(X_REFRESH_TOKEN, format!("Bearer {refresh_token}"))
+            .post(format!("{}/auth/refresh-token", test_app.address))
+            .json(&RefreshTokenRequest {
+                refresh_token: refresh_token.to_string(),
+            })
             .send()
             .await
             .expect("Failed to execute request.");
@@ -82,8 +84,10 @@ async fn test_refresh_with_invalid_token() {
         for (token, err_msg, status_code) in InvalidTestCases::refresh_tokens(valid_token) {
             let response = test_app
                 .client
-                .post(format!("{}/auth/refreshToken", test_app.address))
-                .header(X_REFRESH_TOKEN, token)
+                .post(format!("{}/auth/refresh-token", test_app.address))
+                .json(&RefreshTokenRequest {
+                    refresh_token: token.to_string(),
+                })
                 .send()
                 .await
                 .expect("Failed to execute request.");
@@ -120,8 +124,10 @@ async fn test_refresh_token_single_use() {
         // refresh access token
         let response = test_app
             .client
-            .post(format!("{}/auth/refreshToken", test_app.address))
-            .header(X_REFRESH_TOKEN, format!("Bearer {refresh_token}"))
+            .post(format!("{}/auth/refresh-token", test_app.address))
+            .json(&RefreshTokenRequest {
+                refresh_token: refresh_token.to_string(),
+            })
             .send()
             .await
             .expect("Failed to execute request.");
@@ -130,8 +136,10 @@ async fn test_refresh_token_single_use() {
         // refresh access token twice should fail
         let response = test_app
             .client
-            .post(format!("{}/auth/refreshToken", test_app.address))
-            .header(X_REFRESH_TOKEN, format!("Bearer {refresh_token}"))
+            .post(format!("{}/auth/refresh-token", test_app.address))
+            .json(&RefreshTokenRequest {
+                refresh_token: refresh_token.to_string(),
+            })
             .send()
             .await
             .expect("Failed to execute request.");
@@ -139,10 +147,10 @@ async fn test_refresh_token_single_use() {
             401,
             response.status().as_u16(),
             "The API did not fail when the payload was: {}",
-            "refreshToken was used twice"
+            "refresh-token was used twice"
         );
     }
 }
 
 // Check new tokens are diffrenet from old
-// Check new refreshToken hash stored in DB is diffrenet from old one
+// Check new refresh-token hash stored in DB is diffrenet from old one

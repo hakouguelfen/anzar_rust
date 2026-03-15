@@ -2,6 +2,11 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
+pub struct RefreshTokenRequest {
+    pub refresh_token: String,
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct EmailRequest {
     pub email: String,
 }
@@ -183,11 +188,6 @@ impl InvalidTestCases {
     pub fn refresh_tokens(valid_token: &str) -> Vec<(String, &'static str, u16)> {
         vec![
             (
-                format!("Bearer {valid_token}").to_string(),
-                "token is valid with accountLocked",
-                200
-            ),
-            (
                 "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODliZDhiZWIzZTg4MDdiMzI4OGNkMjYiLCJleHAiOjE3NTYzNDAwMzEsImlhdCI6MTc1NTA0NDAzMSwianRpIjoiMTdiYjYxYWItNTVkZC00MTRjLWE4NGItZGQxMzkyZjYwYzM5IiwidG9rZW5fdHlwZSI6IlJlZnJlc2hUb2tlbiJ9.zSmSyDjVmD6DZuF2Li6-fY3osco2rYfS1Ai9fYZ3j-k".to_string(),
                 "token is wrong",
                 401
@@ -198,7 +198,7 @@ impl InvalidTestCases {
                 401
             ),
             (String::default(), "token is empty", 401),
-            (valid_token.into(), "token without Bearer keyword", 401),
+            (format!("Bearer {}", valid_token), "token wit Bearer keyword", 401),
         ]
     }
 }

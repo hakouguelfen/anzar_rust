@@ -2,7 +2,7 @@ mod shared;
 use anzar::{config::AuthStrategy, scopes::auth::AuthResponse};
 use shared::Helpers;
 
-const X_REFRESH_TOKEN: &str = "x-refresh-token";
+use crate::shared::RefreshTokenRequest;
 
 #[actix_web::test]
 async fn test_logout_success() {
@@ -27,7 +27,10 @@ async fn test_logout_success() {
         let response = test_app
             .client
             .post(format!("{}/auth/logout", test_app.address))
-            .header(X_REFRESH_TOKEN, format!("Bearer {refresh_token}"))
+            .bearer_auth(&tokens.access)
+            .json(&RefreshTokenRequest {
+                refresh_token: refresh_token.to_string(),
+            })
             .send()
             .await
             .expect("Failed to execute request.");
@@ -57,7 +60,10 @@ async fn test_logout_with_invalid_token() {
         let response = test_app
             .client
             .post(format!("{}/auth/logout", test_app.address))
-            .header(X_REFRESH_TOKEN, format!("Bearer {access_token}"))
+            .bearer_auth(&tokens.access)
+            .json(&RefreshTokenRequest {
+                refresh_token: access_token.into(),
+            })
             .send()
             .await
             .expect("Failed to execute request.");

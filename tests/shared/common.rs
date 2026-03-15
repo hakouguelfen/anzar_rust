@@ -6,7 +6,6 @@ use std::sync::LazyLock;
 use anzar::adapters::sqlite::SQLite;
 use anzar::config::AppConfig;
 use anzar::config::AppState;
-use anzar::config::DatabaseDriver;
 use anzar::scopes::auth::service::AuthService;
 
 use anzar::config::{AuthStrategy, Authentication, Configuration, Database};
@@ -44,7 +43,9 @@ impl Common {
         let port = listener.local_addr()?.port();
         let address = format!("http://localhost:{port}");
 
-        let app_state = AppState::testing(&address).await?;
+        let app_state = AppState::testing(&address)
+            .await
+            .expect("Failed to load AppState");
         let server = anzar::startup::run(listener, app_state.clone())
             .await
             .expect("Failed to bind address");
@@ -52,7 +53,7 @@ impl Common {
         let client = reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
             .build()
-            .unwrap();
+            .expect("Failed to initiate reqwest Client");
 
         actix_web::rt::spawn(server);
         Ok(TestApp {

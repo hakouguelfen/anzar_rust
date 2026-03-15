@@ -27,7 +27,7 @@ impl AppState {
     }
 
     pub async fn testing(address: &str) -> Result<Self> {
-        let configuration = Self::build_config(address).await?;
+        let configuration = Self::build_config(address).await.expect("booo");
         let auth_service = Self::build_authservice(&configuration.database).await?;
 
         Ok(Self {
@@ -39,7 +39,7 @@ impl AppState {
     async fn build_config(address: &str) -> Result<Configuration> {
         let mut env_config = AppConfig::load().expect("Failed to read configuration");
 
-        let content = fs::read_to_string(&env_config.config_path)?;
+        let content = fs::read_to_string(&env_config.config_path).expect("Failed to find file");
         let mut configuration: Configuration = serde_yaml::from_str(content.as_str())?;
 
         configuration.api_url = address.into();
