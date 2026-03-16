@@ -3,8 +3,8 @@ variables:
   RUSTUP_HOME: $CI_PROJECT_DIR/.rustup
   IMAGE_NAME: $DOCKER_HUB_USERNAME/anzar
   IMAGE_TAG: $CI_COMMIT_SHORT_SHA 
-  MONGODB_URI: "mongodb://db:27017/prod"
-  RUST_BACKTRACE: 1
+  MONGODB_URI: "mongodb://db:27017/test"
+  RUST_BACKTRACE: "1"
   RUSTFLAGS: "-D warnings"
   # Enable Rust build caching
   CARGO_INCREMENTAL: 0
@@ -24,7 +24,6 @@ stages:
   - prepare
   - lint
   - test
-  - build
   - deploy
 
 prepare:
@@ -33,18 +32,22 @@ prepare:
   script:
     - rustup default stable
     - rustup component add rustfmt clippy
-  # artifacts:
-  #   paths:
-  #     - target/
-  #   expire_in: 1 week
+    - cargo build --release        # ← build ONCE here
+    - cargo test --no-run          # ← compile tests without running them
+  artifacts:
+    paths:
+      - target/
+    expire_in: 1 day
   rules:
     - if: $CI_COMMIT_TAG
 
 lint:
   image: rust:1.90
   stage: lint
-  dependencies:
-    - prepare
+  allow_failure: true
+  needs:
+    - job: prepare
+      artifacts: true
   script:
     - cargo fmt -- --check
     - cargo clippy
@@ -54,8 +57,9 @@ lint:
 test:
   image: rust:1.90
   stage: test
-  dependencies:
-    - prepare
+  needs:
+    - job: prepare
+      artifacts: true
   services:
     - name: mongo:4.4
       alias: db
@@ -69,6 +73,9 @@ security-audit:
   image: rust:1.90
   stage: test
   allow_failure: true
+  needs:
+    - job: prepare
+      artifacts: true
   script:
     - cargo audit --version || cargo install cargo-audit
     - cargo audit --deny warnings
@@ -78,7 +85,7 @@ security-audit:
 
 build:
   image: docker:24
-  stage: build
+  stage: deploy
   services:
     - docker:24-dind
   variables:
