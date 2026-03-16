@@ -36,6 +36,8 @@ prepare:
   #   paths:
   #     - target/
   #   expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_TAG
 
 lint:
   stage: lint
@@ -44,6 +46,8 @@ lint:
   script:
     - cargo fmt -- --check
     - cargo clippy
+  rules:
+    - if: $CI_COMMIT_TAG
 
 test:
   stage: test
@@ -56,12 +60,16 @@ test:
     - ENV=prod cargo test --jobs $(nproc)
     # - cargo tarpaulin --version || cargo install cargo-tarpaulin
     # - cargo tarpaulin --ignore-tests 
+  rules:
+    - if: $CI_COMMIT_TAG
 security-audit:
   stage: test
   allow_failure: true
   script:
     - cargo audit --version || cargo install cargo-audit
     - cargo audit --deny warnings
+  rules:
+    - if: $CI_COMMIT_TAG
 
 
 # build:
