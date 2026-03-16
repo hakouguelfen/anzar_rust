@@ -2,7 +2,7 @@
 name = "anzar"
 description = "Anzar is a lightweight authentication and authorization framework that runs as a separate microservice"
 license = "GPL-3.0"
-version = "0.6.2"
+version = "0.7.0"
 edition = "2024"
 authors = ["Hakou Guelfen <hakoudev@gmail.com>"]
 homepage = "https://gitlab.com/anzar_software/api"
