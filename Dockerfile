@@ -32,11 +32,10 @@ COPY --from=build /etc/passwd.minimal /etc/passwd
 COPY --from=build /etc/group.minimal /etc/group
 
 COPY --from=build /bin/$APP_NAME ./$APP_NAME
-COPY --chown=10001:10001 app/configuration ./configuration
+COPY --chown=10001:10001 app/configuration /app/configuration
 
 USER 10001:10001
 
 ENV ENV=prod
-ENV RUNTIME=docker
 EXPOSE 3000
 ENTRYPOINT ["./anzar"]

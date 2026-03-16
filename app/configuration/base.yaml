@@ -1,8 +1,7 @@
-server:
-  port: 3000
-  host: 0.0.0.0
-  anzar_secret: "f728a7ce67ce61404d46d5a52dede591ebfc257fc7772fe756712d6fb9ba9045"
+name: "Anzar"
+config_dir: "app/configuration"
 database:
-  port: 27017
+  host: "localhost"
   username: "hakou"
   password: "hakou"
+

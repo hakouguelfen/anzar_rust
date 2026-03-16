@@ -1,3 +1,5 @@
+#![warn(unused_imports)]
+
 use std::net::TcpListener;
 
 use anzar::config::{AppConfig, AppState};

@@ -1,4 +1,7 @@
 database:
-  host: "sqlite3"
+  driver: "SQLite"
   name: "./anzar.db"
+  port: 27014
 
+
+# for postgres PostgreSQL

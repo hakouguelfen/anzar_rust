@@ -37,20 +37,20 @@ impl AppState {
     }
 
     async fn build_config(address: &str) -> Result<Configuration> {
-        let mut env_config = AppConfig::load().expect("Failed to read configuration");
+        let mut app_config = AppConfig::load().expect("Failed to read configuration");
 
-        let content = fs::read_to_string(&env_config.config_path).expect("Failed to find file");
+        let content = fs::read_to_string(&app_config.config_path).expect("Failed to find file");
         let mut configuration: Configuration = serde_yaml::from_str(content.as_str())?;
 
         configuration.api_url = address.into();
-        configuration.database.driver = env_config.database.driver;
+        configuration.database.driver = app_config.database.driver;
 
         if configuration.database.driver == DatabaseDriver::MongoDB {
             let db_name = Uuid::new_v4().to_string();
-            env_config.database.name = db_name;
+            app_config.database.name = db_name;
         }
 
-        configuration.database.connection_string = env_config.database.connection_string();
+        configuration.database.connection_string = app_config.database.connection_string();
         Ok(configuration)
     }
 

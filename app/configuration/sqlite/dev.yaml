@@ -1,3 +1,4 @@
 database:
-  host: "sqlite3"
+  driver: "SQLite"
   name: "sqlite::memory:"
+  port: 27017

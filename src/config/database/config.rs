@@ -1,7 +1,7 @@
 use super::driver::DatabaseDriver;
 use secrecy::SecretString;
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Default, Debug, serde::Deserialize)]
 pub struct DatabaseConfig {
     pub username: String,
     pub password: SecretString,
