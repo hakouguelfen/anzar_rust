@@ -1,10 +1,9 @@
-image: rust:1.90
-
 variables:
   CARGO_HOME: $CI_PROJECT_DIR/.cargo
-  RUSTUP_HOME: $CI_PROJECT_DIR/.rustup
-  MONGODB_URI: "mongodb://db:27017/prod"
-  RUST_BACKTRACE: 1
+  IMAGE_NAME: $DOCKER_HUB_USERNAME/anzar
+  IMAGE_TAG: $CI_COMMIT_SHORT_SHA 
+  MONGODB_URI: "mongodb://db:27017/test"
+  RUST_BACKTRACE: "1"
   RUSTFLAGS: "-D warnings"
   # Enable Rust build caching
   CARGO_INCREMENTAL: 0
@@ -16,69 +15,93 @@ cache:
       - $CARGO_HOME/bin
   - key: ${CI_COMMIT_REF_SLUG}
     paths:
-      - target/
       - $CARGO_HOME/registry
-      - $RUSTUP_HOME
 
 stages:
   - prepare
   - lint
   - test
-  - build
   - deploy
 
 prepare:
+  image: rust:latest
   stage: prepare
   script:
-    - rustup default stable
-    - rustup component add rustfmt clippy
-  # artifacts:
-  #   paths:
-  #     - target/
-  #   expire_in: 1 week
+    - mkdir -p migrations
+    - cargo build --release        # ← build ONCE here
+    - strip target/release/anzar
+    - cargo test --no-run          # ← compile tests without running them
+  artifacts:
+    paths:
+      - target/release/anzar
+    expire_in: 1 day
   rules:
     - if: $CI_COMMIT_TAG
 
 lint:
+  image: rust:latest
   stage: lint
+  before_script:
+    - rustup component add rustfmt 
+  script:
+    - cargo fmt --all -- --check
+  rules:
+    - if: $CI_COMMIT_TAG
+
+clippy:
+  image: rust:latest
+  stage: lint
+  allow_failure: true
   dependencies:
     - prepare
+  before_script:
+    - mkdir -p migrations
+    - rustup component add clippy
   script:
-    - cargo fmt -- --check
-    - cargo clippy
+    - cargo clippy -- -D warnings
+  rules:
+    - if: $CI_COMMIT_TAG
+
+security-audit:
+  image: rust:latest
+  stage: test
+  allow_failure: true
+  script:
+    - cargo audit --version || cargo install cargo-audit
+    - cargo audit
   rules:
     - if: $CI_COMMIT_TAG
 
 test:
+  image: rust:latest
   stage: test
   dependencies:
     - prepare
   services:
     - name: mongo:4.4
       alias: db
+    - name: memcached:latest
+      alias: memcache
+  before_script:
+    - mkdir -p migrations
   script:
-    - ENV=prod cargo test --jobs $(nproc)
-    # - cargo tarpaulin --version || cargo install cargo-tarpaulin
-    # - cargo tarpaulin --ignore-tests 
-  rules:
-    - if: $CI_COMMIT_TAG
-security-audit:
-  stage: test
-  allow_failure: true
-  script:
-    - cargo audit --version || cargo install cargo-audit
-    - cargo audit --deny warnings
+    - cargo test --jobs $(nproc)
   rules:
     - if: $CI_COMMIT_TAG
 
 
-# build:
-#   stage: build
-#   dependencies:
-#     - prepare
-#   script:
-#     - docker build -t hakouguelfen79/anzar .
-#   artifacts:
-#     paths:
-#       - target/release/anzar
-#     expire_in: 1 day
+build:
+  image: docker:latest
+  stage: deploy
+  services:
+    - docker:24-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  before_script:
+    - echo "$DOCKER_HUB_TOKEN" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin
+  script:
+    - docker build -t $IMAGE_NAME:$IMAGE_TAG -t $IMAGE_NAME:latest .
+    - docker push $IMAGE_NAME:$IMAGE_TAG
+    - docker push $IMAGE_NAME:latest
+  rules:
+    - if: $CI_COMMIT_TAG

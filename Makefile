@@ -2,4 +2,4 @@
 
 publish:
 	cargo release $(bump) --execute
-	git push && git push --tags
+	git push gitlab && git push gitlab --tags

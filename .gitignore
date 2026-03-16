@@ -9,12 +9,9 @@
 target/
 
 app/cert/
-app/anzar.yml
 compose.yml
 migrations/
 
 entrypoint.sh
 TODO.md
 anzar.db
-anzar.dev.yml
-anzar.yml

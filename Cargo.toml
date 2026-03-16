@@ -2,7 +2,7 @@
 name = "anzar"
 description = "Anzar is a lightweight authentication and authorization framework that runs as a separate microservice"
 license = "GPL-3.0"
-version = "0.6.2"
+version = "0.7.13"
 edition = "2024"
 authors = ["Hakou Guelfen <hakoudev@gmail.com>"]
 homepage = "https://gitlab.com/anzar_software/api"
@@ -21,6 +21,7 @@ lto = true               # Link-time optimization
 codegen-units = 1        # Better optimization, slower compile
 panic = 'abort'          # Remove panic unwinding
 strip = true             # Strip symbols in cargo
+
 # Optional: Further size reduction
 [profile.release.package."*"]
 opt-level = 'z'
@@ -47,7 +48,6 @@ sqlx = { version = "0.8.6", features = ["sqlite", "runtime-tokio", "tls-rustls-r
 mongodb = { version = "3.4.1", features = ["rustls-tls"] }
 
 # Tests
-mockall = "0.13.0"
 async-trait = "0.1.82"
 
 # Cryptography
@@ -74,7 +74,6 @@ secrecy = { version = "0.10.3", features = ["serde"] }
 
 # TODO maybe use redis
 memcache = { version = "0.19", default-features = false }
-dotenvy = "0.15.7"
 utoipa = { version = "5.4.0", features = ["chrono", "actix_extras", "yaml"] }
 utoipa-swagger-ui = { version = "9.0.2", features = ["actix-web", "vendored"] }
 

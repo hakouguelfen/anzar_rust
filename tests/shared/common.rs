@@ -30,6 +30,7 @@ pub static TRACING: LazyLock<()> = LazyLock::new(|| {
 pub struct TestApp {
     pub address: String,
     pub client: reqwest::Client,
+    #[allow(dead_code)]
     pub configuration: Configuration,
 }
 
