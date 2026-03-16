@@ -9,7 +9,6 @@ use crate::utils::mongodb_serde::*;
 pub enum AccountStatus {
     Active,
     Suspended,
-    Unverified,
     Locked,
     InvalidCredentials,
 }

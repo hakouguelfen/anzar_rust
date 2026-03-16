@@ -39,8 +39,11 @@ impl UserRepository {
     pub fn put_cookie_in_lockout(&self, key: &str, expiration: u32) -> Result<()> {
         Ok(self.memcache.lock_account(key, expiration)?)
     }
-    pub fn contains_key(&self, key: &str) -> bool {
+    pub fn is_locked(&self, key: &str) -> bool {
         self.memcache.contains_key(key)
+    }
+    pub fn reset_attempts(&self, key: &str) {
+        self.memcache.reset(key)
     }
     pub fn clear_key(&self, key: &str) -> bool {
         self.memcache.clear(key)

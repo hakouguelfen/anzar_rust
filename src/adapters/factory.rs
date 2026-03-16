@@ -6,8 +6,10 @@ use crate::{
     adapters::{mongodb::MongodbAdapter, sqlite::SQLiteAdapter, traits::DatabaseAdapter},
     scopes::{auth::model::PasswordResetToken, email::model::EmailVerificationToken, user::User},
     services::{
-        account::model::Account, jwt::RefreshToken, session::model::Session,
-        transaction::adapter::MongodbTransaction,
+        account::model::Account,
+        jwt::RefreshToken,
+        session::model::Session,
+        // transaction::adapter::MongodbTransaction,
     },
 };
 

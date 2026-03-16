@@ -3,7 +3,6 @@ mod repository;
 mod support;
 mod tokens;
 
-pub mod keys;
 pub mod service;
 
 pub use model::RefreshToken;

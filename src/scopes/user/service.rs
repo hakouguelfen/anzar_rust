@@ -5,7 +5,7 @@ use crate::scopes::email::model::EmailVerificationToken;
 use crate::scopes::email::service::EmailVerificationTokenServiceTrait;
 use crate::services::account::model::{Account, AccountStatus};
 use crate::services::fake::service::FakeUserGenerator;
-use crate::services::lockout::service::LockoutService;
+use crate::services::lockout::service::LoginAttemptTracker;
 use crate::utils::{CustomPasswordHasher, HmacSigner, Password, Token, TokenHasher};
 
 use super::User;
@@ -88,63 +88,64 @@ impl UserServiceTrait for AuthService {
         session: &actix_session::Session,
         configuration: &Configuration,
     ) -> Result<(User, AccountStatus, u8)> {
-        let raw = session.get::<String>(support::DEVICE_COOKIE).ok().flatten();
-        let device_cookie = raw.as_deref();
-
-        let lockout_service = LockoutService::new(hmac_signer);
-
-        // ALWAYS verify password (constant-time even with fake hash)
+        // 1. ALWAYS verify password (constant-time even with fake hash)
         let (target_user, target_hash) = self
             .find_by_email_with_password(email, configuration)
             .await?;
         let password_valid = Password::verify(password, &target_hash);
 
-        let lockout_key = lockout_service.lockout_key(device_cookie, email);
-        let is_suspended = self.user_service.contains_key(&lockout_key);
+        // 2. Fetch device cookie
+        let raw = session.get::<String>(support::DEVICE_COOKIE).ok().flatten();
+        let device_cookie = raw.as_deref();
 
-        let is_unverified = configuration.auth.email.verification.required && !target_user.verified;
+        // 3.
+        let tracker = LoginAttemptTracker::new(hmac_signer);
+        let identity = tracker.resolve_identity(device_cookie, email);
+        let lockout_key = tracker.resolve_lockout_key(device_cookie, email);
 
-        let account_status = match password_valid {
-            true if !is_suspended && !is_unverified => AccountStatus::Active,
-            true if is_suspended => AccountStatus::Suspended,
-            true if is_unverified => AccountStatus::Unverified,
-            _ => AccountStatus::InvalidCredentials,
-        };
+        // FIXME
+        // 4. Use cache_service instead of user_service (more readable)
+        if self.user_service.is_locked(&lockout_key) {
+            self.user_service.reset_attempts(&identity);
+            return Ok((target_user.clone(), AccountStatus::Suspended, 0));
+        }
 
-        let attempts_key = lockout_service.attempts_key(device_cookie, email);
-        let attempts = if account_status == AccountStatus::Active {
-            self.user_service.clear_key(&attempts_key);
-            0
-        } else {
-            self.register_failed_attempt(email, device_cookie, &configuration.auth.password)
-                .await
-                .unwrap_or(0)
-        };
-
-        Ok((target_user.clone(), account_status, attempts))
+        // 5.
+        match password_valid {
+            true => {
+                self.user_service.clear_key(&identity);
+                Ok((target_user.clone(), AccountStatus::Active, 0))
+            }
+            _ => {
+                let attempts = self
+                    .register_failed_attempt(&identity, device_cookie, &configuration.auth.password)
+                    .await
+                    .unwrap_or(1);
+                Ok((
+                    target_user.clone(),
+                    AccountStatus::InvalidCredentials,
+                    attempts,
+                ))
+            }
+        }
     }
 
     async fn register_failed_attempt(
         &self,
-        user: &str,
+        identity: &str,
         device_cookie: Option<&str>,
         pass_config: &PasswordConfig,
     ) -> Result<u8> {
-        let key = match device_cookie {
-            Some(val) => val.into(),
-            None => format!("user:{}", user),
-        };
+        let attempts = self.user_service.increment(identity);
 
-        let attempts = self.user_service.increment(&key);
-
-        // count number of failed authentication attempts within time period T for this specific cookie
+        // max_failed_attempts of authentication within for this specific cookie
         let max_failed_attempts = match device_cookie {
             Some(_) => pass_config.security.max_failed_login_attempts * 2,
             None => pass_config.security.max_failed_login_attempts,
         };
         if attempts >= max_failed_attempts {
             self.user_service
-                .put_cookie_in_lockout(&key, pass_config.security.lockout_duration as u32)?;
+                .put_cookie_in_lockout(identity, pass_config.security.lockout_duration as u32)?;
         }
 
         Ok(attempts)

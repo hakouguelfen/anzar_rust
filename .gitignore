@@ -8,9 +8,10 @@
 
 target/
 
-cert/
-migrations/
+app/cert/
 app/anzar.yml
+compose.yml
+migrations/
 
 entrypoint.sh
 TODO.md

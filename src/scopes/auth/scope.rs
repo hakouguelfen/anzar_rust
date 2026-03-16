@@ -92,6 +92,13 @@ pub async fn login(
     support::throttle_since(start).await;
 
     // Now handle responses
+    // NOTE this can be removed, if it's not needed
+    if configuration.auth.email.verification.required && !user.verified {
+        return Err(Error::AccountNotVerified {
+            field: CredentialField::Email,
+        });
+    }
+
     match account_status {
         AccountStatus::Active => {
             // Issue new device cookie
@@ -125,9 +132,6 @@ pub async fn login(
         }
         // NOTE fully mask account existence
         // only return InvalidCredentials
-        AccountStatus::Unverified => Err(Error::AccountNotVerified {
-            field: CredentialField::Email,
-        }),
         AccountStatus::Suspended => Err(Error::AccountSuspended {}),
         _ => {
             support::delay(attempts as u32).await;

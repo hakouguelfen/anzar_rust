@@ -11,7 +11,7 @@ use crate::scopes::user::UserRepository;
 use crate::services::account::AccountRepository;
 use crate::services::jwt::JWTRepository;
 use crate::services::session::SessionRepository;
-use crate::services::transaction::repository::TransactionRepository;
+// use crate::services::transaction::repository::TransactionRepository;
 
 #[derive(Clone)]
 pub struct AuthService {
